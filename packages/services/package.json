@@ -1,0 +1,25 @@
+{
+  "name": "@damina/services",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@damina/contracts": "workspace:*",
+    "@damina/db": "workspace:*",
+    "@damina/domain": "workspace:*",
+    "@damina/jobs": "workspace:*",
+    "@damina/shared": "workspace:*",
+    "@damina/storage": "workspace:*"
+  },
+  "devDependencies": {
+    "@damina/tsconfig": "workspace:*",
+    "@types/node": "^22.15.30",
+    "typescript": "^5.8.3"
+  }
+}

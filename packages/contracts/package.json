@@ -1,0 +1,21 @@
+{
+  "name": "@damina/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@damina/shared": "workspace:*",
+    "zod": "^3.25.56"
+  },
+  "devDependencies": {
+    "@damina/tsconfig": "workspace:*",
+    "@types/node": "^22.15.30",
+    "typescript": "^5.8.3"
+  }
+}

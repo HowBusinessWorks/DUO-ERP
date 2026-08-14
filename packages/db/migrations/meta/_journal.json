@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1786739726027,
+      "tag": "0000_schemas_and_enums",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786739749048,
+      "tag": "0001_pg_roles_and_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786739810244,
+      "tag": "0002_bootstrap_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786740415897,
+      "tag": "0003_jobs_runtime_tables",
+      "breakpoints": true
+    }
+  ]
+}

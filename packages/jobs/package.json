@@ -1,0 +1,27 @@
+{
+  "name": "@damina/jobs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@damina/contracts": "workspace:*",
+    "@damina/db": "workspace:*",
+    "@damina/shared": "workspace:*",
+    "drizzle-orm": "^0.44.2",
+    "pg-boss": "^10.3.2",
+    "zod": "^3.25.56"
+  },
+  "devDependencies": {
+    "@damina/tsconfig": "workspace:*",
+    "@types/node": "^22.15.30",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.3"
+  }
+}

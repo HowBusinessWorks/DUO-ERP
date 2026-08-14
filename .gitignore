@@ -1,0 +1,21 @@
+node_modules/
+.pnpm-store/
+
+# build
+.next/
+out/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# medii — NICIODATA in repo
+.env
+.env.local
+.env.*.local
+
+# unelte
+coverage/
+.vercel/
+.DS_Store
+Thumbs.db
+*.log

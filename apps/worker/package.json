@@ -1,0 +1,27 @@
+{
+  "name": "@damina/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "ping": "tsx scripts/ping.ts"
+  },
+  "dependencies": {
+    "@damina/db": "workspace:*",
+    "@damina/jobs": "workspace:*",
+    "@damina/shared": "workspace:*",
+    "@damina/storage": "workspace:*",
+    "pg-boss": "^10.3.2"
+  },
+  "devDependencies": {
+    "@damina/tsconfig": "workspace:*",
+    "@types/node": "^22.15.30",
+    "tsup": "^8.5.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

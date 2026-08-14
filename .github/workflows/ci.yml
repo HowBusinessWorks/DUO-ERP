@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10.12.1'
+
+jobs:
+  quality:
+    name: Lint, typecheck, teste unitare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Regula de dependente intre pachete se verifica aici si e blocanta.
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Teste unitare
+        run: pnpm test
+
+  database:
+    name: Teste de baza de date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Testcontainers porneste un Postgres efemer si aplica migratiile de la
+      # zero. Runner-ul GitHub are Docker inclus, deci nu e nevoie de nimic local.
+      - name: Migratii de la zero + roluri + withActor
+        run: pnpm test:db
+
+  build:
+    name: Build si scan de secrete
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+        env:
+          # Valori false, doar ca build-ul sa treaca. Scanul de mai jos verifica
+          # exact ca ele NU ajung in bundle-ul de client.
+          SUPABASE_SERVICE_ROLE_KEY: sb-fake-service-role-key-for-ci-only
+          R2_ACCESS_KEY_ID: fake-r2-access-key-id-ci
+          R2_SECRET_ACCESS_KEY: fake-r2-secret-access-key-ci
+          DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
+          DATABASE_URL_SESSION: postgresql://fake:fake@localhost:5432/fake
+
+      - name: Scan de secrete in bundle-ul de client
+        run: pnpm scan:secrets
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: sb-fake-service-role-key-for-ci-only
+          R2_ACCESS_KEY_ID: fake-r2-access-key-id-ci
+          R2_SECRET_ACCESS_KEY: fake-r2-secret-access-key-ci
+          DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
+          DATABASE_URL_SESSION: postgresql://fake:fake@localhost:5432/fake
+
+  audit:
+    name: Audit de dependente
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Blocant pe severitate `high` si mai sus.
+      - name: pnpm audit
+        run: pnpm audit --audit-level high

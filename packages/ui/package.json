@@ -1,0 +1,22 @@
+{
+  "name": "@damina/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@damina/contracts": "workspace:*",
+    "@damina/i18n": "workspace:*",
+    "@damina/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@damina/tsconfig": "workspace:*",
+    "@types/node": "^22.15.30",
+    "typescript": "^5.8.3"
+  }
+}

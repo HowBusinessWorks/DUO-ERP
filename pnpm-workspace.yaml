@@ -1,0 +1,10 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+  - 'tools/*'
+
+# Pachetele care au voie sa ruleze scripturi de postinstall (pnpm 10 le blocheaza implicit).
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - unrs-resolver

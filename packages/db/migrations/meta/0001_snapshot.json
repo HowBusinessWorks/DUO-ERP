@@ -1,0 +1,296 @@
+{
+  "id": "cea495cd-0022-46d9-88cf-d699ad486582",
+  "prevId": "bf43356c-35b5-4f97-8de9-36eba8685673",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {},
+  "enums": {
+    "app.allocation_status": {
+      "name": "allocation_status",
+      "schema": "app",
+      "values": [
+        "active",
+        "superseded"
+      ]
+    },
+    "app.budget_cadence": {
+      "name": "budget_cadence",
+      "schema": "app",
+      "values": [
+        "lunar",
+        "anual"
+      ]
+    },
+    "app.checklist_answer": {
+      "name": "checklist_answer",
+      "schema": "app",
+      "values": [
+        "ok",
+        "nok",
+        "na"
+      ]
+    },
+    "app.component_type": {
+      "name": "component_type",
+      "schema": "app",
+      "values": [
+        "mentenanta",
+        "lucrari",
+        "delta",
+        "individual"
+      ]
+    },
+    "app.contract_type": {
+      "name": "contract_type",
+      "schema": "app",
+      "values": [
+        "mentenanta_multianual",
+        "individual_deviz",
+        "individual_taxare_inversa"
+      ]
+    },
+    "app.cost_document_type": {
+      "name": "cost_document_type",
+      "schema": "app",
+      "values": [
+        "bon_consum",
+        "situatie_lucrari",
+        "factura_furnizor",
+        "fisa_motorina",
+        "fisa_utilaj",
+        "pontaj",
+        "fisa_interventie",
+        "comanda",
+        "nir",
+        "nota_realocare",
+        "ajustare_pret",
+        "fisa_reparatie"
+      ]
+    },
+    "app.cost_stage": {
+      "name": "cost_stage",
+      "schema": "app",
+      "values": [
+        "angajat",
+        "receptionat",
+        "consumat",
+        "facturat"
+      ]
+    },
+    "app.executor_type": {
+      "name": "executor_type",
+      "schema": "app",
+      "values": [
+        "echipa_proprie",
+        "subcontractant"
+      ]
+    },
+    "app.expense_type": {
+      "name": "expense_type",
+      "schema": "app",
+      "values": [
+        "material",
+        "manopera_proprie",
+        "servicii_subc",
+        "utilaj",
+        "motorina",
+        "transport",
+        "reparatii",
+        "alte"
+      ]
+    },
+    "app.file_state": {
+      "name": "file_state",
+      "schema": "app",
+      "values": [
+        "uploading",
+        "ready",
+        "failed",
+        "quarantined"
+      ]
+    },
+    "app.finding_outcome": {
+      "name": "finding_outcome",
+      "schema": "app",
+      "values": [
+        "rezolvat_pe_loc",
+        "interventie",
+        "propunere"
+      ]
+    },
+    "app.geo_source": {
+      "name": "geo_source",
+      "schema": "app",
+      "values": [
+        "exif",
+        "device",
+        "manual"
+      ]
+    },
+    "app.location_type": {
+      "name": "location_type",
+      "schema": "app",
+      "values": [
+        "magazie_centrala",
+        "consignatie",
+        "santier",
+        "echipa",
+        "subcontractant",
+        "unelte",
+        "utilaje"
+      ]
+    },
+    "app.node_kind": {
+      "name": "node_kind",
+      "schema": "app",
+      "values": [
+        "folder",
+        "file"
+      ]
+    },
+    "app.node_role": {
+      "name": "node_role",
+      "schema": "app",
+      "values": [
+        "root_company",
+        "contract",
+        "objective",
+        "work_unit",
+        "stage",
+        "system",
+        "user"
+      ]
+    },
+    "app.office_role": {
+      "name": "office_role",
+      "schema": "app",
+      "values": [
+        "pm",
+        "devizist",
+        "achizitii",
+        "magazie",
+        "flota",
+        "financiar",
+        "admin"
+      ]
+    },
+    "app.period_status": {
+      "name": "period_status",
+      "schema": "app",
+      "values": [
+        "open",
+        "closing",
+        "closed"
+      ]
+    },
+    "app.person_category": {
+      "name": "person_category",
+      "schema": "app",
+      "values": [
+        "angajat",
+        "sef_santier",
+        "subcontractant",
+        "client_user"
+      ]
+    },
+    "app.persona": {
+      "name": "persona",
+      "schema": "app",
+      "values": [
+        "office",
+        "field",
+        "subcontractor",
+        "client"
+      ]
+    },
+    "app.request_source": {
+      "name": "request_source",
+      "schema": "app",
+      "values": [
+        "email",
+        "manual",
+        "fisa_inspectie",
+        "utilaj"
+      ]
+    },
+    "app.request_status": {
+      "name": "request_status",
+      "schema": "app",
+      "values": [
+        "neprocesata",
+        "in_evaluare",
+        "decisa",
+        "in_backlog",
+        "respinsa",
+        "anulata"
+      ]
+    },
+    "app.request_type": {
+      "name": "request_type",
+      "schema": "app",
+      "values": [
+        "tichet_client",
+        "solicitare",
+        "constatare_inspectie",
+        "propunere_interna",
+        "solicitare_utilaj",
+        "observatie_utilaj"
+      ]
+    },
+    "app.routing_choice": {
+      "name": "routing_choice",
+      "schema": "app",
+      "values": [
+        "interventie_mentenanta",
+        "lucrare_delta",
+        "lucrare_delta_multi_luna",
+        "lucrare_componenta_lucrari",
+        "contract_individual_nou",
+        "amanata_backlog"
+      ]
+    },
+    "app.share_permission": {
+      "name": "share_permission",
+      "schema": "app",
+      "values": [
+        "read",
+        "write",
+        "manage"
+      ]
+    },
+    "app.work_unit_status": {
+      "name": "work_unit_status",
+      "schema": "app",
+      "values": [
+        "draft",
+        "planificata",
+        "in_executie",
+        "suspendata",
+        "finalizata",
+        "inchisa",
+        "anulata"
+      ]
+    },
+    "app.work_unit_type": {
+      "name": "work_unit_type",
+      "schema": "app",
+      "values": [
+        "inspectie",
+        "interventie",
+        "lucrare"
+      ]
+    }
+  },
+  "schemas": {
+    "app": "app"
+  },
+  "views": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -1,0 +1,10 @@
+node_modules/
+.next/
+dist/
+.turbo/
+pnpm-lock.yaml
+packages/db/migrations/
+Initial_Context/
+Plan/
+PLAN_TEHNIC_INFRASTRUCTURA.md
+LLM_DESIGNER_SKILL.md
