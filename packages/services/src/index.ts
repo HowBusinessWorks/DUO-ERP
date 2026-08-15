@@ -11,3 +11,6 @@
  */
 export { checkHealth } from './health';
 export type { HealthReport, ComponentStatus } from './health';
+
+export { ensureOpenPeriods } from './periods';
+export type { EnsureOpenPeriodsResult } from './periods';

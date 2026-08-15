@@ -60,6 +60,49 @@ Enqueue-ul tranzacțional nu poate folosi `boss.send()`, care își deschide pro
 **Mitigare:** versiunea e pinuită la `^10`, iar `test:db` verifică lanțul complet — dacă
 schema se schimbă, CI-ul pică înainte de deploy.
 
+### Î6 — `citext` și `btree_gist` stau în `public`, nu în `extensions`
+
+Convenția Supabase e schema `extensions`; acolo sunt deja `pgcrypto` și `uuid-ossp`. Noi le-am
+pus în `public`, și nu din neatenție.
+
+Rolurile noastre sunt `NOLOGIN` și se intră în ele prin `SET ROLE`. `alter role … set
+search_path` se aplică **la conectare**, după utilizatorul de sesiune — deci nu ajunge
+niciodată la `app_office` & co. Operatorii `citext = citext` se rezolvă prin `search_path`,
+care implicit e `"$user", public`. Din `extensions`, orice `where email = $1` ar fi picat cu
+„operator does not exist" pentru fiecare persona.
+
+`btree_gist` nu are problema asta (clasele de operatori implicite se rezolvă după tip, nu după
+`search_path`), dar l-am pus în același loc ca să fie o singură regulă.
+
+**Consecință acceptată:** advisor-ul Supabase va semnala `extension_in_public`. `public` rămâne
+fără tabele — extensiile adaugă doar tipuri, funcții și clase de operatori — deci invarianta
+din pasul 01 se păstrează.
+
+### Î7 — Motivul scris ține până la finalul tranzacției
+
+`app.action_reason` se pune o dată per tranzacție (de `withActor`, din `Actor.reason`, sau de
+`app.allow_closed_period_writes()`). Dacă un use-case deschide ușa de avarie și apoi modifică,
+în aceeași tranzacție, și altceva care cere motiv, a doua modificare **moștenește** motivul
+primei.
+
+**Ales:** îl lăsăm așa. Un use-case = o tranzacție = o unitate de lucru cu un singur motiv, și
+asta e chiar modelul dorit. Alternativa — motiv per instrucțiune — ar cere ca fiecare `update`
+să și-l seteze pe al lui, ceea ce se uită exact atunci când contează.
+
+**De reevaluat dacă:** apare un use-case care chiar face două acțiuni ireversibile diferite în
+aceeași tranzacție. Până acum nu există niciunul.
+
+### Î8 — Numerotarea RLS: `0008`/`0009`, nu `0013`/`0014`
+
+Anexa C.16 pune politicile RLS și `REVOKE`-urile pe coloane ultimele din faza 0. Pasul 02
+§3.8–3.9 le cere acum. Cele două nu pot fi ambele adevărate.
+
+**Ales (decizia utilizatorului, 15 august 2026): acum.** Anexa presupunea o fază 0 executată
+dintr-o bucată; noi mergem pe pași, iar între pasul 02 și pasul 09 s-ar fi creat zeci de tabele
+fără politici. Plasa e testul generic din 02b: orice tabelă din `app` fără RLS sau fără nicio
+politică sparge build-ul, deci fiecare pas următor e obligat să-și aducă propriul fișier de
+politici.
+
 ---
 
 ## Închise

@@ -184,3 +184,30 @@ export const findingOutcomeEnum = app.enum('finding_outcome', [
 ]);
 
 export const geoSourceEnum = app.enum('geo_source', ['exif', 'device', 'manual']);
+
+// ── documente numerotate si audit (pasul 02) ────────────────────────────────
+
+/**
+ * Documentele care primesc serie si numar per firma (PLAN_TEHNIC 4.10).
+ *
+ * Lista acopera toata faza 0, nu doar pasii facuti pana acum: adaugarea unei
+ * valori la un enum dupa ce exista date e o migrare in plus, iar o valoare
+ * nefolosita nu costa nimic.
+ */
+export const numberedDocumentTypeEnum = app.enum('numbered_document_type', [
+  'factura',
+  'situatie_lucrari',
+  'comanda',
+  'nir',
+  'aviz_transfer',
+  'aviz_retur',
+  'bon_consum',
+  'pv_receptie',
+  'pv_custodie',
+  'lista_inventar',
+  'decizie_inventariere',
+  'nota_diferente',
+  'nota_realocare',
+]);
+
+export const auditOpEnum = app.enum('audit_op', ['insert', 'update', 'delete']);

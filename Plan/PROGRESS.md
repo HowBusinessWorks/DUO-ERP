@@ -14,7 +14,7 @@
 | Pas | Status | Ultima actualizare |
 |---|---|---|
 | 01 — Fundația | 🟩 gata (15/15, CI verde) | 2026-08-15 |
-| 02 — Identitate, acces, RLS | ⬜ neînceput | — |
+| 02 — Identitate, acces, RLS | 🟨 în lucru (02a din 4) | 2026-08-15 |
 | 03 — Shell UI, nomenclatoare | ⬜ neînceput | — |
 | 04 — Contracte, obiective | ⬜ neînceput | — |
 | 05 — Unitate de Lucru, finanțare | ⬜ neînceput | — |
@@ -147,7 +147,63 @@ Notă de proces: între timp a apărut `CLAUDE.md` în rădăcină, cu regula de
 
 ## Pasul 02 — Identitate, acces, RLS
 
-*(nicio sesiune n-a lucrat încă aici)*
+Pasul e împărțit în patru sub-etape, fiecare cu commit și CI verde propriu (decizia
+utilizatorului, 15 august 2026). Motivul: dacă schema de organizație e greșită, vrem să aflăm
+înainte să construim RLS, auth și ecrane peste ea.
+
+| Sub-etapă | Conținut | Verificări | Stare |
+|---|---|---|---|
+| **02a** | Organizație, perioade, serii, audit (migrările `0004`–`0007`) | 5–11 | 🟨 în lucru |
+| **02b** | RLS + izolarea prețului (`0008`–`0009`) | 1–4 | ⬜ |
+| **02c** | Supabase Auth, JWT hook, `packages/auth`, rutare pe personas | 12–16 | ⬜ |
+| **02d** | Ecran de administrare, seed determinist, `docs/security.md` | 17–19 | ⬜ |
+
+### 2026-08-15 — [status: în lucru] — 02a, baza de date
+
+**Migrări noi:**
+- `0004_organization` — cele 11 tabele din Anexa C.1 plus extinderea lui `companies`. Generată
+  cu drizzle, apoi completată de mână cu ce el nu poate exprima: extensiile, constrângerea
+  `exclude` de pe `rate_cards` și funcțiile SSM.
+- `0005_periods` — `periods`, `period_close_checks`, triggerul generic de blocare și ușa unică
+  de avarie.
+- `0006_document_series` — seriile plus alocatorul fără goluri.
+- `0007_audit` — `audit.entries`, triggerul generic de diff și `app.attach_audit()`. Scrisă
+  integral de mână: schema `audit` nu e sub drizzle (`schemaFilter: ['app']`).
+
+**Decizii de business luate cu utilizatorul:**
+- `hourly_cost = salariu × (1 + taxe) × (1 + neproductivitate)`, înmulțire în cascadă. Cu 30 lei,
+  0.45 și 0.15 → **50.03 lei/oră**. Coeficienții sunt fracții, nu multiplicatori.
+- `numbered_document_type` acoperă toată faza 0 (13 valori), nu doar cele 8 confirmate în §14 —
+  o valoare nefolosită nu costă nimic, o migrare de tip în fiecare pas costă.
+
+**Decizii tehnice, documentate în `QUESTIONS.md`:** Î6 (extensiile în `public`), Î7 (motivul
+ține cât tranzacția), Î8 (RLS la `0008`, nu la `0013`).
+
+**Alte lucruri stabilite pe parcurs:**
+- `withActor` completează acum singur `persona` și `person_id` în `request.jwt.claims`, peste ce
+  a trimis apelantul. Politicile RLS și triggerul de audit citesc din același loc, iar un apelant
+  care uită câmpurile nu mai poate produce rânduri de audit fără autor.
+- Motivul scris se cere la `UPDATE` și `DELETE`, nu la `INSERT`. A crea ceva nu e ireversibil;
+  altfel deschiderea lunilor și adăugarea unui tarif nou ar fi cerut justificare degeaba.
+- `app.attach_audit` și `app.attach_period_guard` nu se acordă niciunui rol. Un rol care poate
+  detașa triggere își poate șterge urmele.
+- `next_number` nu are `update` acordat nimănui: se mișcă doar prin alocator.
+- Containerul de test a urcat de la Postgres 15 la **17**, ca Supabase. Un test care trece pe 15
+  și pică pe 17 e cel mai prost fel de test.
+
+**Capcană evitată:** `citext` pus în schema `extensions`, cum e convenția Supabase, ar fi rupt
+orice `where email = $1` pentru toate cele patru persone — operatorii se rezolvă prin
+`search_path`, iar `alter role … set search_path` nu ajunge la roluri `NOLOGIN` în care se intră
+prin `SET ROLE`. Detaliile în `QUESTIONS.md` Î6.
+
+**Verificat pe Postgres 17 real (Supabase dev), într-un bloc anulat la final** — deci baza a
+rămas goală: `hourly_cost` = 50.03 · `exclude` blochează intervalele suprapuse · `check`-ul de
+persona blochează · `PERIOD_CLOSED: luna 01/2026 este inchisa` · ușa de avarie trece și lasă
+motivul în jurnal · `changed` conține doar câmpul modificat · numerele ies `TST-000001`,
+`TST-000002` · tariful nu se poate modifica fără motiv.
+
+**Ce rămâne la 02a:** testele automate 5–11 sunt scrise dar rulează doar în CI (Testcontainers).
+Se confirmă la primul push.
 
 ---
 

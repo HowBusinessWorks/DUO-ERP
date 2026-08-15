@@ -19,7 +19,9 @@ const MIGRATIONS_FOLDER = resolve(dirname(fileURLToPath(import.meta.url)), '../m
 let container: StartedPostgreSqlContainer | undefined;
 
 export async function setup(project: TestProject): Promise<void> {
-  container = await new PostgreSqlContainer('postgres:15-alpine')
+  // Aceeasi versiune majora ca Supabase (17.6). Un test care trece pe 15 si
+  // pica pe 17 e cel mai prost fel de test posibil.
+  container = await new PostgreSqlContainer('postgres:17-alpine')
     .withDatabase('damina_test')
     .withUsername('postgres')
     .withPassword('postgres')

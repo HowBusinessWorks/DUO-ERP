@@ -29,6 +29,34 @@
       "when": 1786740415897,
       "tag": "0003_jobs_runtime_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786782435997,
+      "tag": "0004_organization",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786782946214,
+      "tag": "0005_periods",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786783206729,
+      "tag": "0006_document_series",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786783624094,
+      "tag": "0007_audit",
+      "breakpoints": true
     }
   ]
 }

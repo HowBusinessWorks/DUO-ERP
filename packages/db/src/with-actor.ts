@@ -31,13 +31,22 @@ export async function withActor<T>(
 
   const db = getDb(options.mode ?? 'pooled');
 
+  // `persona` si `person_id` se pun peste ce a trimis apelantul, nu sub.
+  // Politicile RLS si trigger-ul de audit citesc amandoua din acelasi loc —
+  // `request.jwt.claims` — iar cele doua campuri sunt deja pe `Actor`. Daca
+  // le-am lasa doar in mana celui care construieste `claims`, un apelant care
+  // le uita ar produce randuri de audit fara autor si politici care nu prind.
+  const claims = {
+    ...actor.claims,
+    persona: actor.persona,
+    person_id: actor.personId,
+  };
+
   return db.transaction(async (tx) => {
     // `true` = LOCAL: setarile dispar la commit/rollback, deci nu se scurg
     // catre urmatoarea cerere care refoloseste conexiunea din pool.
     await tx.execute(sql`select set_config('role', ${actor.pgRole}, true)`);
-    await tx.execute(
-      sql`select set_config('request.jwt.claims', ${JSON.stringify(actor.claims)}, true)`,
-    );
+    await tx.execute(sql`select set_config('request.jwt.claims', ${JSON.stringify(claims)}, true)`);
     await tx.execute(sql`select set_config('app.actor_id', ${actor.personId}, true)`);
     if (actor.reason !== undefined && actor.reason !== '') {
       await tx.execute(sql`select set_config('app.action_reason', ${actor.reason}, true)`);
