@@ -13,7 +13,7 @@
 
 | Pas | Status | Ultima actualizare |
 |---|---|---|
-| 01 — Fundația | 🟨 în lucru (14/15; rămâne doar CI-ul) | 2026-08-15 |
+| 01 — Fundația | 🟩 gata (15/15, CI verde) | 2026-08-15 |
 | 02 — Identitate, acces, RLS | ⬜ neînceput | — |
 | 03 — Shell UI, nomenclatoare | ⬜ neînceput | — |
 | 04 — Contracte, obiective | ⬜ neînceput | — |
@@ -133,6 +133,15 @@ Primul push a lăsat CI-ul roșu. `quality` și `build` au trecut; au picat `dat
 Build-ul trece cu override-urile puse, deci `postcss` 8.5 și `sharp` 0.35 nu supără Next 15.
 
 **PR-urile Dependabot** (eslint 10, globals 17, `@next/eslint-plugin-next` 16) sunt roșii din aceeași cauză. Le lăsăm; se refac singure după ce `main` e verde.
+
+**Rezultat (run `31873514952`, commit `89a05e9`): toate cele 4 joburi verzi.** Testele de bază de date 14/14, cu migrațiile aplicate de la zero într-un Postgres efemer. **Verificările #6 și #15 bifate — pasul 01 e complet, 15/15.**
+
+Notă de proces: între timp a apărut `CLAUDE.md` în rădăcină, cu regula de verificare `git fetch` înainte de orice editare. Fix-ul ăsta a fost integrat prin `pull --rebase`, fără suprapuneri de fișiere.
+
+**Datorie tehnică lăsată în urmă, de reluat:**
+- Acțiunile GitHub (`checkout@v4`, `setup-node@v4`, `pnpm/action-setup@v4`) rulează pe Node 20, care e depreciat. Warning, nu eroare, dar va deveni blocant.
+- 3 vulnerabilități sub pragul `high` (`esbuild` prin `drizzle-kit`, `uuid` prin `testcontainers`), toate în tooling de build.
+- Cele 3 `pnpm.overrides` se șterg când dependințele-părinte urcă singure — condițiile sunt în `README.md`.
 
 ---
 
