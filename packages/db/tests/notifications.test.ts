@@ -202,8 +202,11 @@ describe('produse', () => {
         changed: Record<string, unknown>;
         reason: string;
       }>(
+        // `table_name` e scris cu schema: trigger-ul din 0007 il compune ca
+        // `format('%s.%s', tg_table_schema, tg_table_name)`. Testul cauta
+        // 'products' de la pasul 03 incoace, deci nu gasea nimic niciodata.
         sql`select operation, changed, reason from audit.entries
-            where table_name = 'products' and record_id = ${productId} and operation = 'update'`,
+            where table_name = 'app.products' and record_id = ${productId} and operation = 'update'`,
       );
       return r.rows[0];
     });
