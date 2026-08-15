@@ -6,8 +6,30 @@
  *
  * Motivul: calculul de plafon, decizia de rutare, mecanica de re-alocare si CMP
  * trebuie sa fie testabile in milisecunde, fara sa porneasca un Postgres.
- *
- * Continutul propriu-zis vine in pasii 04-09.
  */
 
 export const DOMAIN_PACKAGE_READY = true;
+
+export {
+  addYears,
+  applyIndexation,
+  buildContractYears,
+  CEILING_WARNING_PERCENT,
+  ceilingUsage,
+  compareDates,
+  contractYearAt,
+  daysInMonth,
+  deltaFill,
+  previousDay,
+} from './contracts';
+export type {
+  BusinessDate,
+  CeilingState,
+  CeilingUsage,
+  CeilingUsageInput,
+  ContractYear,
+  ContractYearsInput,
+  DeltaFill,
+  DeltaFillInput,
+  DeltaState,
+} from './contracts';

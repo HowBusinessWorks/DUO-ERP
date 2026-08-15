@@ -18,6 +18,7 @@
     "db:generate": "pnpm --filter @damina/db db:generate",
     "db:migrate": "pnpm --filter @damina/db db:migrate",
     "db:reset": "pnpm --filter @damina/db db:reset",
+    "db:seed": "pnpm --filter @damina/services db:seed",
     "scan:secrets": "node tools/scripts/scan-bundle-secrets.mjs"
   },
   "devDependencies": {

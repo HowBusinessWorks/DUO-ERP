@@ -156,10 +156,13 @@ export default tseslint.config(
     },
   },
 
-  // Driverul de Postgres e permis doar in packages/db.
+  // Driverul de Postgres e permis doar in packages/db — si in harness-urile de
+  // test, care trebuie sa poata ridica o baza de la zero inainte ca `withActor`
+  // sa aiba unde sa se conecteze. Fisierele de test propriu-zise nu-l ating:
+  // exceptia e pentru `tests/global-setup.ts`, nu pentru interogari de business.
   {
     files: ['packages/**/*.{ts,tsx}'],
-    ignores: ['packages/db/**'],
+    ignores: ['packages/db/**', 'packages/*/tests/global-setup.ts'],
     rules: {
       'no-restricted-imports': ['error', RESTRICTED_DRIVER_IMPORTS],
     },

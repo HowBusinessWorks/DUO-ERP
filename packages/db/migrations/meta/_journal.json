@@ -64,6 +64,20 @@
       "when": 1786786019733,
       "tag": "0008_nomenclature_and_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786792459398,
+      "tag": "0009_contracts",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786792467166,
+      "tag": "0010_objectives",
+      "breakpoints": true
     }
   ]
 }

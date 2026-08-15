@@ -13,6 +13,7 @@
   "dependencies": {
     "@damina/db": "workspace:*",
     "@damina/jobs": "workspace:*",
+    "@damina/services": "workspace:*",
     "@damina/shared": "workspace:*",
     "@damina/storage": "workspace:*",
     "pg-boss": "^10.3.2"

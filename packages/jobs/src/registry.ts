@@ -62,7 +62,58 @@ export const systemPing = defineJob({
   expireInSeconds: 60,
 });
 
+/**
+ * `contracts.expiryScan` — scanul zilnic de contracte care expira (pasul 04,
+ * §3.7). Rulare unica pe zi, deci `singletonKey` pe data: doua declansari in
+ * aceeasi zi (cron + o rulare manuala) produc un singur job.
+ */
+export const contractExpiryScan = defineJob({
+  name: 'contracts.expiryScan',
+  schema: z.object({ on: z.string().optional() }),
+  retryLimit: 3,
+  retryDelaySeconds: 300,
+  expireInSeconds: 10 * 60,
+  singletonKey: (payload) => payload.on ?? new Date().toISOString().slice(0, 10),
+});
+
+/**
+ * `contracts.deltaFillScan` — gradul de umplere a Deltei, pe 10 si pe 20.
+ *
+ * NU la inchidere: la inchidere venitul neumplut e deja pierdut. Vezi
+ * `scanDeltaFill` din `@damina/services`.
+ */
+export const deltaFillScan = defineJob({
+  name: 'contracts.deltaFillScan',
+  schema: z.object({ on: z.string().optional() }),
+  retryLimit: 3,
+  retryDelaySeconds: 300,
+  expireInSeconds: 10 * 60,
+  singletonKey: (payload) => payload.on ?? new Date().toISOString().slice(0, 10),
+});
+
 /** Toate cozile cunoscute. Worker-ul le creeaza pe toate la pornire. */
-export const ALL_JOBS = [systemPing] as const;
+export const ALL_JOBS = [systemPing, contractExpiryScan, deltaFillScan] as const;
+
+/**
+ * Cozile care ruleaza pe ceas, cu expresia lor cron. Fusul e cel al aplicatiei
+ * (`APP_TIMEZONE`), nu UTC: „pe 10 la 09:00” inseamna ora Bucurestiului, si se
+ * schimba cu ora de vara ca sa ramana la fel pentru oameni.
+ */
+export const SCHEDULED_JOBS: readonly {
+  readonly name: string;
+  readonly cron: string;
+  readonly why: string;
+}[] = [
+  {
+    name: contractExpiryScan.name,
+    cron: '0 6 * * *',
+    why: 'Zilnic la 06:00 — alerta de expirare apare inaintea programului de lucru.',
+  },
+  {
+    name: deltaFillScan.name,
+    cron: '0 9 10,20 * *',
+    why: 'Pe 10 si pe 20, la 09:00. La inchidere ar fi prea tarziu: Delta neumpluta se pierde.',
+  },
+];
 
 export type JobPayload<T> = T extends JobDefinition<infer P> ? P : never;

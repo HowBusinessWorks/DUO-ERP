@@ -5,3 +5,5 @@ export * from './periods';
 export * from './document-series';
 export * from './products';
 export * from './notifications';
+export * from './contracts';
+export * from './objectives';

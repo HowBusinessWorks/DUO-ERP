@@ -1,0 +1,3396 @@
+{
+  "id": "f03da4be-4d8f-4c15-a25b-af62f493d4fb",
+  "prevId": "eece82f1-eaf3-49a9-8a69-8ce197e64720",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "app.companies": {
+      "name": "companies",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cui": {
+          "name": "cui",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reg_com": {
+          "name": "reg_com",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "address": {
+          "name": "address",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "logo_node_id": {
+          "name": "logo_node_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_group_member": {
+          "name": "is_group_member",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "efactura_config": {
+          "name": "efactura_config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_indexation_pct": {
+          "name": "default_indexation_pct",
+          "type": "numeric(6, 4)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0.0500'"
+        },
+        "default_delta_threshold": {
+          "name": "default_delta_threshold",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'2000.00'"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "companies_cui_unique": {
+          "name": "companies_cui_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "cui"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.clients": {
+      "name": "clients",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cui": {
+          "name": "cui",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "address": {
+          "name": "address",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "payment_term_days": {
+          "name": "payment_term_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 70
+        },
+        "report_template_id": {
+          "name": "report_template_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_intercompany": {
+          "name": "is_intercompany",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "intercompany_company_id": {
+          "name": "intercompany_company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "clients_intercompany_company_id_companies_id_fk": {
+          "name": "clients_intercompany_company_id_companies_id_fk",
+          "tableFrom": "clients",
+          "tableTo": "companies",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "intercompany_company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "clients_intercompany_consistent": {
+          "name": "clients_intercompany_consistent",
+          "value": "(\"app\".\"clients\".\"is_intercompany\") = (\"app\".\"clients\".\"intercompany_company_id\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.person_authorizations": {
+      "name": "person_authorizations",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "person_id": {
+          "name": "person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issued_at": {
+          "name": "issued_at",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "document_node_id": {
+          "name": "document_node_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "person_authorizations_person_expires_idx": {
+          "name": "person_authorizations_person_expires_idx",
+          "columns": [
+            {
+              "expression": "person_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "person_authorizations_person_id_persons_id_fk": {
+          "name": "person_authorizations_person_id_persons_id_fk",
+          "tableFrom": "person_authorizations",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "person_authorizations_valid_range": {
+          "name": "person_authorizations_valid_range",
+          "value": "\"app\".\"person_authorizations\".\"expires_at\" is null or \"app\".\"person_authorizations\".\"expires_at\" >= \"app\".\"person_authorizations\".\"issued_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.person_company_access": {
+      "name": "person_company_access",
+      "schema": "app",
+      "columns": {
+        "person_id": {
+          "name": "person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "person_company_access_person_id_persons_id_fk": {
+          "name": "person_company_access_person_id_persons_id_fk",
+          "tableFrom": "person_company_access",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "person_company_access_company_id_companies_id_fk": {
+          "name": "person_company_access_company_id_companies_id_fk",
+          "tableFrom": "person_company_access",
+          "tableTo": "companies",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "person_company_access_person_id_company_id_pk": {
+          "name": "person_company_access_person_id_company_id_pk",
+          "columns": [
+            "person_id",
+            "company_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.person_office_roles": {
+      "name": "person_office_roles",
+      "schema": "app",
+      "columns": {
+        "person_id": {
+          "name": "person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "office_role",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "person_office_roles_person_id_persons_id_fk": {
+          "name": "person_office_roles_person_id_persons_id_fk",
+          "tableFrom": "person_office_roles",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "person_office_roles_person_id_role_pk": {
+          "name": "person_office_roles_person_id_role_pk",
+          "columns": [
+            "person_id",
+            "role"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.persons": {
+      "name": "persons",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "auth_user_id": {
+          "name": "auth_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "persona": {
+          "name": "persona",
+          "type": "persona",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "person_category",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "full_name": {
+          "name": "full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "citext",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "qualification_id": {
+          "name": "qualification_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subcontractor_id": {
+          "name": "subcontractor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "must_change_password": {
+          "name": "must_change_password",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "persons_qualification_id_qualifications_id_fk": {
+          "name": "persons_qualification_id_qualifications_id_fk",
+          "tableFrom": "persons",
+          "tableTo": "qualifications",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "qualification_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "persons_subcontractor_id_subcontractors_id_fk": {
+          "name": "persons_subcontractor_id_subcontractors_id_fk",
+          "tableFrom": "persons",
+          "tableTo": "subcontractors",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "subcontractor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "persons_client_id_clients_id_fk": {
+          "name": "persons_client_id_clients_id_fk",
+          "tableFrom": "persons",
+          "tableTo": "clients",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "persons_auth_user_id_unique": {
+          "name": "persons_auth_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "auth_user_id"
+          ]
+        },
+        "persons_email_unique": {
+          "name": "persons_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "persons_subcontractor_consistent": {
+          "name": "persons_subcontractor_consistent",
+          "value": "(\"app\".\"persons\".\"persona\" = 'subcontractor') = (\"app\".\"persons\".\"subcontractor_id\" is not null)"
+        },
+        "persons_client_consistent": {
+          "name": "persons_client_consistent",
+          "value": "(\"app\".\"persons\".\"persona\" = 'client') = (\"app\".\"persons\".\"client_id\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.qualifications": {
+      "name": "qualifications",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "qualifications_code_unique": {
+          "name": "qualifications_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.rate_cards": {
+      "name": "rate_cards",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "qualification_id": {
+          "name": "qualification_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_from": {
+          "name": "valid_from",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_to": {
+          "name": "valid_to",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hourly_salary": {
+          "name": "hourly_salary",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tax_coefficient": {
+          "name": "tax_coefficient",
+          "type": "numeric(6, 4)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unproductivity_coefficient": {
+          "name": "unproductivity_coefficient",
+          "type": "numeric(6, 4)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hourly_cost": {
+          "name": "hourly_cost",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "generated": {
+            "as": "round(hourly_salary * (1 + tax_coefficient) * (1 + unproductivity_coefficient), 2)",
+            "type": "stored"
+          }
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rate_cards_qualification_id_qualifications_id_fk": {
+          "name": "rate_cards_qualification_id_qualifications_id_fk",
+          "tableFrom": "rate_cards",
+          "tableTo": "qualifications",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "qualification_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "rate_cards_valid_range": {
+          "name": "rate_cards_valid_range",
+          "value": "\"app\".\"rate_cards\".\"valid_to\" is null or \"app\".\"rate_cards\".\"valid_to\" > \"app\".\"rate_cards\".\"valid_from\""
+        },
+        "rate_cards_salary_positive": {
+          "name": "rate_cards_salary_positive",
+          "value": "\"app\".\"rate_cards\".\"hourly_salary\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.subcontractors": {
+      "name": "subcontractors",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cui": {
+          "name": "cui",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "address": {
+          "name": "address",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "specialties": {
+          "name": "specialties",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "warranty_retention_pct": {
+          "name": "warranty_retention_pct",
+          "type": "numeric(6, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.suppliers": {
+      "name": "suppliers",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cui": {
+          "name": "cui",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "address": {
+          "name": "address",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_lead_time_days": {
+          "name": "default_lead_time_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.team_members": {
+      "name": "team_members",
+      "schema": "app",
+      "columns": {
+        "team_id": {
+          "name": "team_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "person_id": {
+          "name": "person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_from": {
+          "name": "valid_from",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_to": {
+          "name": "valid_to",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "team_members_team_id_teams_id_fk": {
+          "name": "team_members_team_id_teams_id_fk",
+          "tableFrom": "team_members",
+          "tableTo": "teams",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "team_members_person_id_persons_id_fk": {
+          "name": "team_members_person_id_persons_id_fk",
+          "tableFrom": "team_members",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "team_members_team_id_person_id_valid_from_pk": {
+          "name": "team_members_team_id_person_id_valid_from_pk",
+          "columns": [
+            "team_id",
+            "person_id",
+            "valid_from"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "team_members_valid_range": {
+          "name": "team_members_valid_range",
+          "value": "\"app\".\"team_members\".\"valid_to\" is null or \"app\".\"team_members\".\"valid_to\" > \"app\".\"team_members\".\"valid_from\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.teams": {
+      "name": "teams",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lead_person_id": {
+          "name": "lead_person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "teams_company_id_companies_id_fk": {
+          "name": "teams_company_id_companies_id_fk",
+          "tableFrom": "teams",
+          "tableTo": "companies",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "teams_lead_person_id_persons_id_fk": {
+          "name": "teams_lead_person_id_persons_id_fk",
+          "tableFrom": "teams",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "lead_person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.period_close_checks": {
+      "name": "period_close_checks",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "period_id": {
+          "name": "period_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "check_key": {
+          "name": "check_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "blocking_count": {
+          "name": "blocking_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "detail": {
+          "name": "detail",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "evaluated_at": {
+          "name": "evaluated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "period_close_checks_period_id_periods_id_fk": {
+          "name": "period_close_checks_period_id_periods_id_fk",
+          "tableFrom": "period_close_checks",
+          "tableTo": "periods",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "period_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "period_close_checks_period_key_unique": {
+          "name": "period_close_checks_period_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "period_id",
+            "check_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "period_close_checks_status": {
+          "name": "period_close_checks_status",
+          "value": "\"app\".\"period_close_checks\".\"status\" in ('pending', 'ok', 'blocked')"
+        },
+        "period_close_checks_blocking_count": {
+          "name": "period_close_checks_blocking_count",
+          "value": "\"app\".\"period_close_checks\".\"blocking_count\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.periods": {
+      "name": "periods",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "year": {
+          "name": "year",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "month": {
+          "name": "month",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "period_status",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closed_by": {
+          "name": "closed_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "periods_company_id_companies_id_fk": {
+          "name": "periods_company_id_companies_id_fk",
+          "tableFrom": "periods",
+          "tableTo": "companies",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "periods_closed_by_persons_id_fk": {
+          "name": "periods_closed_by_persons_id_fk",
+          "tableFrom": "periods",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "closed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "periods_company_year_month_unique": {
+          "name": "periods_company_year_month_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "company_id",
+            "year",
+            "month"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "periods_month_range": {
+          "name": "periods_month_range",
+          "value": "\"app\".\"periods\".\"month\" between 1 and 12"
+        },
+        "periods_year_range": {
+          "name": "periods_year_range",
+          "value": "\"app\".\"periods\".\"year\" between 2000 and 2100"
+        },
+        "periods_closed_has_author": {
+          "name": "periods_closed_has_author",
+          "value": "(\"app\".\"periods\".\"status\" = 'closed') = (\"app\".\"periods\".\"closed_at\" is not null and \"app\".\"periods\".\"closed_by\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.document_series": {
+      "name": "document_series",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "document_type": {
+          "name": "document_type",
+          "type": "numbered_document_type",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "series": {
+          "name": "series",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "next_number": {
+          "name": "next_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "document_series_company_id_companies_id_fk": {
+          "name": "document_series_company_id_companies_id_fk",
+          "tableFrom": "document_series",
+          "tableTo": "companies",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "document_series_company_type_series_unique": {
+          "name": "document_series_company_type_series_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "company_id",
+            "document_type",
+            "series"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "document_series_next_number_positive": {
+          "name": "document_series_next_number_positive",
+          "value": "\"app\".\"document_series\".\"next_number\" >= 1"
+        },
+        "document_series_series_not_blank": {
+          "name": "document_series_series_not_blank",
+          "value": "btrim(\"app\".\"document_series\".\"series\") <> ''"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.products": {
+      "name": "products",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uom": {
+          "name": "uom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_supplier_id": {
+          "name": "default_supplier_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_stock_item": {
+          "name": "is_stock_item",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "min_stock": {
+          "name": "min_stock",
+          "type": "numeric(14, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "products_name_idx": {
+          "name": "products_name_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "products_default_supplier_id_suppliers_id_fk": {
+          "name": "products_default_supplier_id_suppliers_id_fk",
+          "tableFrom": "products",
+          "tableTo": "suppliers",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "default_supplier_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "products_code_not_blank": {
+          "name": "products_code_not_blank",
+          "value": "length(btrim(\"app\".\"products\".\"code\")) > 0"
+        },
+        "products_uom_not_blank": {
+          "name": "products_uom_not_blank",
+          "value": "length(btrim(\"app\".\"products\".\"uom\")) > 0"
+        },
+        "products_min_stock_non_negative": {
+          "name": "products_min_stock_non_negative",
+          "value": "\"app\".\"products\".\"min_stock\" is null or \"app\".\"products\".\"min_stock\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.alerts": {
+      "name": "alerts",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scope_type": {
+          "name": "scope_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scope_id": {
+          "name": "scope_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "severity": {
+          "name": "severity",
+          "type": "alert_severity",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'warning'"
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "href": {
+          "name": "href",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raised_at": {
+          "name": "raised_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "alerts_scope_idx": {
+          "name": "alerts_scope_idx",
+          "columns": [
+            {
+              "expression": "scope_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "scope_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "alerts_company_id_companies_id_fk": {
+          "name": "alerts_company_id_companies_id_fk",
+          "tableFrom": "alerts",
+          "tableTo": "companies",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.notifications": {
+      "name": "notifications",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "person_id": {
+          "name": "person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "href": {
+          "name": "href",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action_kind": {
+          "name": "action_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "notifications_person_created_idx": {
+          "name": "notifications_person_created_idx",
+          "columns": [
+            {
+              "expression": "person_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "notifications_person_id_persons_id_fk": {
+          "name": "notifications_person_id_persons_id_fk",
+          "tableFrom": "notifications",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "notifications_company_id_companies_id_fk": {
+          "name": "notifications_company_id_companies_id_fk",
+          "tableFrom": "notifications",
+          "tableTo": "companies",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.outbox_events": {
+      "name": "outbox_events",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "processed_at": {
+          "name": "processed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "outbox_events_unprocessed_idx": {
+          "name": "outbox_events_unprocessed_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "processed_at is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.work_queue_items": {
+      "name": "work_queue_items",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "person_id": {
+          "name": "person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "href": {
+          "name": "href",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "work_queue_items_open_idx": {
+          "name": "work_queue_items_open_idx",
+          "columns": [
+            {
+              "expression": "person_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "resolved_at is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "work_queue_items_person_id_persons_id_fk": {
+          "name": "work_queue_items_person_id_persons_id_fk",
+          "tableFrom": "work_queue_items",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "work_queue_items_company_id_companies_id_fk": {
+          "name": "work_queue_items_company_id_companies_id_fk",
+          "tableFrom": "work_queue_items",
+          "tableTo": "companies",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "app.component_ceilings": {
+      "name": "component_ceilings",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "component_id": {
+          "name": "component_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period_id": {
+          "name": "period_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contract_year_id": {
+          "name": "contract_year_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "allocated_revenue": {
+          "name": "allocated_revenue",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cost_ceiling": {
+          "name": "cost_ceiling",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revenue_ceiling": {
+          "name": "revenue_ceiling",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "set_by": {
+          "name": "set_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "set_at": {
+          "name": "set_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "component_ceilings_period_idx": {
+          "name": "component_ceilings_period_idx",
+          "columns": [
+            {
+              "expression": "period_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "component_ceilings_component_id_contract_components_id_fk": {
+          "name": "component_ceilings_component_id_contract_components_id_fk",
+          "tableFrom": "component_ceilings",
+          "tableTo": "contract_components",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "component_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "component_ceilings_period_id_periods_id_fk": {
+          "name": "component_ceilings_period_id_periods_id_fk",
+          "tableFrom": "component_ceilings",
+          "tableTo": "periods",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "period_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "component_ceilings_contract_year_id_contract_years_id_fk": {
+          "name": "component_ceilings_contract_year_id_contract_years_id_fk",
+          "tableFrom": "component_ceilings",
+          "tableTo": "contract_years",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "contract_year_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "component_ceilings_set_by_persons_id_fk": {
+          "name": "component_ceilings_set_by_persons_id_fk",
+          "tableFrom": "component_ceilings",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "set_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "component_ceilings_scope_unique": {
+          "name": "component_ceilings_scope_unique",
+          "nullsNotDistinct": true,
+          "columns": [
+            "component_id",
+            "period_id",
+            "contract_year_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "component_ceilings_one_scope": {
+          "name": "component_ceilings_one_scope",
+          "value": "num_nonnulls(\"app\".\"component_ceilings\".\"period_id\", \"app\".\"component_ceilings\".\"contract_year_id\") = 1"
+        },
+        "component_ceilings_allocated_revenue_non_negative": {
+          "name": "component_ceilings_allocated_revenue_non_negative",
+          "value": "\"app\".\"component_ceilings\".\"allocated_revenue\" is null or \"app\".\"component_ceilings\".\"allocated_revenue\" >= 0"
+        },
+        "component_ceilings_cost_ceiling_non_negative": {
+          "name": "component_ceilings_cost_ceiling_non_negative",
+          "value": "\"app\".\"component_ceilings\".\"cost_ceiling\" is null or \"app\".\"component_ceilings\".\"cost_ceiling\" >= 0"
+        },
+        "component_ceilings_revenue_ceiling_non_negative": {
+          "name": "component_ceilings_revenue_ceiling_non_negative",
+          "value": "\"app\".\"component_ceilings\".\"revenue_ceiling\" is null or \"app\".\"component_ceilings\".\"revenue_ceiling\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.contract_components": {
+      "name": "contract_components",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "contract_id": {
+          "name": "contract_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "component_type",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "budget_cadence": {
+          "name": "budget_cadence",
+          "type": "budget_cadence",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_fill_target": {
+          "name": "is_fill_target",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "contract_components_contract_id_contracts_id_fk": {
+          "name": "contract_components_contract_id_contracts_id_fk",
+          "tableFrom": "contract_components",
+          "tableTo": "contracts",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "contract_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "contract_components_contract_type_unique": {
+          "name": "contract_components_contract_type_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "contract_id",
+            "type"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "contract_components_name_not_blank": {
+          "name": "contract_components_name_not_blank",
+          "value": "length(btrim(\"app\".\"contract_components\".\"name\")) > 0"
+        },
+        "contract_components_fill_target_only_delta": {
+          "name": "contract_components_fill_target_only_delta",
+          "value": "\"app\".\"contract_components\".\"is_fill_target\" = (\"app\".\"contract_components\".\"type\" = 'delta')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.contract_years": {
+      "name": "contract_years",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "contract_id": {
+          "name": "contract_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "year_index": {
+          "name": "year_index",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_on": {
+          "name": "starts_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monthly_value": {
+          "name": "monthly_value",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "indexation_applied_pct": {
+          "name": "indexation_applied_pct",
+          "type": "numeric(6, 4)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "contract_years_contract_id_contracts_id_fk": {
+          "name": "contract_years_contract_id_contracts_id_fk",
+          "tableFrom": "contract_years",
+          "tableTo": "contracts",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "contract_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "contract_years_contract_index_unique": {
+          "name": "contract_years_contract_index_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "contract_id",
+            "year_index"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "contract_years_index_range": {
+          "name": "contract_years_index_range",
+          "value": "\"app\".\"contract_years\".\"year_index\" between 1 and 20"
+        },
+        "contract_years_period_valid": {
+          "name": "contract_years_period_valid",
+          "value": "\"app\".\"contract_years\".\"ends_on\" > \"app\".\"contract_years\".\"starts_on\""
+        },
+        "contract_years_monthly_value_non_negative": {
+          "name": "contract_years_monthly_value_non_negative",
+          "value": "\"app\".\"contract_years\".\"monthly_value\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.contracts": {
+      "name": "contracts",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reference": {
+          "name": "reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type": {
+          "name": "type",
+          "type": "contract_type",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_on": {
+          "name": "starts_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_value": {
+          "name": "total_value",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "monthly_value": {
+          "name": "monthly_value",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "payment_term_days": {
+          "name": "payment_term_days",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 70
+        },
+        "indexation_pct": {
+          "name": "indexation_pct",
+          "type": "numeric(6, 4)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0.0500'"
+        },
+        "delta_threshold": {
+          "name": "delta_threshold",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'2000.00'"
+        },
+        "expiry_alert_months": {
+          "name": "expiry_alert_months",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 6
+        },
+        "owner_person_id": {
+          "name": "owner_person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "overhead_pct": {
+          "name": "overhead_pct",
+          "type": "numeric(6, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "contracts_expiry_idx": {
+          "name": "contracts_expiry_idx",
+          "columns": [
+            {
+              "expression": "ends_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "status = 'activ'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "contracts_company_status_idx": {
+          "name": "contracts_company_status_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "contracts_client_idx": {
+          "name": "contracts_client_idx",
+          "columns": [
+            {
+              "expression": "client_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "contracts_company_id_companies_id_fk": {
+          "name": "contracts_company_id_companies_id_fk",
+          "tableFrom": "contracts",
+          "tableTo": "companies",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "contracts_client_id_clients_id_fk": {
+          "name": "contracts_client_id_clients_id_fk",
+          "tableFrom": "contracts",
+          "tableTo": "clients",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "contracts_owner_person_id_persons_id_fk": {
+          "name": "contracts_owner_person_id_persons_id_fk",
+          "tableFrom": "contracts",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "owner_person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "contracts_company_code_unique": {
+          "name": "contracts_company_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "company_id",
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "contracts_code_not_blank": {
+          "name": "contracts_code_not_blank",
+          "value": "length(btrim(\"app\".\"contracts\".\"code\")) > 0"
+        },
+        "contracts_period_valid": {
+          "name": "contracts_period_valid",
+          "value": "\"app\".\"contracts\".\"ends_on\" > \"app\".\"contracts\".\"starts_on\""
+        },
+        "contracts_status_known": {
+          "name": "contracts_status_known",
+          "value": "\"app\".\"contracts\".\"status\" in ('draft', 'activ', 'suspendat', 'incheiat', 'anulat')"
+        },
+        "contracts_indexation_non_negative": {
+          "name": "contracts_indexation_non_negative",
+          "value": "\"app\".\"contracts\".\"indexation_pct\" >= 0"
+        },
+        "contracts_delta_threshold_non_negative": {
+          "name": "contracts_delta_threshold_non_negative",
+          "value": "\"app\".\"contracts\".\"delta_threshold\" >= 0"
+        },
+        "contracts_total_value_non_negative": {
+          "name": "contracts_total_value_non_negative",
+          "value": "\"app\".\"contracts\".\"total_value\" is null or \"app\".\"contracts\".\"total_value\" >= 0"
+        },
+        "contracts_monthly_value_non_negative": {
+          "name": "contracts_monthly_value_non_negative",
+          "value": "\"app\".\"contracts\".\"monthly_value\" is null or \"app\".\"contracts\".\"monthly_value\" >= 0"
+        },
+        "contracts_expiry_alert_positive": {
+          "name": "contracts_expiry_alert_positive",
+          "value": "\"app\".\"contracts\".\"expiry_alert_months\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.checklist_items": {
+      "name": "checklist_items",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "checklist_id": {
+          "name": "checklist_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requires_photo": {
+          "name": "requires_photo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_critical": {
+          "name": "is_critical",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "checklist_items_checklist_id_checklists_id_fk": {
+          "name": "checklist_items_checklist_id_checklists_id_fk",
+          "tableFrom": "checklist_items",
+          "tableTo": "checklists",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "checklist_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "checklist_items_position_unique": {
+          "name": "checklist_items_position_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "checklist_id",
+            "position"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "checklist_items_text_not_blank": {
+          "name": "checklist_items_text_not_blank",
+          "value": "length(btrim(\"app\".\"checklist_items\".\"text\")) > 0"
+        },
+        "checklist_items_position_positive": {
+          "name": "checklist_items_position_positive",
+          "value": "\"app\".\"checklist_items\".\"position\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.checklists": {
+      "name": "checklists",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "objective_kind": {
+          "name": "objective_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "checklists_code_version_unique": {
+          "name": "checklists_code_version_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code",
+            "version"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "checklists_code_not_blank": {
+          "name": "checklists_code_not_blank",
+          "value": "length(btrim(\"app\".\"checklists\".\"code\")) > 0"
+        },
+        "checklists_version_positive": {
+          "name": "checklists_version_positive",
+          "value": "\"app\".\"checklists\".\"version\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.contract_objectives": {
+      "name": "contract_objectives",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "contract_id": {
+          "name": "contract_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "objective_id": {
+          "name": "objective_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_from": {
+          "name": "valid_from",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_to": {
+          "name": "valid_to",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inspection_profile_id": {
+          "name": "inspection_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "contract_objectives_objective_idx": {
+          "name": "contract_objectives_objective_idx",
+          "columns": [
+            {
+              "expression": "objective_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "contract_objectives_contract_id_contracts_id_fk": {
+          "name": "contract_objectives_contract_id_contracts_id_fk",
+          "tableFrom": "contract_objectives",
+          "tableTo": "contracts",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "contract_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "contract_objectives_objective_id_objectives_id_fk": {
+          "name": "contract_objectives_objective_id_objectives_id_fk",
+          "tableFrom": "contract_objectives",
+          "tableTo": "objectives",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "objective_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "contract_objectives_inspection_profile_id_inspection_profiles_id_fk": {
+          "name": "contract_objectives_inspection_profile_id_inspection_profiles_id_fk",
+          "tableFrom": "contract_objectives",
+          "tableTo": "inspection_profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "inspection_profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "contract_objectives_valid_range": {
+          "name": "contract_objectives_valid_range",
+          "value": "\"app\".\"contract_objectives\".\"valid_to\" is null or \"app\".\"contract_objectives\".\"valid_to\" > \"app\".\"contract_objectives\".\"valid_from\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.inspection_profile_items": {
+      "name": "inspection_profile_items",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checklist_id": {
+          "name": "checklist_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "frequency_months": {
+          "name": "frequency_months",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "inspection_profile_items_profile_id_inspection_profiles_id_fk": {
+          "name": "inspection_profile_items_profile_id_inspection_profiles_id_fk",
+          "tableFrom": "inspection_profile_items",
+          "tableTo": "inspection_profiles",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "inspection_profile_items_checklist_id_checklists_id_fk": {
+          "name": "inspection_profile_items_checklist_id_checklists_id_fk",
+          "tableFrom": "inspection_profile_items",
+          "tableTo": "checklists",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "checklist_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "inspection_profile_items_unique": {
+          "name": "inspection_profile_items_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "checklist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "inspection_profile_items_frequency_range": {
+          "name": "inspection_profile_items_frequency_range",
+          "value": "\"app\".\"inspection_profile_items\".\"frequency_months\" between 1 and 60"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.inspection_profiles": {
+      "name": "inspection_profiles",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "inspection_profiles_name_unique": {
+          "name": "inspection_profiles_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "inspection_profiles_name_not_blank": {
+          "name": "inspection_profiles_name_not_blank",
+          "value": "length(btrim(\"app\".\"inspection_profiles\".\"name\")) > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.objectives": {
+      "name": "objectives",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "geo_lat": {
+          "name": "geo_lat",
+          "type": "numeric(10, 7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "geo_lng": {
+          "name": "geo_lng",
+          "type": "numeric(10, 7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "area_sqm": {
+          "name": "area_sqm",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "root_node_id": {
+          "name": "root_node_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "objectives_name_idx": {
+          "name": "objectives_name_idx",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "objectives_kind_idx": {
+          "name": "objectives_kind_idx",
+          "columns": [
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "objectives_code_not_blank": {
+          "name": "objectives_code_not_blank",
+          "value": "length(btrim(\"app\".\"objectives\".\"code\")) > 0"
+        },
+        "objectives_kind_not_blank": {
+          "name": "objectives_kind_not_blank",
+          "value": "length(btrim(\"app\".\"objectives\".\"kind\")) > 0"
+        },
+        "objectives_lat_range": {
+          "name": "objectives_lat_range",
+          "value": "\"app\".\"objectives\".\"geo_lat\" is null or \"app\".\"objectives\".\"geo_lat\" between -90 and 90"
+        },
+        "objectives_lng_range": {
+          "name": "objectives_lng_range",
+          "value": "\"app\".\"objectives\".\"geo_lng\" is null or \"app\".\"objectives\".\"geo_lng\" between -180 and 180"
+        },
+        "objectives_geo_complete": {
+          "name": "objectives_geo_complete",
+          "value": "num_nonnulls(\"app\".\"objectives\".\"geo_lat\", \"app\".\"objectives\".\"geo_lng\") <> 1"
+        },
+        "objectives_area_non_negative": {
+          "name": "objectives_area_non_negative",
+          "value": "\"app\".\"objectives\".\"area_sqm\" is null or \"app\".\"objectives\".\"area_sqm\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "app.alert_severity": {
+      "name": "alert_severity",
+      "schema": "app",
+      "values": [
+        "info",
+        "warning",
+        "critical"
+      ]
+    },
+    "app.allocation_status": {
+      "name": "allocation_status",
+      "schema": "app",
+      "values": [
+        "active",
+        "superseded"
+      ]
+    },
+    "app.audit_op": {
+      "name": "audit_op",
+      "schema": "app",
+      "values": [
+        "insert",
+        "update",
+        "delete"
+      ]
+    },
+    "app.budget_cadence": {
+      "name": "budget_cadence",
+      "schema": "app",
+      "values": [
+        "lunar",
+        "anual"
+      ]
+    },
+    "app.checklist_answer": {
+      "name": "checklist_answer",
+      "schema": "app",
+      "values": [
+        "ok",
+        "nok",
+        "na"
+      ]
+    },
+    "app.component_type": {
+      "name": "component_type",
+      "schema": "app",
+      "values": [
+        "mentenanta",
+        "lucrari",
+        "delta",
+        "individual"
+      ]
+    },
+    "app.contract_type": {
+      "name": "contract_type",
+      "schema": "app",
+      "values": [
+        "mentenanta_multianual",
+        "individual_deviz",
+        "individual_taxare_inversa"
+      ]
+    },
+    "app.cost_document_type": {
+      "name": "cost_document_type",
+      "schema": "app",
+      "values": [
+        "bon_consum",
+        "situatie_lucrari",
+        "factura_furnizor",
+        "fisa_motorina",
+        "fisa_utilaj",
+        "pontaj",
+        "fisa_interventie",
+        "comanda",
+        "nir",
+        "nota_realocare",
+        "ajustare_pret",
+        "fisa_reparatie"
+      ]
+    },
+    "app.cost_stage": {
+      "name": "cost_stage",
+      "schema": "app",
+      "values": [
+        "angajat",
+        "receptionat",
+        "consumat",
+        "facturat"
+      ]
+    },
+    "app.executor_type": {
+      "name": "executor_type",
+      "schema": "app",
+      "values": [
+        "echipa_proprie",
+        "subcontractant"
+      ]
+    },
+    "app.expense_type": {
+      "name": "expense_type",
+      "schema": "app",
+      "values": [
+        "material",
+        "manopera_proprie",
+        "servicii_subc",
+        "utilaj",
+        "motorina",
+        "transport",
+        "reparatii",
+        "alte"
+      ]
+    },
+    "app.file_state": {
+      "name": "file_state",
+      "schema": "app",
+      "values": [
+        "uploading",
+        "ready",
+        "failed",
+        "quarantined"
+      ]
+    },
+    "app.finding_outcome": {
+      "name": "finding_outcome",
+      "schema": "app",
+      "values": [
+        "rezolvat_pe_loc",
+        "interventie",
+        "propunere"
+      ]
+    },
+    "app.geo_source": {
+      "name": "geo_source",
+      "schema": "app",
+      "values": [
+        "exif",
+        "device",
+        "manual"
+      ]
+    },
+    "app.location_type": {
+      "name": "location_type",
+      "schema": "app",
+      "values": [
+        "magazie_centrala",
+        "consignatie",
+        "santier",
+        "echipa",
+        "subcontractant",
+        "unelte",
+        "utilaje"
+      ]
+    },
+    "app.node_kind": {
+      "name": "node_kind",
+      "schema": "app",
+      "values": [
+        "folder",
+        "file"
+      ]
+    },
+    "app.node_role": {
+      "name": "node_role",
+      "schema": "app",
+      "values": [
+        "root_company",
+        "contract",
+        "objective",
+        "work_unit",
+        "stage",
+        "system",
+        "user"
+      ]
+    },
+    "app.numbered_document_type": {
+      "name": "numbered_document_type",
+      "schema": "app",
+      "values": [
+        "factura",
+        "situatie_lucrari",
+        "comanda",
+        "nir",
+        "aviz_transfer",
+        "aviz_retur",
+        "bon_consum",
+        "pv_receptie",
+        "pv_custodie",
+        "lista_inventar",
+        "decizie_inventariere",
+        "nota_diferente",
+        "nota_realocare"
+      ]
+    },
+    "app.office_role": {
+      "name": "office_role",
+      "schema": "app",
+      "values": [
+        "pm",
+        "devizist",
+        "achizitii",
+        "magazie",
+        "flota",
+        "financiar",
+        "admin"
+      ]
+    },
+    "app.period_status": {
+      "name": "period_status",
+      "schema": "app",
+      "values": [
+        "open",
+        "closing",
+        "closed"
+      ]
+    },
+    "app.person_category": {
+      "name": "person_category",
+      "schema": "app",
+      "values": [
+        "angajat",
+        "sef_santier",
+        "subcontractant",
+        "client_user"
+      ]
+    },
+    "app.persona": {
+      "name": "persona",
+      "schema": "app",
+      "values": [
+        "office",
+        "field",
+        "subcontractor",
+        "client"
+      ]
+    },
+    "app.request_source": {
+      "name": "request_source",
+      "schema": "app",
+      "values": [
+        "email",
+        "manual",
+        "fisa_inspectie",
+        "utilaj"
+      ]
+    },
+    "app.request_status": {
+      "name": "request_status",
+      "schema": "app",
+      "values": [
+        "neprocesata",
+        "in_evaluare",
+        "decisa",
+        "in_backlog",
+        "respinsa",
+        "anulata"
+      ]
+    },
+    "app.request_type": {
+      "name": "request_type",
+      "schema": "app",
+      "values": [
+        "tichet_client",
+        "solicitare",
+        "constatare_inspectie",
+        "propunere_interna",
+        "solicitare_utilaj",
+        "observatie_utilaj"
+      ]
+    },
+    "app.routing_choice": {
+      "name": "routing_choice",
+      "schema": "app",
+      "values": [
+        "interventie_mentenanta",
+        "lucrare_delta",
+        "lucrare_delta_multi_luna",
+        "lucrare_componenta_lucrari",
+        "contract_individual_nou",
+        "amanata_backlog"
+      ]
+    },
+    "app.share_permission": {
+      "name": "share_permission",
+      "schema": "app",
+      "values": [
+        "read",
+        "write",
+        "manage"
+      ]
+    },
+    "app.work_unit_status": {
+      "name": "work_unit_status",
+      "schema": "app",
+      "values": [
+        "draft",
+        "planificata",
+        "in_executie",
+        "suspendata",
+        "finalizata",
+        "inchisa",
+        "anulata"
+      ]
+    },
+    "app.work_unit_type": {
+      "name": "work_unit_type",
+      "schema": "app",
+      "values": [
+        "inspectie",
+        "interventie",
+        "lucrare"
+      ]
+    }
+  },
+  "schemas": {
+    "app": "app"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

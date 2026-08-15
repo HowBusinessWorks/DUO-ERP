@@ -16,7 +16,7 @@
 | 01 — Fundația | 🟩 gata (15/15, CI verde) | 2026-08-15 |
 | 02 — Identitate, acces, RLS | 🟨 în lucru (02a din 4) | 2026-08-15 |
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat) | 2026-08-15 |
-| 04 — Contracte, obiective | ⬜ neînceput | — |
+| 04 — Contracte, obiective | 🟨 în lucru (04a din 2) | 2026-08-15 |
 | 05 — Unitate de Lucru, finanțare | ⬜ neînceput | — |
 | 06 — Registrul de cost, închidere | ⬜ neînceput | — |
 | 07 — File management (R2) | ⬜ neînceput | — |
@@ -305,7 +305,114 @@ imposibil să apară un tip în bază fără ca cineva să-l fi vrut acolo.
 
 ## Pasul 04 — Contracte, obiective
 
-*(nicio sesiune n-a lucrat încă aici)*
+Pasul e împărțit în două sub-etape, fiecare cu commit și CI verde propriu (decizia
+utilizatorului, 15 august 2026). Motivul: pasul e de ~3x volumul pasului 03, iar dacă schema de
+contract e greșită nu vrem să fi construit deja 15 ecrane peste ea.
+
+| Sub-etapă | Conținut | Verificări | Stare |
+|---|---|---|---|
+| **04a** | Migrările `0009`–`0010`, domain pur, servicii, alerte cron, seed determinist | 1–6, 10, 11, 15–18 | 🟩 gata |
+| **04b** | Ecranele: contract (9 tab-uri), obiectiv (6), hartă, acoperire inspecții | 7–9, 12–14 | ⬜ |
+
+### 2026-08-15 — [status: în lucru] — 04a, schema și motorul de bani
+
+**Ce s-a executat:**
+
+- **`0009_contracts`** — `contracts`, `contract_years`, `contract_components`,
+  `component_ceilings`. Scris peste ce generează drizzle: trigger-ul `check_ceiling_kind`,
+  atașarea auditului și a gărzii de perioadă, **grant-urile pe coloană** și reparația
+  auditului (mai jos).
+- **`0010_objectives`** — `objectives`, `checklists`, `checklist_items`,
+  `inspection_profiles`, `inspection_profile_items`, `contract_objectives`. Adăugat de mână:
+  unicul case-insensitive pe `objectives.code`, constrângerea `exclude` de pe legătură,
+  audit și grant-uri.
+- **`packages/domain/contracts`** — `applyIndexation`, `buildContractYears`, `contractYearAt`,
+  `ceilingUsage`, `deltaFill`, plus aritmetica de date (`addYears`, `previousDay`).
+  **28 de teste, fără bază de date, în 12 ms.**
+- **`packages/contracts`** — scheme Zod pentru contract, componentă și cele **două** feluri de
+  plafon (cost / venit), obiectiv, legătură, profil, fișă.
+- **`packages/services`** — `contracts.ts` (CRUD, plafoane cu upsert, `getContractOverview`),
+  `objectives.ts` (CRUD, legături, `getInspectionCoverage`), `contract-alerts.ts`.
+- **`packages/jobs` + `apps/worker`** — cozile `contracts.expiryScan` (zilnic 06:00) și
+  `contracts.deltaFillScan` (**pe 10 și pe 20, 09:00**), programate cu `boss.schedule()` pe
+  fusul aplicației.
+- **Seed determinist** (`pnpm db:seed`): 2 firme, 2 contracte, 4 componente, 20 obiective,
+  22 legături, 2 profile cu frecvențe, plafoane pe 3 luni + planul anual.
+
+**Verificări din pas care trec / nu trec:**
+- [x] #1 contract 4 ani, 50.000, 5% → `50.000 → 52.500 → 55.125 → 57.881,25`, aniversări
+  corecte inclusiv `2028-02-29`. **Confirmat pe datele reale din seed.**
+- [x] #2 indexare 0 → cei 4 ani au aceeași valoare
+- [x] #3 cele 3 componente, cu `is_fill_target` derivat din tip
+- [x] #4 `is_fill_target` pe Mentenanță → respins de DB (confirmat pe Postgres 17 real)
+- [x] #5 plafon fără motiv → respins; cu motiv → rând în `audit.entries`
+- [x] #6 plafon pe lună închisă → `PERIOD_CLOSED: luna 08/2026 este inchisa`
+- [x] #10 legătură suprapusă pe același contract → `23P01`, mesaj în română
+- [x] #11 același obiectiv pe două contracte simultan, cu profile diferite → permis
+- [x] #15 `app_field` citește contractul, dar **fiecare** coloană comercială e refuzată cu
+  `42501`, la fel `select *`, `contract_years` și `component_ceilings`. Confirmat rulând ca
+  rol `app_field` pe Supabase real.
+- [x] #16 20 obiective cu profil trimestrial → 20 de rânduri, 0 inspecții, restanțe din frecvență
+- [x] #17 contract care expiră în 5 luni + 3 rulări de scan → **o singură alertă**
+- [x] #18 testele de domain rulează fără DB, în milisecunde
+- [ ] #7, #8, #9, #12, #13, #14 — ecrane, deci 04b
+- [x] Seed-ul din §7 există și trece prin servicii, nu prin `insert` direct
+
+**Bug găsit în cod deja livrat (pasul 02a):** `audit.record_change()` derivă `record_id` din
+coloana `id` a rândului, iar trei tabele auditate n-au coloana asta —
+`person_company_access`, `person_office_roles`, `team_members`. Consecința: **orice `insert` în
+ele eșua cu 23502**. Verificat pe Supabase înainte de reparație. Nu s-a văzut până acum pentru
+că niciun test și niciun ecran nu scrisese în ele; seed-ul pasului 04 le atinge pe toate trei.
+Reparat în `0009` printr-un `create or replace`: când rândul n-are `id`, `record_id` se derivă
+din `md5` al rândului întreg — pe tabele de legătură pură toate coloanele *sunt* cheia, deci
+hash-ul rândului e hash-ul cheii, stabil între INSERT și DELETE. **3 teste noi** blochează
+regresia.
+
+**Al doilea bug, găsit de propriul test de domain:** `applyIndexation` construia factorul ca
+`Money.of(1).add(Money.of(pct))`. `Money` are două zecimale prin definiție, deci 3,5% devenea
+4%. Corectat: creșterea se calculează ca **sumă în lei, rotunjită la ban** (`v + v × pct`), ceea
+ce e și mai aproape de realitate — indexarea se negociază ca „creștem cu 2.500 lei”.
+
+**Observații / decizii luate / abateri de la plan:**
+
+- **Numerotarea s-a decalat a doua oară.** Planul cere `0011`/`0012`; au ieșit `0009`/`0010`.
+  **02b ia acum `0011`–`0012`.** Vezi Î9 din QUESTIONS.md.
+- **Izolarea prețului se face pe COLOANĂ, nu prin RLS** (decizia utilizatorului). Precondiția
+  §2 a pasului cerea 02b, care nu e făcut. `app.contracts` acordă celor trei persone
+  non-birou exact 13 coloane; cele 5 comerciale (`total_value`, `monthly_value`,
+  `indexation_pct`, `delta_threshold`, `overhead_pct`) lipsesc din grant. Politicile RLS pe
+  rânduri rămân în 02b și doar strâng peste.
+- **Anii contractuali se generează în serviciu, nu într-un trigger.** Aritmetica are un
+  singur loc: `buildContractYears`. Vezi Î11.
+- **`is_fill_target` nu e câmp de formular.** Se derivă din tip, în `createComponent`, iar baza
+  impune egalitatea `is_fill_target = (type = 'delta')`. E singurul comutator din tot pasul
+  care inversează sensul unui indicator pe ecran; bifat greșit, Delta s-ar desena ca limită de
+  cheltuială.
+- **`ceilingUsage` și `deltaFill` sunt două funcții, nu una cu un `boolean`.** Un parametru care
+  inversează sensul ar fi exact felul în care cele două citiri ajung amestecate.
+- **`deltaFill` întoarce și `expectedPercent`** — ritmul la umplere uniformă. Fără el, „38%” nu
+  spune nimic: e excelent pe 12 și dezastruos pe 28. Alerta de pe 10 și 20 se ia pe diferența
+  dintre cele două, nu pe un prag fix.
+- **Plafonul e ori lunar, ori anual**, impus cu `num_nonnulls(...) = 1`, iar unicitatea
+  scope-ului cu `unique nulls not distinct` — fără el, două rânduri anuale ar trece amândouă.
+- **Plafoanele anuale nu sunt blocate de luna închisă**, intenționat: planul anual nu e o cifră
+  a lui august.
+- **Testele de servicii au acum infrastructură proprie** (decizia utilizatorului):
+  `packages/services/{tests,vitest.db.config.ts}`, container propriu, aceleași migrări din
+  `packages/db`. `packages/db` nu poate importa `services` fără să închidă un ciclu. CI-ul
+  pornește acum **două** Postgres-uri efemere, în paralel. Infrastructura se refolosește la
+  pașii 05–10, care sunt aproape numai servicii.
+- **`no-restricted-imports` are o excepție nouă**: `packages/*/tests/global-setup.ts` poate
+  importa driverul. Un harness care ridică o bază de la zero n-are cum să n-o facă.
+- Contractele au **`company_id`**, spre deosebire de nomenclatoare. Toate listele cer explicit
+  `companyIds`; o selecție goală întoarce zero rânduri, nu „toate”.
+
+**Ce rămâne pentru sesiunea următoare (04b):**
+1. Contractul și obiectivul în `entityRegistry`, **fără să se atingă shell-ul** — §7 al pasului.
+2. Prezentare cu cele trei benzi (#7), navigare pe luni (#8), componentă clickabilă (#9).
+3. Obiectiv: tab Contracte (#12), tab Istoric etichetat „analitica: folosit” (#13).
+4. Lista de obiective cu comutator tabel/hartă, Leaflet + tile-uri OSM (#14).
+5. Acoperire inspecții pe ecran (serviciul există deja și e testat).
 
 ---
 

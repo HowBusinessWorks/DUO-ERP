@@ -1,4 +1,11 @@
-export { defineJob, systemPing, ALL_JOBS } from './registry';
+export {
+  ALL_JOBS,
+  contractExpiryScan,
+  defineJob,
+  deltaFillScan,
+  SCHEDULED_JOBS,
+  systemPing,
+} from './registry';
 export type { JobDefinition, JobPayload } from './registry';
 
 export { enqueue } from './enqueue';

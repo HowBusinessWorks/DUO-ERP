@@ -69,6 +69,71 @@ export type {
   WorkQueueRow,
 } from './notifications';
 
+export {
+  countCeilingsWithoutValue,
+  createComponent,
+  createContract,
+  getContract,
+  getContractOverview,
+  listCeilings,
+  listComponents,
+  listContracts,
+  listContractsForObjective,
+  listContractYears,
+  listExpiringContracts,
+  listUnderfilledDelta,
+  setCostCeiling,
+  setRevenueCeiling,
+  updateContract,
+} from './contracts';
+export type {
+  CeilingRow,
+  ComponentBand,
+  ComponentRow,
+  ContractOverview,
+  ContractRow,
+  ContractYearRow,
+  DeltaUnderfilled,
+  ExpiringContract,
+  ListCeilingsOptions,
+  ListContractsOptions,
+} from './contracts';
+
+export {
+  clearDeltaAlert,
+  clearExpiryAlert,
+  CONTRACT_ALERT_KINDS,
+  scanContractExpiry,
+  scanDeltaFill,
+  totalUnfilled,
+} from './contract-alerts';
+
+export {
+  addProfileItem,
+  createChecklist,
+  createInspectionProfile,
+  createObjective,
+  getInspectionCoverage,
+  getObjective,
+  linkObjective,
+  listChecklists,
+  listContractObjectives,
+  listInspectionProfiles,
+  listObjectives,
+  setInspectionProfile,
+  unlinkObjective,
+  updateObjective,
+} from './objectives';
+export type {
+  ChecklistRow,
+  ContractObjectiveRow,
+  CoverageReport,
+  CoverageRow,
+  InspectionProfileRow,
+  ListObjectivesOptions,
+  ObjectiveRow,
+} from './objectives';
+
 export { listAuditEntries } from './audit';
 export type { AuditEntry } from './audit';
 

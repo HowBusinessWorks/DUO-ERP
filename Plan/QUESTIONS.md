@@ -103,6 +103,50 @@ fără politici. Plasa e testul generic din 02b: orice tabelă din `app` fără 
 politică sparge build-ul, deci fiecare pas următor e obligat să-și aducă propriul fișier de
 politici.
 
+**Consecință, aflată în pasul 04:** RLS n-a apucat să ia `0008` — pasul 03 l-a luat pentru
+nomenclatoare, iar contractele au luat `0009`/`0010`. Vezi Î9.
+
+### Î9 — Numerotarea migrărilor s-a decalat a doua oară
+
+Pasul 04 cere `0011_contracts` și `0012_objectives`. Ele au ieșit `0009` și `0010`, pentru că
+drizzle numerotează în ordinea creării și 02b n-a fost încă executat.
+
+**Ales:** urmăm ordinea reală de execuție, nu numerele din plan. **02b ia acum `0011`–`0012`.**
+Numerele din documentele de plan trebuie citite ca „migrarea în care se face treaba asta”, nu ca
+un identificator. Alternativa — să rezervăm numere goale — ar însemna fișiere de migrare vide în
+istoric, iar drizzle nu le acceptă oricum.
+
+**De reevaluat dacă:** vreodată se aplică două migrări cu același număr din ramuri diferite.
+Atunci numerotarea trebuie să devină un timestamp, nu un contor.
+
+### Î10 — Motivul scris la plafoane: și la creare, sau doar la modificare?
+
+Regula 7 a pasului 04 spune „modificarea de plafon cere motiv scris”. Verificarea #5 a aceluiași
+pas cere însă ca și **prima setare** fără motiv să fie respinsă. Decizia din 02a spune că motivul
+se cere la `UPDATE` și `DELETE`, nu la `INSERT` — a crea ceva nu e ireversibil.
+
+**Ales: amândouă, pe straturi diferite.** Baza păstrează regula din 02a (`attach_audit(...,
+true)` → motiv la UPDATE/DELETE), iar `setCostCeiling`/`setRevenueCeiling` cer motiv și la
+creare, prin schema Zod. Motivul pentru care nu s-a slăbit regula din baza: `attach_audit` e
+folosit de zece tabele, iar o a treia variantă de comportament („motiv și la insert”) ar fi
+însemnat un parametru în plus pe care fiecare pas viitor trebuie să-l nimerească. Un plafon nu se
+setează niciodată din altă parte decât prin cele două use-case-uri.
+
+**De reevaluat dacă:** apare o a doua tabelă la care crearea trebuie justificată. Atunci merită
+al treilea mod în `attach_audit`.
+
+### Î11 — Anii contractuali: trigger în bază sau serviciu?
+
+Verificarea #1 spune „se generează **automat** 4 `contract_years`”. Automat pentru cine îl
+folosește; întrebarea e unde stă aritmetica.
+
+**Ales: în serviciu, peste `buildContractYears` din `@damina/domain`.** Un trigger plpgsql ar fi
+fost a doua implementare a aceleiași reguli — compunerea an de an, rotunjirea la ban, aniversarea
+pe 29 februarie — iar două implementări diverg la prima corecție. Atomicitatea o dă tranzacția
+din `createContract`: un contract fără ani n-a existat niciodată. Prețul: un `insert` direct în
+`app.contracts`, din `psql`, nu produce ani. E acceptabil — nimic din aplicație nu scrie așa, iar
+seed-ul trece dinadins prin servicii tocmai ca să nu creeze stări la care aplicația n-ar ajunge.
+
 ---
 
 ## Închise

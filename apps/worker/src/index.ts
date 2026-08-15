@@ -1,6 +1,7 @@
 import { beatHeartbeat, closeConnections, grantQueueAccess, withServiceActor } from '@damina/db';
 import { logger } from '@damina/shared/logger';
 import { createBoss, ensureQueues } from './boss';
+import { registerContractAlerts, scheduleContractAlerts } from './handlers/contract-alerts';
 import { registerSystemPing } from './handlers/system-ping';
 
 /**
@@ -29,6 +30,8 @@ async function main(): Promise<void> {
 
   await ensureQueues(boss);
   await registerSystemPing(boss);
+  await registerContractAlerts(boss);
+  await scheduleContractAlerts(boss);
   logger.info({ worker_id: WORKER_ID }, 'cozi inregistrate, worker activ');
 
   const beat = async (): Promise<void> => {
