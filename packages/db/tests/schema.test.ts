@@ -34,9 +34,17 @@ function sqlstate(error: unknown): string | undefined {
   return undefined;
 }
 
-/** Enumerarile din PLAN_TEHNIC Anexa C.0, toate. Verificarea #4 din Pasul 01. */
+/**
+ * Enumerarile din PLAN_TEHNIC Anexa C.0, toate. Verificarea #4 din Pasul 01.
+ *
+ * Lista e exhaustiva, nu un subset: un enum in plus in baza pica testul la fel
+ * ca unul lipsa. Cand un pas adauga tipuri noi, se adauga si aici.
+ */
 const EXPECTED_ENUMS = [
   'allocation_status',
+  // adaugate in pasul 02a
+  'audit_op',
+  'numbered_document_type',
   'budget_cadence',
   'checklist_answer',
   'component_type',
