@@ -102,6 +102,16 @@ function like(query: string): string {
   return `%${query.replace(/([%_\\])/g, '\\$1')}%`;
 }
 
+/*
+ * Coloana exterioara e scrisa CALIFICAT, `app.contracts.id`, nu interpolata cu
+ * `${schema.contracts.id}`.
+ *
+ * Nu e stil, e o capcana: intr-un `select` fara join, drizzle randeaza coloana
+ * interpolata ca `"id"`, fara prefix de tabela. In interiorul subinterogarii,
+ * `"id"` se leaga atunci de tabela DIN subinterogare — deci conditia devine
+ * `y.contract_id = y.id`, mereu falsa, si cifra iese 0 fara nicio eroare. Un
+ * raspuns gresit in tacere e mai rau decat o exceptie.
+ */
 const contractSelection = {
   contract: schema.contracts,
   clientName: schema.clients.name,
@@ -109,12 +119,12 @@ const contractSelection = {
   ownerName: schema.persons.fullName,
   currentYearIndex: sql<number | null>`(
     select y.year_index from app.contract_years y
-     where y.contract_id = ${schema.contracts.id}
+     where y.contract_id = app.contracts.id
        and current_date between y.starts_on and y.ends_on
      limit 1
   )`,
   yearCount: sql<string>`(
-    select count(*)::text from app.contract_years y where y.contract_id = ${schema.contracts.id}
+    select count(*)::text from app.contract_years y where y.contract_id = app.contracts.id
   )`,
 };
 

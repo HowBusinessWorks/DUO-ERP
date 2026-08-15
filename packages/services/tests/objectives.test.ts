@@ -179,11 +179,15 @@ describe('legatura contract ↔ obiectiv', () => {
     const error = await rejection(unlinkObjective(officeActor(), linkId, '2026-09-01', '  '));
     expect(String(error)).toContain('motiv scris');
 
-    await unlinkObjective(officeActor(), linkId, '2026-09-01', 'trece pe contractul 4800');
+    // Data de iesire e in TRECUT fata de azi: altfel legatura ramane curenta,
+    // si pe buna dreptate — un obiectiv anuntat ca iese luna viitoare e inca in
+    // contract azi. `isCurrent` inseamna „acum”, nu „are data de sfarsit”.
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    await unlinkObjective(officeActor(), linkId, yesterday, 'trece pe contractul 4800');
 
     const links = await listContractObjectives(officeActor(), contractId);
     expect(links).toHaveLength(1);
-    expect(links[0]?.validTo).toBe('2026-09-01');
+    expect(links[0]?.validTo).toBe(yesterday);
     expect(links[0]?.isCurrent).toBe(false);
   });
 });

@@ -368,7 +368,24 @@ din `md5` al rândului întreg — pe tabele de legătură pură toate coloanele
 hash-ul rândului e hash-ul cheii, stabil între INSERT și DELETE. **3 teste noi** blochează
 regresia.
 
-**Al doilea bug, găsit de propriul test de domain:** `applyIndexation` construia factorul ca
+**Al doilea bug, prins de primul CI și de departe cel mai urât:** într-un `select` fără join,
+drizzle randează o coloană interpolată (`${schema.objectives.id}`) ca `"id"`, **fără prefix de
+tabelă**. Într-o subinterogare corelată, `"id"` se leagă atunci de tabela dinăuntru: condiția
+`co.objective_id = "id"` devine `co.objective_id = co.id`, mereu falsă, iar contorul iese **0 în
+tăcere**. Aceeași greșeală era în `contractSelection` și în `listChecklists`; acolo n-a explodat
+doar pentru că interogările au join-uri, caz în care drizzle califică. Reparat scriind coloana
+exterioară calificat (`app.objectives.id`), cu comentariu la ambele locuri. Lecția: o
+subinterogare corelată nu se scrie niciodată cu interpolare de coloană.
+
+**Al treilea bug, în teste:** actorul de test avea `personId` inventat, iar
+`component_ceilings.set_by` are cheie străină către `app.persons`. Jurnalul de audit
+supraviețuiește (`actor_id` n-are FK, dinadins), dar prima scriere care păstrează autorul cade.
+Harness-ul provizionează acum o persoană reală la migrare.
+
+**Al patrulea bug, tot în teste:** o aserție cerea ca o legătură cu `valid_to` în **viitor** să
+nu mai fie curentă. E pe dos — un obiectiv anunțat că iese luna viitoare e încă în contract azi.
+
+**Al cincilea bug, găsit de propriul test de domain:** `applyIndexation` construia factorul ca
 `Money.of(1).add(Money.of(pct))`. `Money` are două zecimale prin definiție, deci 3,5% devenea
 4%. Corectat: creșterea se calculează ca **sumă în lei, rotunjită la ban** (`v + v × pct`), ceea
 ce e și mai aproape de realitate — indexarea se negociază ca „creștem cu 2.500 lei”.

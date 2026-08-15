@@ -282,7 +282,7 @@ describe('componente si plafoane', () => {
         reason: 'incercare',
       }),
     );
-    expect(String(error)).toContain('doar Delta are plafon de venit');
+    expect(String(error)).toContain('Delta are plafon de venit');
   });
 });
 

@@ -59,12 +59,20 @@ export interface ListObjectivesOptions {
   readonly limit?: number;
 }
 
+/*
+ * `app.objectives.id` scris calificat, nu `${schema.objectives.id}`.
+ *
+ * Intr-un `select` fara join, drizzle randeaza coloana interpolata ca `"id"`,
+ * fara prefix — iar in subinterogare `"id"` se leaga de `contract_objectives`,
+ * nu de `objectives`. Conditia devine `co.objective_id = co.id`, mereu falsa,
+ * si numarul iese 0 fara nicio eroare. Vezi si `contractSelection`.
+ */
 const objectiveSelection = {
   objective: schema.objectives,
   activeContractCount: sql<string>`(
     select count(*)::text
       from app.contract_objectives co
-     where co.objective_id = ${schema.objectives.id}
+     where co.objective_id = app.objectives.id
        and co.valid_from <= current_date
        and (co.valid_to is null or co.valid_to > current_date)
   )`,
@@ -317,7 +325,7 @@ export async function listChecklists(actor: Actor): Promise<ChecklistRow[]> {
         checklist: schema.checklists,
         itemCount: sql<string>`(
           select count(*)::text from app.checklist_items i
-           where i.checklist_id = ${schema.checklists.id}
+           where i.checklist_id = app.checklists.id
         )`,
       })
       .from(schema.checklists)

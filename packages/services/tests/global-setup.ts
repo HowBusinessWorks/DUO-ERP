@@ -20,6 +20,9 @@ import type { TestProject } from 'vitest/node';
  */
 const MIGRATIONS_FOLDER = resolve(dirname(fileURLToPath(import.meta.url)), '../../db/migrations');
 
+/** Persoana in numele careia ruleaza toate testele. Vezi `helpers.ts`. */
+export const TEST_PERSON_ID = '01950000-0000-7000-8000-000000000001';
+
 let container: StartedPostgreSqlContainer | undefined;
 
 export async function setup(project: TestProject): Promise<void> {
@@ -34,6 +37,20 @@ export async function setup(project: TestProject): Promise<void> {
   const pool = new pg.Pool({ connectionString: url, max: 1 });
   try {
     await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS_FOLDER });
+
+    // Actorul testelor e o PERSOANA REALA, nu un uuid inventat.
+    //
+    // `component_ceilings.set_by` are cheie straina catre `app.persons` — si
+    // trebuie s-o aiba: „cine a pus plafonul asta” nu poate fi un id care nu
+    // corespunde nimanui. Un actor sintetic trece prin `withActor` (jurnalul de
+    // audit nu are cheie straina, dinadins), dar cade la prima scriere care
+    // pastreaza autorul. Harness-ul provizioneaza persoana o data, la migrare.
+    await pool.query(
+      `insert into app.persons (id, persona, category, full_name, email)
+       values ($1, 'office', 'angajat', 'Actor de test', 'actor@test.local')
+       on conflict do nothing`,
+      [TEST_PERSON_ID],
+    );
   } finally {
     await pool.end();
   }
