@@ -15,6 +15,25 @@ afterAll(async () => {
   await closeConnections();
 });
 
+/**
+ * Codul SQLSTATE real al unei erori venite prin Drizzle.
+ *
+ * Drizzle imbraca erorile driverului intr-un `DrizzleQueryError` al carui mesaj
+ * e doar "Failed query: ...", deci potrivirea pe text nu functioneaza. Codul din
+ * `cause` e si mai bun decat textul original: nu depinde de `lc_messages`.
+ */
+function sqlstate(error: unknown): string | undefined {
+  let current: unknown = error;
+  while (current instanceof Error) {
+    const { code } = current as Error & { code?: unknown };
+    if (typeof code === 'string') {
+      return code;
+    }
+    current = current.cause;
+  }
+  return undefined;
+}
+
 /** Enumerarile din PLAN_TEHNIC Anexa C.0, toate. Verificarea #4 din Pasul 01. */
 const EXPECTED_ENUMS = [
   'allocation_status',
@@ -67,13 +86,15 @@ describe('schema', () => {
     const found = await withActor(officeActor, async (tx) => {
       const result = await tx.execute<{ typname: string }>(
         sql`select typname from pg_type
-            where typnamespace = 'app'::regnamespace and typtype = 'e'
-            order by typname`,
+            where typnamespace = 'app'::regnamespace and typtype = 'e'`,
       );
       return result.rows.map((r) => r.typname);
     });
 
-    expect(found).toEqual(EXPECTED_ENUMS);
+    // Sortarea se face in JS, nu in SQL: `order by typname` depinde de colatia
+    // bazei, iar aceea difera intre containerul de test si Supabase. In `C`,
+    // "person_category" vine inaintea lui "persona"; in `en_US`, invers.
+    expect([...found].sort()).toEqual([...EXPECTED_ENUMS].sort());
   });
 
   // Verificarea #5 din Pasul 01.
@@ -133,12 +154,18 @@ describe('schema', () => {
       claims: {},
     };
 
-    await expect(
-      withActor(fieldActor, async (tx) => {
-        await tx.execute(
-          sql`insert into app.companies (id, name) values (${uuidv7()}, 'Nu are voie')`,
-        );
-      }),
-    ).rejects.toThrow(/permission denied/i);
+    const error = await withActor(fieldActor, async (tx) => {
+      await tx.execute(
+        sql`insert into app.companies (id, name) values (${uuidv7()}, 'Nu are voie')`,
+      );
+    }).then(
+      () => undefined,
+      (reason: unknown) => reason,
+    );
+
+    expect(error, 'app_field a reusit sa scrie in app.companies').toBeInstanceOf(Error);
+    // 42501 = insufficient_privilege. Verificam codul, nu mesajul, ca sa nu
+    // trecem din greseala pe o alta eroare (de exemplu o constrangere incalcata).
+    expect(sqlstate(error)).toBe('42501');
   });
 });

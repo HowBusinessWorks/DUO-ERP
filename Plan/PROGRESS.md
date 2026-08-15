@@ -115,6 +115,27 @@ Legendă: ⬜ neînceput · 🟨 în lucru · 🟩 gata (toate verificările din
 
 ---
 
+### 2026-08-15 — [status: în lucru] — primul CI, roșu, reparat
+
+Primul push a lăsat CI-ul roșu. `quality` și `build` au trecut; au picat `database` și `audit`.
+
+**Verificarea #6 a trecut din prima:** toate cele 8 teste `withActor` sunt verzi. Rolul chiar se schimbă în tranzacție și `app.actor_id` chiar ajunge la destinație.
+
+**Două teste picate — ambele bug-uri în teste, nu în schemă:**
+- *Enumerările din Anexa C.0.* Testul făcea `order by typname` în SQL și compara cu o listă sortată în JS. Cele două sortări nu coincid: colația bazei decide. În `C`, `person_category` vine înaintea lui `persona` (underscore-ul, `0x5F`, e sub `a`); în `en_US`, colația ignoră underscore-ul la nivel primar și ordinea se inversează. Containerul de test și Supabase nu au aceeași colație, deci testul ar fi fost instabil oriunde. Sortarea s-a mutat integral în JS.
+- *`app_field` nu poate scrie în `companies`.* Testul cerea un mesaj `/permission denied/i`, dar Drizzle îmbracă erorile driverului într-un `DrizzleQueryError` al cărui mesaj e doar `Failed query: ...`. Textul original stă în `cause`. Se verifică acum **SQLSTATE `42501`** (`insufficient_privilege`), scos recursiv din lanțul de `cause` — cod, nu text, deci nu depinde nici de `lc_messages` și nu poate trece din greșeală pe altă eroare (o constrângere încălcată, de exemplu).
+
+**Auditul — 9 vulnerabilități `high`/`critical`.** Rezolvate chirurgical, fără upgrade de Next:
+- `drizzle-orm` urcat de la `^0.44.2` la `^0.45.2` în **ambele** pachete care îl declară (`db` **și** `jobs` — advisory de SQL injection prin identificatori neescapați).
+- `pnpm.overrides` în rădăcină pentru `handlebars ^4.7.9` (critical, tranzitiv prin `eslint-plugin-boundaries`), `postcss ^8.5.26` (Next 15.5 pinuiește exact `8.4.31`) și `sharp ^0.35.3`. Motivul fiecăruia și condiția de ștergere sunt în `README.md`, secțiunea „Override-uri de securitate" — `package.json` nu acceptă comentarii.
+- Rămân 3 vulnerabilități sub prag (1 low, 2 moderate), toate în tooling de build. Gate-ul CI a rămas la `high`, neschimbat.
+
+Build-ul trece cu override-urile puse, deci `postcss` 8.5 și `sharp` 0.35 nu supără Next 15.
+
+**PR-urile Dependabot** (eslint 10, globals 17, `@next/eslint-plugin-next` 16) sunt roșii din aceeași cauză. Le lăsăm; se refac singure după ce `main` e verde.
+
+---
+
 ## Pasul 02 — Identitate, acces, RLS
 
 *(nicio sesiune n-a lucrat încă aici)*

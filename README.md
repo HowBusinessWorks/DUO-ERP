@@ -60,3 +60,17 @@ Reconstruire completă a bazei (**șterge tot**, cere `ALLOW_DB_RESET=true` în 
 5. **TypeScript `strict`**, `noUncheckedIndexedAccess`, zero `any` în cod de producție.
 6. **Zero string-uri de UI hardcodate.** Tot textul trece prin `packages/i18n`.
 7. **Limbă:** cod și DB în engleză; domeniu intraductibil în română fără diacritice (`deviz`, `aviz`, `nir`, `pontaj`); UI 100% română cu diacritice.
+
+## Override-uri de securitate
+
+`pnpm audit --audit-level high` e blocant în CI. Când o vulnerabilitate vine dintr-o
+dependință tranzitivă pe care nu o controlăm, o forțăm cu `pnpm.overrides` în
+`package.json` din rădăcină. `package.json` nu acceptă comentarii, deci motivul
+fiecărui override se scrie aici. Când dependința-părinte se actualizează singură,
+override-ul se șterge.
+
+| Pachet                | De ce e acolo                                                                                                                       | Când îl scoatem                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `handlebars` `^4.7.9` | Vulnerabilitate `critical`, trasă de `eslint-plugin-boundaries` → `@boundaries/elements`. Doar la lint, nu ajunge în niciun bundle. | Când `eslint-plugin-boundaries` urcă singur `handlebars`. |
+| `postcss` `^8.5.26`   | Next 15.5 pinuiește exact `8.4.31`, care are advisory `high` de path traversal. `8.5.x` e același major și compatibil.              | La upgrade-ul pe Next 16.                                 |
+| `sharp` `^0.35.3`     | Next declară `^0.34.3` ca dependință opțională; `<0.35.0` are advisory `high`. Folosit doar la optimizarea imaginilor pe server.    | La upgrade-ul pe Next 16.                                 |
