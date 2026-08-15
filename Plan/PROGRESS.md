@@ -424,6 +424,20 @@ ce e și mai aproape de realitate — indexarea se negociază ca „creștem cu 
 - Contractele au **`company_id`**, spre deosebire de nomenclatoare. Toate listele cer explicit
   `companyIds`; o selecție goală întoarce zero rânduri, nu „toate”.
 
+**Al șaselea bug, moștenit: `main` era roșu de la pasul 03.** Testul „modificarea unui produs
+ajunge în audit” căuta `table_name = 'products'`, dar trigger-ul din `0007` compune numele cu
+schema — `app.products`. Deci nu găsea niciodată rândul. Confirmat că nu e regresie: aceeași
+singură eroare pe run-ul `31880570041`, pe commit-ul `7c8ab7f`, dinaintea pasului 04. Reparat.
+
+**Rezultat: toate cele 4 joburi verzi** (run `31884687256`).
+
+| Suită | Înainte | Acum |
+|---|---|---|
+| Teste unitare (shared, domain, i18n, storage) | 48 | **76** (+28 domain) |
+| Teste de bază de date — `packages/db` | 47 | **79** (9 fișiere) |
+| Teste de bază de date — `packages/services` | — | **27** (2 fișiere, infrastructură nouă) |
+| **Total** | 95 | **182** |
+
 **Ce rămâne pentru sesiunea următoare (04b):**
 1. Contractul și obiectivul în `entityRegistry`, **fără să se atingă shell-ul** — §7 al pasului.
 2. Prezentare cu cele trei benzi (#7), navigare pe luni (#8), componentă clickabilă (#9).
