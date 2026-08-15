@@ -153,7 +153,7 @@ utilizatorului, 15 august 2026). Motivul: dacă schema de organizație e greșit
 
 | Sub-etapă | Conținut | Verificări | Stare |
 |---|---|---|---|
-| **02a** | Organizație, perioade, serii, audit (migrările `0004`–`0007`) | 5–11 | 🟨 în lucru |
+| **02a** | Organizație, perioade, serii, audit (migrările `0004`–`0007`) | 5–11 | 🟩 gata |
 | **02b** | RLS + izolarea prețului (`0008`–`0009`) | 1–4 | ⬜ |
 | **02c** | Supabase Auth, JWT hook, `packages/auth`, rutare pe personas | 12–16 | ⬜ |
 | **02d** | Ecran de administrare, seed determinist, `docs/security.md` | 17–19 | ⬜ |
@@ -202,8 +202,15 @@ persona blochează · `PERIOD_CLOSED: luna 01/2026 este inchisa` · ușa de avar
 motivul în jurnal · `changed` conține doar câmpul modificat · numerele ies `TST-000001`,
 `TST-000002` · tariful nu se poate modifica fără motiv.
 
-**Ce rămâne la 02a:** testele automate 5–11 sunt scrise dar rulează doar în CI (Testcontainers).
-Se confirmă la primul push.
+**Rezultat: CI verde, 39/39 teste** (run `31875863298`). Verificările **5–11 sunt bifate**, iar
+suita de bază de date a crescut de la 14 la 39 de teste, în 6 fișiere.
+
+Un singur test a picat la primul push, și e o lecție de reținut: inventarul de enumerări din
+`schema.test.ts` e **exhaustiv**, deci un enum în plus îl pică exact ca unul lipsă. Orice pas
+care adaugă tipuri trebuie să adauge și acolo. Nu e o bătaie de cap — e testul care face
+imposibil să apară un tip în bază fără ca cineva să-l fi vrut acolo.
+
+**02a e gata. Următorul: 02b — RLS pe toate tabelele din `app` + izolarea prețului.**
 
 ---
 
