@@ -12,8 +12,10 @@ export type ConnectionMode = 'pooled' | 'session';
 
 export type Db = NodePgDatabase<typeof schema>;
 
-const pools = new Map<ConnectionMode, pg.Pool>();
-const databases = new Map<ConnectionMode, Db>();
+const pools = (globalThis as typeof globalThis & { __daminaPools?: Map<ConnectionMode, pg.Pool> }).__daminaPools
+  ?? ((globalThis as typeof globalThis & { __daminaPools?: Map<ConnectionMode, pg.Pool> }).__daminaPools = new Map());
+const databases = (globalThis as typeof globalThis & { __daminaDatabases?: Map<ConnectionMode, Db> }).__daminaDatabases
+  ?? ((globalThis as typeof globalThis & { __daminaDatabases?: Map<ConnectionMode, Db> }).__daminaDatabases = new Map());
 
 function createPool(mode: ConnectionMode): pg.Pool {
   const env = loadDbEnv(mode === 'session' ? { requireSession: true } : { requirePooled: true });
@@ -28,6 +30,11 @@ function createPool(mode: ConnectionMode): pg.Pool {
     max: mode === 'pooled' ? 5 : 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
+    // TCP keepalive: Supavisor inchide tacut conexiuni idle, iar fara keepalive
+    // o conexiune pe jumatate inchisa ramane in pool pana ce timeout-ul de 10s
+    // de la checkout o omoara cu „Connection terminated due to connection timeout”.
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
     application_name: `damina-${mode}`,
   });
 }
