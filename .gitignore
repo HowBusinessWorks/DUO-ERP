@@ -19,3 +19,6 @@ coverage/
 .DS_Store
 Thumbs.db
 *.log
+
+# Varianta fara punct, scapata o data din .gitignore.
+env.local

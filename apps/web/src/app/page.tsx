@@ -1,32 +1,12 @@
-import { roRO } from '@damina/i18n';
-import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
-const WORKSPACES = [
-  { href: '/auth', label: roRO.workspace.auth },
-  { href: '/office', label: roRO.workspace.office },
-  { href: '/field', label: roRO.workspace.field },
-  { href: '/portal/subcontractor', label: roRO.workspace.portalSubcontractor },
-  { href: '/portal/client', label: roRO.workspace.portalClient },
-] as const;
-
-export default function HomePage() {
-  return (
-    <main>
-      <h1>{roRO.common.appName}</h1>
-      <p>
-        Pasul 01 — fundația. Nu există încă niciun ecran de business; fiecare spațiu de lucru
-        randează doar propriul layout.
-      </p>
-      <ul>
-        {WORKSPACES.map((w) => (
-          <li key={w.href}>
-            <Link href={w.href}>{w.label}</Link>
-          </li>
-        ))}
-      </ul>
-      <p>
-        Stare tehnică: <Link href="/api/health">/api/health</Link>
-      </p>
-    </main>
-  );
+/**
+ * Radacina duce in Panou.
+ *
+ * Cand pasul 02c aduce autentificarea reala, aici se decide spatiul de lucru
+ * dupa persona: birou → `/panou`, teren → `/field`, portaluri → `/portal/*`.
+ * Nu exista o ruta care sa serveasca doua persone (§7.1).
+ */
+export default function RootPage() {
+  redirect('/panou');
 }

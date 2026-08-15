@@ -57,6 +57,13 @@
       "when": 1786783624094,
       "tag": "0007_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786786019733,
+      "tag": "0008_nomenclature_and_notifications",
+      "breakpoints": true
     }
   ]
 }

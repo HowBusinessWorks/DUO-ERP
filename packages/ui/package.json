@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./tokens.css": "./src/tokens.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -12,11 +13,25 @@
   "dependencies": {
     "@damina/contracts": "workspace:*",
     "@damina/i18n": "workspace:*",
-    "@damina/shared": "workspace:*"
+    "@damina/shared": "workspace:*",
+    "@hookform/resolvers": "^5.0.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.511.0",
+    "react-hook-form": "^7.56.4",
+    "tailwind-merge": "^3.3.0",
+    "zod": "^3.25.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@damina/tsconfig": "workspace:*",
     "@types/node": "^22.15.30",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "typescript": "^5.8.3"
   }
 }

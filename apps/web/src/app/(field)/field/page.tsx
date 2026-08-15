@@ -1,13 +1,17 @@
-import { roRO } from '@damina/i18n';
+import { EmptyState } from '@damina/ui';
+import { ClipboardCheck } from 'lucide-react';
 
-export default function FieldPage() {
+export default function FieldTodayPage() {
   return (
-    <main>
-      <h1>{roRO.workspace.field}</h1>
-      <p>
-        Route group <code>(field)</code>, rol Postgres <code>app_field</code> — fără nicio coloană
-        de preț, la nivel de date. PWA-ul offline și cele opt ecrane de teren vin în pasul 10.
+    <>
+      <EmptyState
+        icon={<ClipboardCheck className="size-5" aria-hidden="true" />}
+        title="Nimic pe ziua de azi"
+        body="Când primești o inspecție sau o intervenție, apare aici. Merge și fără semnal — se trimite singură când prinzi rețea."
+      />
+      <p className="mt-6 text-center text-sm text-ink-subtle">
+        Aplicația de teren nu arată prețuri. Niciodată.
       </p>
-    </main>
+    </>
   );
 }

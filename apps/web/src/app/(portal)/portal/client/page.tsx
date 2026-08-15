@@ -1,12 +1,10 @@
-import { roRO } from '@damina/i18n';
+import { EmptyState } from '@damina/ui';
 
 export default function ClientPortalPage() {
   return (
-    <main>
-      <h1>{roRO.workspace.portalClient}</h1>
-      <p>
-        Route group <code>(portal)</code>, rol Postgres <code>app_client</code>.
-      </p>
-    </main>
+    <EmptyState
+      title="Portal client"
+      body="Tichete, rapoarte lunare și istoricul obiectivelor, pentru clienții de mentenanță. Vine în faza 5; ruta există de acum, cu rolul Postgres app_client."
+    />
   );
 }

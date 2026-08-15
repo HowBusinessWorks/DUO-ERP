@@ -1,47 +1,9 @@
+@import 'tailwindcss';
+@import '@damina/ui/tokens.css';
+
 /*
- * Stiluri minime, cat sa fie lizibil.
- * Design system-ul propriu-zis vine in pasul 03 — aici nu se construieste UI.
+ * Tailwind scaneaza si sursele pachetului de design system: componentele din
+ * `@damina/ui` isi poarta clasele in propriul cod, iar fara linia asta ele nu
+ * ajung in CSS-ul final.
  */
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html {
-  color-scheme: light dark;
-}
-
-body {
-  margin: 0;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-
-main {
-  max-width: 48rem;
-  margin: 0 auto;
-  padding: 3rem 1.5rem;
-}
-
-h1 {
-  font-size: 1.5rem;
-  margin: 0 0 0.5rem;
-}
-
-p {
-  margin: 0 0 1rem;
-  opacity: 0.75;
-}
-
-code {
-  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
-  font-size: 0.875em;
-}
+@source '../../../../packages/ui/src';

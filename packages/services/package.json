@@ -15,7 +15,8 @@
     "@damina/domain": "workspace:*",
     "@damina/jobs": "workspace:*",
     "@damina/shared": "workspace:*",
-    "@damina/storage": "workspace:*"
+    "@damina/storage": "workspace:*",
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "@damina/tsconfig": "workspace:*",

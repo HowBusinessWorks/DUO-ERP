@@ -15,7 +15,7 @@
 |---|---|---|
 | 01 — Fundația | 🟩 gata (15/15, CI verde) | 2026-08-15 |
 | 02 — Identitate, acces, RLS | 🟨 în lucru (02a din 4) | 2026-08-15 |
-| 03 — Shell UI, nomenclatoare | ⬜ neînceput | — |
+| 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat) | 2026-08-15 |
 | 04 — Contracte, obiective | ⬜ neînceput | — |
 | 05 — Unitate de Lucru, finanțare | ⬜ neînceput | — |
 | 06 — Registrul de cost, închidere | ⬜ neînceput | — |
@@ -216,7 +216,90 @@ imposibil să apară un tip în bază fără ca cineva să-l fi vrut acolo.
 
 ## Pasul 03 — Shell UI, nomenclatoare
 
-*(nicio sesiune n-a lucrat încă aici)*
+### 2026-08-15 — [status: în lucru] — shell fractal, design system, nomenclatoare
+
+**Ce s-a executat:**
+
+- **`packages/ui` — design system.** `tokens.css` (Tailwind v4 `@theme`: paletă petrol
+  în oklch, scară tipografică de ERP 11/13/14/16/20/24, umbre în două straturi, cifre
+  tabulare global, un singur inel de focus). Componente: `Button` `Badge` `CountBadge`
+  `Banner` `Card` `Table` `Tabs` `ProgressBar` `EmptyState` `Dialog` `Form`+`Field`
+  `Input`/`Select`/`Textarea`/`DateInput`/`Checkbox` `Money` `Stat` `Skeleton` `Toast`.
+  Zero dependințe de UI în afară de `react-hook-form`, `clsx`, `tailwind-merge`,
+  `lucide-react` — fără Radix: `<dialog>` nativ dă capcană de focus, `inert` și strat
+  de sus gratis, iar tab-urile sunt rute, nu stare de client.
+- **`packages/i18n`** — dicționar ro-RO complet cu diacritice, `t()` tipizat
+  (`TranslationKey` = uniunea căilor de frunză, deci o cheie greșită **nu compilează**)
+  + test care scanează `apps/web/src` și `packages/ui/src` pentru chei lipsă. 3/3 verzi.
+- **`packages/db`** — `app.products` + cele patru tabele de notificări din Anexa C.15,
+  migrarea `0008_nomenclature_and_notifications`. Enum nou: `alert_severity` (adăugat și
+  în inventarul din `schema.test.ts`). Scris de mână peste ce generează drizzle: unic
+  case-insensitive pe `products.code`, **unicul parțial `alerts (scope_type, scope_id,
+  kind) where resolved_at is null`**, indecși parțiali pentru cozi/necitite, grant-uri,
+  `attach_audit('app.products')`, adăugarea în publicația `supabase_realtime` (bloc `do`,
+  trece fără efect în Postgres-ul din CI). **8 teste noi** în `notifications.test.ts`.
+- **`packages/services`** — `nomenclature` (CRUD pe 6 nomenclatoare, 23505/23P01 traduse
+  în română), `notifications` (cele 3 mecanisme, API-uri deliberat diferite),
+  `context` (firme + starea lunii per firmă), `search` (7 grupuri, în paralel), `audit`.
+- **`packages/auth`** — `Session`, `actorFor`, `canSeeFinancials`, `canEditNomenclature`.
+- **`apps/web`** — shell-ul în cinci benzi, `entityRegistry`, pagina fractală, Ctrl+K,
+  clopoțel, selectoare de firmă/lună, panou de Legături, `createAction`, Panou,
+  shell de teren și portaluri.
+
+**Verificări din pas care trec / nu trec:**
+- [x] #1 două entități în registry cu tab-uri diferite randează fără cod de pagină nou —
+  6 entități, zero fișiere de pagină per entitate
+- [x] #2 selectorul de firmă persistă (cookie, un an) și se reflectă în tot ce e sub el
+- [x] #3 lacătul 🔒 apare pe orice ecran care depinde de lună; scrierile sunt dezactivate
+  **cu explicație**, nu doar gri
+- [x] #4 modala nu se închide la click în afară; Escape trece prin aceeași poartă;
+  `isDirty` cere confirmare
+- [x] #5 orice listă are `EmptyState` — impus de tipuri, nu de disciplină
+- [x] #6 Ctrl+K cu grupuri și prefixe (`/` și `>` se rezolvă local, fără rețea)
+- [x] #7 tab-urile financiare lipsesc din DOM pentru rolurile fără drept, iar ruta lor
+  răspunde „nu ai acces” (filtrarea e înainte de randare, nu în CSS)
+- [x] #9 două alerte identice pe același scope → un singur rând (test de bază de date)
+- [x] #11 rate card cu interval suprapus → mesaj în română, nu stack trace
+- [x] #12 `(field)` are shell propriu, zero cifre în lei, banner de sincronizare
+- [ ] #8 badge-ul crește fără refresh — cod livrat (`live-sync.tsx`, Realtime + fallback
+  60 s), dar Realtime cere sesiune Supabase, deci se validează la 02c
+- [ ] #10 produs creat/editat apare imediat + audit — de rulat pe baza de date reală
+- [ ] #13 test Playwright la 1200 px și 390 px — Playwright nu e încă în repo
+- [ ] #14 Lighthouse pe o listă — de rulat
+
+**Observații / decizii luate / abateri de la plan:**
+
+- **Numerotarea migrărilor.** Pasul ăsta a luat `0008`, deci **02b (RLS + izolarea
+  prețului) se mută pe `0009`–`0010`**. Drizzle numerotează în ordinea creării; nu era
+  loc de rezervat.
+- **Sesiunea e provizorie.** 02c (Supabase Auth, JWT hook) nu e făcut, iar shell-ul se
+  construiește peste identitate. Sesiunea vine dintr-un cookie de dezvoltare, cu un
+  administrator implicit când lipsește — **doar sub `NODE_ENV !== 'production'`**.
+  Contractul e ales ca să nu ceară rescrieri: tot ce e deasupra consumă `Session`, iar
+  02c schimbă **un singur fișier**, `apps/web/src/lib/session.ts`.
+- **Contextul stă în cookie, nu în URL**, deși planul spune „URL + cookie”. Motivul: în
+  Next 15 layout-urile nu primesc `searchParams`, iar shell-ul (sidebar, badge-uri,
+  bară de sus) trăiește în layout. Cu contextul în URL, layout-ul și pagina ar citi din
+  două surse și s-ar contrazice exact în cazul care contează — omul schimbă luna și
+  sidebar-ul rămâne pe cea veche. Prețul: un link copiat nu poartă contextul.
+- **Rutele nomenclatoarelor sunt plate** (`/produse`, nu `/nomenclatoare/produse`).
+  Gruparea e vizuală, în sidebar. Asta face ca `/produse/{id}/istoric` să aibă exact
+  forma pe care o va avea `/contracte/{id}/plafoane` în pasul 04 — un singur șablon.
+- **Fără temă întunecată.** Token-urile sunt gata pentru ea (nicio culoare nu e scrisă
+  într-o componentă), dar varianta nu se livrează nevalidată pe ecrane reale.
+- **`Money` refuză `number` la nivel de tip.** `Stat` cere `context`. `Tabs` nu are
+  `disabled`. `EmptyState` nu are câmpuri opționale pentru titlu și corp. Regulile din
+  §30 sunt impuse de semnături, nu de review.
+- **`text-sm` = 13px, `text-base` = 14px** — scara e mai strânsă decât implicitul
+  Tailwind. Un ERP arată 40 de rânduri pe ecran, nu o pagină de marketing.
+- **Bivarianța din `registry/types.ts`** e ce ține registry-ul tipizat fără `any`.
+  Detaliile în `docs/entity-registry.md`.
+
+**Ce rămâne pentru sesiunea următoare:**
+1. `pnpm db:migrate` pe Supabase dev → verificările #8, #10 pe date reale.
+2. Push → CI (testele de bază de date urcă de la 39 la 47).
+3. Playwright pentru #13, Lighthouse pentru #14.
+4. 02b (RLS, migrările `0009`–`0010`) și 02c (auth), care închid și #8.
 
 ---
 

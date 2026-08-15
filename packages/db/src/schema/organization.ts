@@ -18,12 +18,12 @@ import { app, officeRoleEnum, personCategoryEnum, personaEnum } from './enums';
 import { companies } from './companies';
 
 /** Coloane pe care le poarta orice tabela de nomenclator. */
-const id = (): ReturnType<typeof uuid> =>
+const id = () =>
   uuid('id')
     .primaryKey()
     .$defaultFn(() => uuidv7());
 
-const createdAt = (): ReturnType<typeof timestamp> =>
+const createdAt = () =>
   timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
 /**

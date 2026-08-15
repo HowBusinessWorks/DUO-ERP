@@ -45,6 +45,8 @@ const EXPECTED_ENUMS = [
   // adaugate in pasul 02a
   'audit_op',
   'numbered_document_type',
+  // adaugat in pasul 03
+  'alert_severity',
   'budget_cadence',
   'checklist_answer',
   'component_type',

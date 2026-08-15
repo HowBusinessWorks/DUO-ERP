@@ -211,3 +211,12 @@ export const numberedDocumentTypeEnum = app.enum('numbered_document_type', [
 ]);
 
 export const auditOpEnum = app.enum('audit_op', ['insert', 'update', 'delete']);
+
+// ── notificari (pasul 03) ───────────────────────────────────────────────────
+
+/**
+ * Severitatea unei alerte. Enum, spre deosebire de `kind`, pentru ca decide
+ * culoarea si ordinea in interfata: o lista inchisa de trei valori, care nu are
+ * de ce sa creasca. `kind` ramane text — fiecare pas isi aduce pragurile lui.
+ */
+export const alertSeverityEnum = app.enum('alert_severity', ['info', 'warning', 'critical']);
