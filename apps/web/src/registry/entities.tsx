@@ -23,6 +23,8 @@ import { Money as MoneyValue } from '@damina/shared';
 import { Badge, CellMeta, CellTitle, EmptyState, Money } from '@damina/ui';
 import { Clock } from 'lucide-react';
 import { AuditTrail } from '../components/detail/audit-trail';
+import { contracte } from './contracts';
+import { obiective } from './objectives';
 import { DefinitionList, Empty } from '../components/detail/definition-list';
 import { PhasePlaceholder } from '../components/detail/phase-placeholder';
 import { defineEntity, type EntityContext, type EntityDefinition } from './types';
@@ -1264,6 +1266,11 @@ function RateCardTimeline({ rows }: { rows: readonly RateCardRow[] }) {
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 export const entityRegistry: Readonly<Record<string, EntityDefinition>> = {
+  // Contractul si obiectivul s-au adaugat in pasul 04 FARA sa se atinga shell-ul
+  // sau pagina fractala: doua intrari aici, doua fisiere de declaratii, zero
+  // fisiere de pagina. Asta era testul pe care si-l pusese pasul 03.
+  contracte,
+  obiective,
   produse,
   furnizori,
   clienti,

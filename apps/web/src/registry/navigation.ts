@@ -84,7 +84,7 @@ export const NAVIGATION: readonly NavItem[] = [
     label: 'Contracte',
     icon: 'fileSignature',
     group: 'operational',
-    phase: 1,
+    phase: 0,
     usesPeriod: true,
     children: [
       { slug: '', label: 'Toate contractele' },
@@ -99,7 +99,7 @@ export const NAVIGATION: readonly NavItem[] = [
     label: 'Obiective',
     icon: 'mapPin',
     group: 'operational',
-    phase: 1,
+    phase: 0,
     children: [
       { slug: '', label: 'Toate obiectivele' },
       { slug: 'acoperire', label: 'Acoperire inspecții' },

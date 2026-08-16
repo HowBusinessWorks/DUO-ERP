@@ -2,6 +2,8 @@
 
 import {
   clientInputSchema,
+  contractInputSchema,
+  objectiveInputSchema,
   productInputSchema,
   qualificationInputSchema,
   rateCardInputSchema,
@@ -11,12 +13,16 @@ import {
 import { canEditNomenclature, canSeeFinancials } from '@damina/auth';
 import {
   createClient,
+  createContract,
+  createObjective,
   createProduct,
   createQualification,
   createRateCard,
   createSubcontractor,
   createSupplier,
   updateClient,
+  updateContract,
+  updateObjective,
   updateProduct,
   updateSubcontractor,
   updateSupplier,
@@ -46,6 +52,8 @@ interface Writer {
   update?(actor: Actor, id: string, values: never): Promise<{ id: string }>;
   /** Cine are dreptul sa scrie. Tarifele poarta salarii, deci sunt separate. */
   canWrite: typeof canEditNomenclature;
+  /** Motivul scris pentru UPDATE. Baza il cere; ecranul il declara aici. */
+  readonly updateReason?: string;
 }
 
 const WRITERS: Readonly<Record<string, Writer>> = {
@@ -85,6 +93,25 @@ const WRITERS: Readonly<Record<string, Writer>> = {
     create: createRateCard as Writer['create'],
     canWrite: canSeeFinancials,
   },
+  // Contractul poarta valoare, indexare si prag de Delta — deci dreptul e cel
+  // financiar, nu cel de nomenclator. Un PM fara drept financiar deschide
+  // contractul si nu-i vede coloanele comerciale (izolarea e pe coloana, in
+  // baza); aici i se refuza si scrierea, inainte sa ajunga la ea.
+  contracte: {
+    schema: contractInputSchema,
+    create: createContract as Writer['create'],
+    update: updateContract as NonNullable<Writer['update']>,
+    canWrite: canSeeFinancials,
+    updateReason: 'modificare contract',
+  },
+  // Obiectivele NU au `company_id`: sunt nomenclator comun celor 5 firme.
+  obiective: {
+    schema: objectiveInputSchema,
+    create: createObjective as Writer['create'],
+    update: updateObjective as NonNullable<Writer['update']>,
+    canWrite: canEditNomenclature,
+    updateReason: 'modificare obiectiv',
+  },
 };
 
 export async function saveRecord(
@@ -102,21 +129,24 @@ export async function saveRecord(
     return {
       ok: false,
       code: 'FORBIDDEN',
-      message: 'Rolul tău nu poate modifica acest nomenclator.',
+      message: 'Rolul tău nu poate modifica înregistrările din acest modul.',
     };
   }
 
   const run = createAction({
     schema: writer.schema,
-    reason: id === null ? undefined : 'editare nomenclator',
-    run: async (actor, values) => {
+    reason: id === null ? undefined : (writer.updateReason ?? 'editare nomenclator'),
+    // Serviciile primesc valoarea BRUTA, nu cea deja transformata: ele o
+    // parseaza cu aceeasi schema, iar o valoare trecuta o data prin transformari
+    // (`'' → null`) nu mai trece a doua oara.
+    run: async (actor, _values, rawInput) => {
       if (id === null) {
-        return writer.create(actor, values as never);
+        return writer.create(actor, rawInput as never);
       }
       if (writer.update === undefined) {
-        throw new AppError('FORBIDDEN', 'Înregistrările din acest nomenclator nu se modifică.');
+        throw new AppError('FORBIDDEN', 'Înregistrările din acest modul nu se modifică.');
       }
-      return writer.update(actor, id, values as never);
+      return writer.update(actor, id, rawInput as never);
     },
   });
 

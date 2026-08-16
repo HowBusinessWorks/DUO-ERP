@@ -29,9 +29,19 @@ export type ActionResult<T = void> =
  */
 export function createAction<Schema extends z.ZodType, Result>(config: {
   readonly schema: Schema;
+  /**
+   * `input` e valoarea VALIDATA, `raw` cea primita de la formular.
+   *
+   * Use-case-urile din `services` isi parseaza singure intrarea, cu aceeasi
+   * schema — deci lor li se da `raw`, nu `input`. Diferenta nu e stilistica:
+   * schemele au transformari (`'' → null`), iar rezultatul lor nu mai trece a
+   * doua oara prin ele. Un `category` lasat gol ar fi ajuns `null` aici si ar fi
+   * picat la re-parsare in serviciu, cu ZodError, nu cu mesaj in romana.
+   */
   readonly run: (
     actor: Awaited<ReturnType<typeof requireActor>>,
     input: z.output<Schema>,
+    raw: unknown,
   ) => Promise<Result>;
   /** Ce se invalideaza dupa succes. Fiecare use-case isi declara tagurile. */
   readonly tags?: readonly string[] | ((result: Result, input: z.output<Schema>) => readonly string[]);
@@ -51,7 +61,7 @@ export function createAction<Schema extends z.ZodType, Result>(config: {
 
     try {
       const actor = await requireActor(config.reason);
-      const result = await config.run(actor, parsed.data as z.output<Schema>);
+      const result = await config.run(actor, parsed.data as z.output<Schema>, raw);
 
       const tags =
         typeof config.tags === 'function'

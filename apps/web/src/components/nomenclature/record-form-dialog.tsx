@@ -2,6 +2,8 @@
 
 import {
   clientInputSchema,
+  contractInputSchema,
+  objectiveInputSchema,
   productInputSchema,
   qualificationInputSchema,
   rateCardInputSchema,
@@ -26,6 +28,7 @@ import {
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import type { z } from 'zod';
+import { GeoField } from '../objective/geo-field';
 import type { ActionResult } from '../../lib/action';
 import type { FormFieldSpec } from '../../registry/types';
 
@@ -44,6 +47,8 @@ const SCHEMAS: Readonly<Record<string, z.ZodType>> = {
   subcontractanti: subcontractorInputSchema,
   calificari: qualificationInputSchema,
   tarife: rateCardInputSchema,
+  contracte: contractInputSchema,
+  obiective: objectiveInputSchema,
 };
 
 export interface RecordFormDialogProps {
@@ -171,7 +176,6 @@ function FormDialog({
   onClose: () => void;
   onSubmit: (values: unknown) => Promise<void>;
 }) {
-  const [dirty, setDirty] = useState(false);
   const formId = `form-${module}`;
 
   return (
@@ -189,10 +193,9 @@ function FormDialog({
       {(form) => {
         // `isDirty` merge in Dialog: la inchidere cu modificari nesalvate,
         // se cere confirmare (§30.1). Regula traieste in componenta, nu aici.
-        if (form.formState.isDirty !== dirty) {
-          setDirty(form.formState.isDirty);
-        }
-
+        // Se citeste direct din `formState` (proxy react-hook-form, care
+        // reranda `Form` la schimbare) — o copie in `useState` ar insemna
+        // setState in timpul randarii altei componente.
         return (
           <Dialog
             open
@@ -202,7 +205,7 @@ function FormDialog({
               }
             }}
             title={title}
-            isDirty={dirty}
+            isDirty={form.formState.isDirty}
             size="md"
             footer={
               <>
@@ -240,6 +243,17 @@ function FormDialog({
 function FieldControl({ spec, editing }: { spec: FormFieldSpec; editing: boolean }) {
   const form = useFormContext();
   const readOnly = editing && spec.readOnlyOnEdit === true;
+
+  if (spec.control === 'geo') {
+    return (
+      <GeoField
+        latName={spec.name}
+        lngName={spec.pairedWith ?? ''}
+        label={spec.label}
+        hint={spec.hint}
+      />
+    );
+  }
 
   if (spec.control === 'checkbox') {
     return (

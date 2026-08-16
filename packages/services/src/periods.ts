@@ -1,5 +1,6 @@
 import { type Actor, schema, withActor } from '@damina/db';
 import { AppError } from '@damina/shared';
+import { and, eq } from 'drizzle-orm';
 
 /**
  * Deschide lunile care lipsesc, de la `fromYear` pana la luna curenta inclusiv.
@@ -52,4 +53,37 @@ export async function ensureOpenPeriods(
 
     return { created: inserted.length, existing: wanted.length - inserted.length };
   });
+}
+
+/**
+ * Id-ul lunii unei firme. `null` cand luna nu e deschisa inca.
+ *
+ * Plafoanele se leaga de `app.periods`, nu de un an si o luna scrise ca numere:
+ * asa garda de perioada (triggerul din 02a) are ce sa verifice, iar o luna
+ * inchisa refuza scrierea din baza, nu din ecran.
+ *
+ * `null` NU e o eroare de programare — lunile viitoare chiar nu exista pana
+ * ruleaza `ensureOpenPeriods`. Apelantul spune omului ce lipseste.
+ */
+export async function findPeriodId(
+  actor: Actor,
+  companyId: string,
+  year: number,
+  month: number,
+): Promise<string | null> {
+  const row = await withActor(actor, async (tx) => {
+    const [found] = await tx
+      .select({ id: schema.periods.id })
+      .from(schema.periods)
+      .where(
+        and(
+          eq(schema.periods.companyId, companyId),
+          eq(schema.periods.year, year),
+          eq(schema.periods.month, month),
+        ),
+      )
+      .limit(1);
+    return found;
+  });
+  return row?.id ?? null;
 }

@@ -1,5 +1,5 @@
 import { EmptyState } from '@damina/ui';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { EntityHeader } from '../../../../../components/shell/entity-header';
 import { LinksPanel } from '../../../../../components/shell/links-panel';
 import { PeriodLockBanner } from '../../../../../components/shell/period-lock-banner';
@@ -30,6 +30,13 @@ export default async function EntityDetailPage({
   const entity = entityRegistry[module];
   if (entity?.detail === undefined) {
     notFound();
+  }
+
+  // `/contracte/plafoane` din sidebar nu e un contract cu id-ul „plafoane”, e o
+  // VEDERE a listei. Ruta plata le-ar confunda si ar da 404 pe o intrare de
+  // meniu care exista — de aceea vederile se recunosc inainte de incarcare.
+  if (entity.list?.views?.some((view) => view.key === id) === true) {
+    redirect(`/${module}?view=${id}`);
   }
 
   const ctx = await getAppContext();
@@ -63,9 +70,9 @@ export default async function EntityDetailPage({
   }
 
   const [header, links, content] = await Promise.all([
-    Promise.resolve(entity.detail.header(record)),
+    Promise.resolve(entity.detail.header(record, entityCtx)),
     entity.detail.links(record, entityCtx),
-    Promise.resolve(activeTab.render(record, entityCtx)),
+    Promise.resolve(activeTab.render(record, entityCtx, tab?.slice(1) ?? [])),
   ]);
 
   const actions = entity.detail.quickActions(record, entityCtx);

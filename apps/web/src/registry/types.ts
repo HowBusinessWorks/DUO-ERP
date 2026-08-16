@@ -33,6 +33,20 @@ export interface EntityContext {
 export interface ListQuery {
   readonly query?: string;
   readonly includeInactive?: boolean;
+  /**
+   * Vederea aleasa din comutatorul listei. Sirul vid e tabelul.
+   *
+   * Exista pentru ca obiectivele se citesc si pe harta (§3.5) — aceleasi date,
+   * alta reprezentare. Nu e o a doua lista: `load` ramane unul singur, ca
+   * numarul de randuri sa nu poata diferi intre vederi.
+   */
+  readonly view?: string;
+}
+
+/** O vedere a listei. Prima din sir e implicita si e intotdeauna tabelul. */
+export interface ListView {
+  readonly key: string;
+  readonly label: string;
 }
 
 export interface ListColumn<Row> {
@@ -62,6 +76,20 @@ export interface EntityListConfig<Row> {
   readonly searchPlaceholder: string;
   /** Text de context deasupra listei. Ex: „nomenclatoarele sunt comune”. */
   readonly notice?: string;
+  /**
+   * Vederile comutabile. Lipsa lor inseamna „doar tabel”, cazul obisnuit.
+   *
+   * Cheia unei vederi e si sub-slugul ei de navigare: `/obiective/profile` din
+   * sidebar ajunge la `?view=profile`. Asa intrarile de meniu prevazute in §3
+   * raman navigabile fara sa se creeze o a doua pagina de lista.
+   */
+  readonly views?: readonly ListView[];
+  /** Randeaza o vedere care nu e tabelul. Primeste ACELEASI randuri. */
+  renderView?(
+    rows: readonly Row[],
+    view: string,
+    ctx: EntityContext,
+  ): ReactNode | Promise<ReactNode>;
 }
 
 export interface HeaderBadge {
@@ -108,7 +136,19 @@ export interface EntityTab<Entity> {
    */
   visible?(session: Session): boolean;
   count?(entity: Entity): number | undefined;
-  render(entity: Entity, ctx: EntityContext): ReactNode | Promise<ReactNode>;
+  /**
+   * `sub` sunt segmentele de dupa slugul tab-ului.
+   *
+   * Exista pentru cifrele care se desfac: banda unei componente duce la
+   * `/contracte/{id}/componente/{componentId}`, adica la lista de UL finantate
+   * din ea. Fara ele, „orice cifra se poate deschide” (I3) ar fi cerut o a doua
+   * pagina de detaliu — exact ce interzice fisierul asta.
+   */
+  render(
+    entity: Entity,
+    ctx: EntityContext,
+    sub: readonly string[],
+  ): ReactNode | Promise<ReactNode>;
 }
 
 export interface LinkItem {
@@ -135,7 +175,11 @@ export interface QuickAction {
 
 export interface EntityDetailConfig<Entity> {
   load(ctx: EntityContext, id: string): Promise<Entity | null>;
-  header(entity: Entity): EntityHeaderModel;
+  /**
+   * Antetul. Poate fi asincron: barele de progres ale contractului se calculeaza
+   * din plafoanele lunii selectate, iar luna vine din context, nu din rand.
+   */
+  header(entity: Entity, ctx: EntityContext): EntityHeaderModel | Promise<EntityHeaderModel>;
   readonly tabs: readonly EntityTab<Entity>[];
   /**
    * Panoul de Legaturi, rezolvat in RSC, cu contoare.
@@ -152,7 +196,22 @@ export interface EntityDetailConfig<Entity> {
 
 // ── Formularul, declarat ca date ─────────────────────────────────────────────
 
-export type ControlKind = 'text' | 'textarea' | 'select' | 'checkbox' | 'date' | 'number';
+export type ControlKind =
+  | 'text'
+  | 'textarea'
+  | 'select'
+  | 'checkbox'
+  | 'date'
+  | 'number'
+  /**
+   * Perechea de coordonate, cu harta pe care se pune pinul.
+   *
+   * E un singur control, nu doua campuri de text, pentru ca latitudinea si
+   * longitudinea nu au sens separat — iar §3.5 cere explicit ca pinul de pe
+   * harta sa se foloseasca si la SELECTIA coordonatelor, nu doar la afisare.
+   * Numele campului e cel al latitudinii; longitudinea o da `pairedWith`.
+   */
+  | 'geo';
 
 export interface FormFieldSpec {
   readonly name: string;
@@ -166,6 +225,8 @@ export interface FormFieldSpec {
   readonly full?: boolean;
   /** Se poate scrie doar la creare. Ex: codul unui produs deja folosit. */
   readonly readOnlyOnEdit?: boolean;
+  /** Doar pentru `control: 'geo'`: numele campului de longitudine. */
+  readonly pairedWith?: string;
 }
 
 export type Lookups = Readonly<Record<string, readonly { value: string; label: string }[]>>;

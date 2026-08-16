@@ -112,7 +112,7 @@ export function Dialog({
       className={cn(
         'w-[calc(100vw-2rem)] rounded-xl border border-border bg-surface p-0 text-ink shadow-lg',
         'backdrop:bg-ink/35 backdrop:backdrop-blur-[2px]',
-        'my-auto',
+        'my-auto mx-auto',
         SIZES[size],
       )}
     >

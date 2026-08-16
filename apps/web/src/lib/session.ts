@@ -19,8 +19,11 @@ import { cookies } from 'next/headers';
  * cand soseste 02c. Tot ce e deasupra (shell, registry, ecrane) consuma deja
  * `Session` si nu va sti ca s-a schimbat ceva.
  *
- * `DEV_FALLBACK_SESSION` se activeaza doar cand `NODE_ENV !== 'production'`.
- * In productie, lipsa sesiunii inseamna redirect la autentificare.
+ * Fallback-ul e activ cand `NODE_ENV !== 'production'`. Pentru build-urile de
+ * productie rulate local (`next build && next start`, unde `NODE_ENV` e mereu
+ * `production`) se poate reaprinde explicit cu `ALLOW_DEV_SESSION=1` in
+ * `apps/web/.env.local` — fisier ignorat de git, deci nu ajunge in deploy.
+ * In productie reala, lipsa sesiunii inseamna redirect la autentificare.
  */
 
 /**
@@ -47,7 +50,7 @@ export async function getSession(): Promise<Session | null> {
   if (fromCookie !== null) {
     return fromCookie;
   }
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_SESSION !== '1') {
     return null;
   }
   return devFallbackSession();

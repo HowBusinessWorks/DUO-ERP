@@ -9,7 +9,7 @@
 export { checkHealth } from './health';
 export type { HealthReport, ComponentStatus } from './health';
 
-export { ensureOpenPeriods } from './periods';
+export { ensureOpenPeriods, findPeriodId } from './periods';
 export type { EnsureOpenPeriodsResult } from './periods';
 
 export { getPeriodContext, listCompanies } from './context';

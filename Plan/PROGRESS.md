@@ -16,7 +16,7 @@
 | 01 — Fundația | 🟩 gata (15/15, CI verde) | 2026-08-15 |
 | 02 — Identitate, acces, RLS | 🟨 în lucru (02a din 4) | 2026-08-15 |
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat) | 2026-08-15 |
-| 04 — Contracte, obiective | 🟨 în lucru (04a din 2) | 2026-08-15 |
+| 04 — Contracte, obiective | 🟨 în lucru (04b livrat, de rulat pe date reale) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | ⬜ neînceput | — |
 | 06 — Registrul de cost, închidere | ⬜ neînceput | — |
 | 07 — File management (R2) | ⬜ neînceput | — |
@@ -274,7 +274,9 @@ imposibil să apară un tip în bază fără ca cineva să-l fi vrut acolo.
   loc de rezervat.
 - **Sesiunea e provizorie.** 02c (Supabase Auth, JWT hook) nu e făcut, iar shell-ul se
   construiește peste identitate. Sesiunea vine dintr-un cookie de dezvoltare, cu un
-  administrator implicit când lipsește — **doar sub `NODE_ENV !== 'production'`**.
+  administrator implicit când lipsește — **doar sub `NODE_ENV !== 'production'`**, sau
+  cu `ALLOW_DEV_SESSION=1` în `apps/web/.env.local` (necesar ca un `next build && next
+  start` local să fie utilizabil; fișierul e ignorat de git, nu ajunge în deploy).
   Contractul e ales ca să nu ceară rescrieri: tot ce e deasupra consumă `Session`, iar
   02c schimbă **un singur fișier**, `apps/web/src/lib/session.ts`.
 - **Contextul stă în cookie, nu în URL**, deși planul spune „URL + cookie”. Motivul: în
@@ -312,7 +314,7 @@ contract e greșită nu vrem să fi construit deja 15 ecrane peste ea.
 | Sub-etapă | Conținut | Verificări | Stare |
 |---|---|---|---|
 | **04a** | Migrările `0009`–`0010`, domain pur, servicii, alerte cron, seed determinist | 1–6, 10, 11, 15–18 | 🟩 gata |
-| **04b** | Ecranele: contract (9 tab-uri), obiectiv (6), hartă, acoperire inspecții | 7–9, 12–14 | ⬜ |
+| **04b** | Ecranele: contract (9 tab-uri), obiectiv (6), hartă, acoperire inspecții | 7–9, 12–14 | 🟨 cod complet |
 
 ### 2026-08-15 — [status: în lucru] — 04a, schema și motorul de bani
 
@@ -444,6 +446,87 @@ singură eroare pe run-ul `31880570041`, pe commit-ul `7c8ab7f`, dinaintea pasul
 3. Obiectiv: tab Contracte (#12), tab Istoric etichetat „analitica: folosit” (#13).
 4. Lista de obiective cu comutator tabel/hartă, Leaflet + tile-uri OSM (#14).
 5. Acoperire inspecții pe ecran (serviciul există deja și e testat).
+
+### 2026-08-16 — [status: în lucru] — 04b, ecranele
+
+**Ce s-a executat:**
+
+- **Contractul și obiectivul sunt în `entityRegistry`, fără să se atingă shell-ul** — §7 al
+  pasului. Build-ul o confirmă: **tot 12 rute**, aceleași ca înainte. Două entități noi cu 15
+  tab-uri între ele, zero fișiere de pagină. Ce a trebuit adăugat s-a adăugat în
+  `registry/types.ts`, unde beneficiază toate entitățile deodată — nu s-a ocolit registry-ul.
+- **`registry/contracts.tsx`** — cele 9 tab-uri. Prezentare cu bandă per componentă, Componente cu
+  plafoane editabile (lunar + plan anual), Obiective cu legături și acoperire, Financiar cu
+  indexarea istoricizată și comutator marjă brută/netă, Setări cu pragurile și audit trail-ul.
+  Vederi de listă: Toate · Plafoane · Portofoliu · Cadru furnizori · Subcontractanți.
+- **`registry/objectives.tsx`** — cele 6 tab-uri, plus vederile Tabel · Hartă · Acoperire
+  inspecții · Profile de inspecție.
+- **Hartă Leaflet** (`components/objective/objective-map.tsx`), o singură componentă și pentru
+  afișare, și pentru selecția coordonatelor. Tile-uri OSM, foaia de stil din pachet.
+- **`contract-actions.ts`** — plafoane (cost și venit, două acțiuni separate), legături de
+  obiectiv, schimbarea profilului. Toate cer motiv scris.
+
+**Verificări din pas care trec / nu trec:**
+- [x] §7 contractul și obiectivul în registry, **shell-ul neatins** — confirmat de build
+- [~] #7 trei benzi cu venit/plafon/angajat(0)/consumat(0)/rest, Delta cu lei neumpluți — cod
+  livrat, de confirmat pe seed
+- [~] #8 navigare ◀ ▶ pe luni, lună închisă cu 🔒 — idem
+- [~] #9 click pe componentă → lista de UL, goală cu `EmptyState` — idem
+- [~] #12 obiectiv → tab Contracte, ambele contracte cu perioade — idem
+- [~] #13 obiectiv → tab Istoric, etichetat „analitica: folosit” — idem
+- [~] #14 comutator tabel/hartă, click pe hartă la creare setează coordonatele — idem
+- [x] `pnpm typecheck` 12/12 · `pnpm lint` verde · `pnpm build` verde · 76 teste unitare
+
+**Bug găsit în cod deja livrat (pasul 03), reparat:** server action-urile trimiteau spre servicii
+valorile **deja transformate** de Zod, iar serviciile le re-parsau cu aceeași schemă. Schemele au
+transformări (`'' → null`), iar rezultatul lor nu mai trece a doua oară prin ele: orice câmp
+opțional lăsat gol — `category` la produs, `cui` la furnizor — ar fi picat la re-parsare cu
+`ZodError`, adică 500, nu mesaj în română. Nu se văzuse pentru că niciun test nu salva un
+nomenclator cu un câmp opțional gol. Reparat generic: `createAction` dă acum lui `run` și valoarea
+brută, iar serviciile o primesc pe aceea. Parsarea are un singur loc — serviciul.
+
+**Observații / decizii luate / abateri de la plan:**
+
+- **Vederile de listă sunt în URL, nu în cookie.** Firma și luna sunt context global și stau în
+  cookie; vederea e a ecranului, deci se poate da bookmark și trimite pe chat. Cheia unei vederi e
+  și sub-slugul ei de navigare, așa că `/contracte/plafoane` din sidebar redirectează la
+  `?view=plafoane` în loc să caute un contract cu id-ul „plafoane” și să dea 404. Intrările de
+  meniu prevăzute în §3 rămân navigabile fără a doua pagină de listă.
+- **Tab-urile primesc sub-segmente.** `/contracte/{id}/componente/{componentId}` e cifra desfăcută
+  (I3), nu o pagină nouă. Același mecanism ține comutatorul brută/netă din Financiar: e o rută, ca
+  linkul trimis pe chat să deschidă exact cifra pe care a văzut-o expeditorul.
+- **Antetul poate fi asincron.** Barele de progres ale contractului se calculează din plafoanele
+  lunii selectate, iar luna vine din context, nu din rând. Antetul și tab-ul Prezentare cer
+  aceleași cifre și sunt randate în paralel, deci `getContractOverview` e memoizat cu `cache()` —
+  altfel ecranul central al firmei ar face de două ori același set de interogări și ar putea afișa
+  două adevăruri.
+- **Tonul barei de Delta e dat EXPLICIT**, și e inversul celui implicit. `ProgressBar` colorează
+  peste 80% în portocaliu, ceea ce e corect pentru consum și fix pe dos pentru umplere: o Delta
+  umplută 90% ar fi arătat ca o depășire de buget. Singurul loc din tot pasul unde se scrie `tone`
+  împotriva regulii implicite, și motivul e comentat acolo.
+- **Consum și marjă în listă sunt „—”, nu 0.** Rollup-urile vin în pasul 06. Un zero inventat s-ar
+  citi ca o cifră reală; liniuța spune că nu se știe încă, iar `notice`-ul listei spune de ce.
+- **Control de formular nou: `geo`.** Un singur control pentru pereche, nu două câmpuri de text —
+  latitudinea și longitudinea nu au sens separat, iar baza le cere pe amândouă sau pe niciuna.
+  Clicul pe hartă scrie în câmpuri cu `shouldDirty`, altfel o coordonată pusă doar de pe hartă n-ar
+  fi cerut confirmare la închiderea formularului, adică munca omului s-ar fi pierdut tăcut.
+- **Obiectivele fără coordonate se numără sub hartă.** Un obiectiv care lipsește de pe hartă pentru
+  că n-are pin arată identic cu unul care nu există — și atunci nimeni nu-i completează
+  coordonatele.
+- **`leaflet` e dependință nouă** în `apps/web` (fără `react-leaflet`: harta se conduce imperativ,
+  o dependință în loc de două). Se încarcă dinamic în `useEffect` — modulul atinge `window` la
+  import. **Atenție:** adăugarea lui a stricat cache-ul `.next` și build-ul a picat cu
+  `Cannot find module './115.js'`; se repară ștergând `apps/web/.next`.
+- **Acoperirea inspecțiilor stă sub lista de obiective a contractului**, nu într-un tab propriu:
+  lista de tab-uri din §3.3 e explicită și n-are unul. Vederea `/obiective/acoperire` e alegătorul
+  de contract — frecvențele stau pe legătură, deci un tabel global ar fi trebuit să aleagă una din
+  frecvențele aceluiași obiectiv și să le ascundă pe celelalte.
+
+**Ce rămâne pentru sesiunea următoare:**
+1. `pnpm db:seed` + parcurs pe date reale: verificările #7, #8, #9, #12, #13, #14.
+2. Push → CI (testele de bază de date sunt neatinse, ar trebui să rămână 182).
+3. Playwright pentru #13 din pasul 03 (1200 px / 390 px) — acum există și ecrane cu hartă.
+4. Lista de persoane în formularul de contract (câmpul PM e gol până la 02d).
 
 ---
 

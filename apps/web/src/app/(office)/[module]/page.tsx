@@ -1,5 +1,6 @@
-import { EmptyState, Table } from '@damina/ui';
+import { cn, EmptyState, Table } from '@damina/ui';
 import { Construction } from 'lucide-react';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PeriodLockBanner } from '../../../components/shell/period-lock-banner';
 import { RecordFormDialog } from '../../../components/nomenclature/record-form-dialog';
@@ -67,10 +68,22 @@ export default async function ModuleListPage({
   const entityCtx: EntityContext = { session: ctx.session, actor: ctx.actor, app: ctx };
   const query = typeof search.q === 'string' ? search.q : undefined;
 
+  const views = entity.list.views ?? [];
+  const requestedView = typeof search.view === 'string' ? search.view : '';
+  const view = views.some((candidate) => candidate.key === requestedView) ? requestedView : '';
+
   const [rows, lookups] = await Promise.all([
-    entity.list.load(entityCtx, { query }),
+    entity.list.load(entityCtx, { query, view }),
     entity.form?.loadLookups?.(entityCtx) ?? Promise.resolve({}),
   ]);
+
+  // Vederile alternative primesc ACELEASI randuri ca tabelul. Doua incarcari ar
+  // fi insemnat ca harta poate arata alt numar de obiective decat lista, si
+  // nimeni n-ar sti care dintre ele minte.
+  const alternate =
+    view === '' || entity.list.renderView === undefined
+      ? null
+      : await entity.list.renderView(rows, view, entityCtx);
 
   const canWrite = entity.canWrite?.(ctx.session) ?? false;
   const usesPeriod = entity.usesPeriod;
@@ -105,6 +118,9 @@ export default async function ModuleListPage({
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
+            {views.length === 0 ? null : (
+              <ViewSwitch module={module} views={views} active={view} query={query} />
+            )}
             <ListSearch placeholder={entity.list.searchPlaceholder} />
             {entity.form === undefined ? null : (
               <RecordFormDialog
@@ -123,6 +139,8 @@ export default async function ModuleListPage({
           </div>
         </header>
 
+        {alternate === null ? (
+          <>
         <Table
           caption={entity.plural}
           columns={entity.list.columns}
@@ -153,6 +171,10 @@ export default async function ModuleListPage({
             {rows.length === 1 ? 'un rând' : `${String(rows.length)} rânduri`}
           </p>
         )}
+          </>
+        ) : (
+          <div className="min-h-0 flex-1">{alternate}</div>
+        )}
       </div>
     </>
   );
@@ -163,5 +185,59 @@ function Forbidden({ title, body }: { title: string; body: string }) {
     <div className="p-5">
       <EmptyState title={title} body={body} />
     </div>
+  );
+}
+
+/**
+ * Comutatorul de vederi al unei liste.
+ *
+ * Sunt ancore, nu stare de client: vederea sta in URL, deci se poate da
+ * bookmark si se poate trimite pe chat — spre deosebire de firma si de luna,
+ * care sunt context global si stau in cookie.
+ */
+function ViewSwitch({
+  module,
+  views,
+  active,
+  query,
+}: {
+  module: string;
+  views: readonly { key: string; label: string }[];
+  active: string;
+  query: string | undefined;
+}) {
+  const href = (key: string): string => {
+    const params = new URLSearchParams();
+    if (key !== '') {
+      params.set('view', key);
+    }
+    if (query !== undefined && query !== '') {
+      params.set('q', query);
+    }
+    const search = params.toString();
+    return search === '' ? `/${module}` : `/${module}?${search}`;
+  };
+
+  return (
+    <nav
+      aria-label="Vederea listei"
+      className="flex items-center gap-0.5 rounded-lg border border-border bg-surface-sunken p-0.5"
+    >
+      {views.map((view) => (
+        <Link
+          key={view.key}
+          href={href(view.key)}
+          aria-current={view.key === active ? 'page' : undefined}
+          className={cn(
+            'rounded px-2.5 py-1 text-sm font-medium transition-colors',
+            view.key === active
+              ? 'bg-surface text-ink shadow-sm'
+              : 'text-ink-muted hover:text-ink',
+          )}
+        >
+          {view.label}
+        </Link>
+      ))}
+    </nav>
   );
 }
