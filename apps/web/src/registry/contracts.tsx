@@ -172,7 +172,7 @@ function ComponentBandCard({
         {band.fill === null ? (
           <CostBand usage={band.usage} allocatedRevenue={band.allocatedRevenue} />
         ) : (
-          <FillBand fill={band.fill} contractId={contractId} />
+          <FillBand fill={band.fill} />
         )}
       </div>
 
@@ -231,7 +231,7 @@ function CostBand({
  * `expectedPercent` e rigla: pe 10 ale lunii, 33%. Fara ea „38%” nu spune
  * nimic — e excelent pe 12 si dezastruos pe 28.
  */
-function FillBand({ fill, contractId }: { fill: DeltaFill; contractId: string }) {
+function FillBand({ fill }: { fill: DeltaFill }) {
   if (fill.state === 'nesetat') {
     return (
       <Banner
@@ -276,10 +276,7 @@ function FillBand({ fill, contractId }: { fill: DeltaFill; contractId: string })
       ) : null}
 
       <p className="text-sm text-ink-subtle">
-        Propunerile din backlog care ar putea umple Delta vin în pasul 08.{' '}
-        <span title="Backlogul de propuneri se construiește în pasul 08.">
-          Legătura e pregătită pe contractul {contractId.slice(0, 8)}…
-        </span>
+        Propunerile din backlog care ar putea umple Delta vin în pasul 08.
       </p>
     </div>
   );

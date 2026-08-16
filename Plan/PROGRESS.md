@@ -314,7 +314,7 @@ contract e greșită nu vrem să fi construit deja 15 ecrane peste ea.
 | Sub-etapă | Conținut | Verificări | Stare |
 |---|---|---|---|
 | **04a** | Migrările `0009`–`0010`, domain pur, servicii, alerte cron, seed determinist | 1–6, 10, 11, 15–18 | 🟩 gata |
-| **04b** | Ecranele: contract (9 tab-uri), obiectiv (6), hartă, acoperire inspecții | 7–9, 12–14 | 🟨 cod complet |
+| **04b** | Ecranele: contract (9 tab-uri), obiectiv (6), hartă, acoperire inspecții | 7–9, 12–14 | 🟩 gata (#14 doar parțial în browser) |
 
 ### 2026-08-15 — [status: în lucru] — 04a, schema și motorul de bani
 
@@ -527,6 +527,66 @@ brută, iar serviciile o primesc pe aceea. Parsarea are un singur loc — servic
 2. Push → CI (testele de bază de date sunt neatinse, ar trebui să rămână 182).
 3. Playwright pentru #13 din pasul 03 (1200 px / 390 px) — acum există și ecrane cu hartă.
 4. Lista de persoane în formularul de contract (câmpul PM e gol până la 02d).
+
+### 2026-08-16 — [status: gata] — 04b, parcursul pe date reale
+
+**Ce s-a executat:**
+
+- Push pe `main` (`fca60ec`) → **CI verde, toate cele 4 joburi**, 182 de teste de bază de date
+  neatinse, ca prevăzut.
+- Parcurs pe seed, prin randarea reală a paginilor, pe contractul `4700` și obiectivul `OB-001`.
+
+**Verificări din pas care trec / nu trec:**
+- [x] #7 cele trei benzi pe Mar 2026: Mentenanță `30.000 / 18.000 / 0 / 0 / rest 18.000`,
+  Lucrări `14.000 / 9.500 / 0 / 0 / rest 9.500`, Delta `plafon 20.000 · umplut 7.600 ·
+  neumplut 12.400 · 38%`, cu „12.400,00 RON se pierd dacă luna se închide așa”. Pe o lună fără
+  plafoane setate banda spune „Plafon nesetat”, nu 0 — corect.
+- [x] #8 navigarea pe luni schimbă contextul global; pe o lună închisă apar lacătul, titlul
+  „Luna e închisă…” și bannerul „Luna ianuarie 2026 este închisă”. Verificat închizând temporar
+  ianuarie 2026 și redeschizând-o după.
+- [x] #9 click pe componentă → `/contracte/{id}/componente/{componentId}`, `EmptyState` cu
+  „Nicio unitate de lucru finanțată din Mentenanță” și `Total: 0,00 RON · analitica: folosit`.
+- [x] #12 obiectivul e pe **2 contracte simultan**, cu perioadele lor (`4700` din 01 mar. 2026
+  fără sfârșit, `5100` 01 apr. → 31 oct. 2026), la firme diferite.
+- [x] #13 tab-ul Istoric e etichetat „analitica: **folosit** — nu pe «descărcat»”.
+- [~] #14 comutatorul tabel/hartă merge (vederea `?view=harta` randează „21 obiective pe
+  hartă”, coloana Coordonate are pin doar unde există). **Clicul pe hartă la creare n-a fost
+  confirmat în browser** — extensia Chrome nu era conectată, iar Playwright nu e încă instalat.
+  Rămâne singura verificare a pasului confirmată doar din cod.
+
+**Trei buguri găsite la parcurs, toate reparate:**
+
+1. **Seed-ul nu era repetabil, deși se declara determinist.** `createContract` și
+   `createInspectionProfile` își generează singure id-ul, deci `IDS.contractMaintenance` și
+   `IDS.profile*` nu ajungeau niciodată în baza de date. Consecința: `exists()` întorcea mereu
+   `false`, `wipe()` nu ștergea nimic, și a doua rulare cădea cu `CONFLICT: Există deja un
+   contract cu codul 4700`. Reparat: `createContract` acceptă un `id` impus din afară (îl
+   folosește doar seed-ul), iar `wipe()` caută contractele și profilele după **cheia naturală**
+   — cod + firmă, respectiv nume — ca să prindă și ce au lăsat rulările vechi. `wipe()` șterge
+   acum rândurile de profil după **ambele** capete, profil și fișă; altfel fișele rămâneau
+   referite și ștergerea cădea cu `23503`.
+2. **`deltaFill` spunea „mai ai o zi” pe o lună deja încheiată.** Pe o lună trecută serviciul
+   trimite ultima ei zi ca `asOf`, iar `daysLeft` numără ziua curentă inclusiv — corect doar
+   când ea chiar e azi. Pe o lună închisă nu mai e nimic de umplut. Adăugat `monthEnded` în
+   `DeltaFillInput`, pus de serviciu din comparația perioadei cu luna curentă; **un test nou**
+   blochează regresia (`daysLeft` 0, ritm cerut 100%).
+3. **Un UUID brut pe ecran.** Banda Delta afișa „Legătura e pregătită pe contractul
+   `01950000`…” — un fragment de id care nu spune nimic nimănui. Scos; propoziția despre pasul
+   08 rămâne.
+
+**Observații:**
+
+- Contextul de lună fiind în cookie (`damina_ctx`), parcursul s-a putut face fără browser,
+  cerând paginile cu cookie-ul pus pe luna dorită. E o consecință utilă a deciziei din 04b, nu
+  ceva construit pentru asta.
+- Plafoanele din seed stau pe **03–05/2026**, iar aplicația se deschide pe luna curentă, deci
+  pe august benzile arată „Plafon nesetat”. Nu e bug — dar la primul parcurs arată gol.
+
+**Ce rămâne pentru sesiunea următoare:**
+1. Playwright: #13 din pasul 03 (1200 px / 390 px) **și** clicul pe hartă din #14, singura
+   verificare rămasă neconfirmată în browser.
+2. Lista de persoane în formularul de contract (câmpul PM e gol până la 02d).
+3. Pasul 05 — Unitate de Lucru, finanțare.
 
 ---
 

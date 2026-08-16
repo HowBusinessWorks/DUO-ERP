@@ -89,6 +89,22 @@ describe('deltaFill', () => {
     expect(fill.unfilled.toString()).toBe('12400.00');
   });
 
+  // Ultima zi se numara inclusiv doar cand ea chiar e azi. Pe o luna deja
+  // incheiata, „mai ai o zi” e o minciuna: nu mai e nimic de umplut.
+  it('o luna incheiata n-are zile ramase, iar ritmul cerut e 100%', () => {
+    const fill = deltaFill({
+      revenueCeiling: lei('20000.00'),
+      allocatedRevenue: lei('7600.00'),
+      asOf: '2026-03-31',
+      monthEnded: true,
+    });
+
+    expect(fill.daysLeft).toBe(0);
+    expect(fill.expectedPercent).toBe(100);
+    expect(fill.state).toBe('in_urma');
+    expect(fill.unfilled.toString()).toBe('12400.00');
+  });
+
   it('pe 10 ale unei luni de 31 de zile, ritmul asteptat e ~32%', () => {
     const fill = deltaFill({
       revenueCeiling: lei('10000.00'),

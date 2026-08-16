@@ -214,10 +214,17 @@ export async function getContract(actor: Actor, id: string): Promise<ContractRow
  * implementare a aceleiasi reguli, si cele doua diverg la prima corectie.
  *
  * Atomicitatea o da tranzactia: un contract fara ani n-a existat niciodata.
+ *
+ * `id` se poate impune din afara — il foloseste doar seed-ul determinist, care
+ * promite id-uri fixe testelor E2E. Formularele nu-l trimit niciodata.
  */
-export async function createContract(actor: Actor, input: ContractInput): Promise<{ id: string }> {
+export async function createContract(
+  actor: Actor,
+  input: ContractInput,
+  id?: string,
+): Promise<{ id: string }> {
   const values = contractInputSchema.parse(input);
-  const contractId = uuidv7();
+  const contractId = id ?? uuidv7();
 
   try {
     return await withActor(actor, async (tx) => {
@@ -536,6 +543,8 @@ export async function getContractOverview(
 
   const byComponent = new Map(ceilings.map((row) => [row.ceiling.componentId, row.ceiling]));
   const asOf = todayWithin(period);
+  // Luna privita e in trecut: nu mai are zile de umplut, oricare i-ar fi ultima zi.
+  const monthEnded = period.compare(Period.fromDate(new Date())) < 0;
 
   const bands: ComponentBand[] = components.map((component) => {
     const ceiling = byComponent.get(component.id);
@@ -550,6 +559,7 @@ export async function getContractOverview(
             ceiling?.revenueCeiling == null ? null : Money.fromDb(ceiling.revenueCeiling),
           allocatedRevenue,
           asOf,
+          monthEnded,
         }),
         usage: null,
       };

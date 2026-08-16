@@ -100,6 +100,15 @@ export interface DeltaFillInput {
   readonly allocatedRevenue: Money;
   /** Ziua fata de care se judeca ritmul, `yyyy-mm-dd`. */
   readonly asOf: BusinessDate;
+  /**
+   * Luna e deja INCHEIATA (se priveste o luna din trecut).
+   *
+   * Fara steagul asta, o luna trecuta se judeca cu `asOf` pus pe ultima ei zi si
+   * iese „mai ai o zi” — ultima zi se numara inclusiv, ceea ce e corect doar
+   * cand ea chiar e azi. Pe o luna incheiata nu mai e nimic de umplut, iar
+   * cifra care conteaza e cat s-a pierdut, nu cat mai ai.
+   */
+  readonly monthEnded?: boolean;
 }
 
 export interface DeltaFill {
@@ -131,8 +140,8 @@ export function deltaFill(input: DeltaFillInput): DeltaFill {
   }
 
   const total = daysInMonth(year, month);
-  const daysLeft = Math.max(0, total - day + 1);
-  const expectedPercent = (day / total) * 100;
+  const daysLeft = input.monthEnded === true ? 0 : Math.max(0, total - day + 1);
+  const expectedPercent = input.monthEnded === true ? 100 : (day / total) * 100;
 
   const ceiling = input.revenueCeiling;
   if (ceiling === null || ceiling.isZero()) {

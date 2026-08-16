@@ -1,5 +1,5 @@
 import { closeConnections, loadEnvFiles, schema, withActor, type Actor } from '@damina/db';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import {
   createComponent,
   createContract,
@@ -45,10 +45,12 @@ const IDS = {
   contractIndividual: id(4, 2),
   checklistStation: id(5, 1),
   checklistBasin: id(5, 2),
-  profileQuarterly: id(6, 1),
-  profileMonthly: id(6, 2),
   objective: (n: number) => id(7, n),
 };
+
+/** Profilele isi iau id-ul din baza, deci numele le e cheia — si aici, si in `wipe`. */
+const PROFILE_QUARTERLY = 'Trimestrial — stații';
+const PROFILE_MONTHLY = 'Lunar — obiective critice';
 
 const OBJECTIVES = [
   { kind: 'statie_pompare', name: 'Stația de pompare' },
@@ -73,23 +75,47 @@ const actor = (reason?: string): Actor => ({
 async function wipe(): Promise<void> {
   // Ordinea conteaza doar pentru ce n-are `on delete cascade`.
   await withActor(actor('stergere date de seed'), async (tx) => {
-    await tx.delete(schema.contractObjectives).where(
-      inArray(schema.contractObjectives.contractId, [IDS.contractMaintenance, IDS.contractIndividual]),
-    );
-    await tx.delete(schema.contracts).where(
-      inArray(schema.contracts.id, [IDS.contractMaintenance, IDS.contractIndividual]),
-    );
+    // Cautate dupa cheia naturala (cod + firma), nu dupa id: rulari mai vechi
+    // ale seed-ului au lasat contracte cu id generat, iar ele blocheaza unicul
+    // pe cod la reluare. Codurile '4700' si '5100' sunt rezervate seed-ului.
+    const stale = await tx
+      .select({ id: schema.contracts.id })
+      .from(schema.contracts)
+      .where(
+        and(
+          inArray(schema.contracts.companyId, [IDS.companyA, IDS.companyB]),
+          inArray(schema.contracts.code, ['4700', '5100']),
+        ),
+      );
+    const contractIds = stale.map((row) => row.id);
+    if (contractIds.length > 0) {
+      await tx.delete(schema.contractObjectives).where(
+        inArray(schema.contractObjectives.contractId, contractIds),
+      );
+      await tx.delete(schema.contracts).where(inArray(schema.contracts.id, contractIds));
+    }
     await tx.delete(schema.objectives).where(
       inArray(
         schema.objectives.id,
         Array.from({ length: 20 }, (_, index) => IDS.objective(index + 1)),
       ),
     );
+    // Profilele isi iau id-ul din baza (`createInspectionProfile` nu-l impune),
+    // deci si ele se cauta dupa cheia naturala — numele.
+    const profiles = await tx
+      .select({ id: schema.inspectionProfiles.id })
+      .from(schema.inspectionProfiles)
+      .where(inArray(schema.inspectionProfiles.name, [PROFILE_QUARTERLY, PROFILE_MONTHLY]));
+    // Randurile de profil trimit si spre fise, nu doar spre profil: sterse dupa
+    // ambele capete, altfel fisele raman referite si `delete` pica cu 23503.
     await tx.delete(schema.inspectionProfileItems).where(
-      inArray(schema.inspectionProfileItems.profileId, [IDS.profileQuarterly, IDS.profileMonthly]),
+      or(
+        inArray(schema.inspectionProfileItems.profileId, profiles.map((row) => row.id)),
+        inArray(schema.inspectionProfileItems.checklistId, [IDS.checklistStation, IDS.checklistBasin]),
+      ),
     );
     await tx.delete(schema.inspectionProfiles).where(
-      inArray(schema.inspectionProfiles.id, [IDS.profileQuarterly, IDS.profileMonthly]),
+      inArray(schema.inspectionProfiles.name, [PROFILE_QUARTERLY, PROFILE_MONTHLY]),
     );
     await tx.delete(schema.checklists).where(
       inArray(schema.checklists.id, [IDS.checklistStation, IDS.checklistBasin]),
@@ -103,7 +129,12 @@ async function exists(): Promise<boolean> {
     const rows = await tx
       .select({ id: schema.contracts.id })
       .from(schema.contracts)
-      .where(eq(schema.contracts.id, IDS.contractMaintenance))
+      .where(
+        and(
+          eq(schema.contracts.companyId, IDS.companyA),
+          eq(schema.contracts.code, '4700'),
+        ),
+      )
       .limit(1);
     return rows.length > 0;
   });
@@ -206,13 +237,13 @@ async function inspectionLibrary(): Promise<void> {
   });
 
   await createInspectionProfile(actor('seed'), {
-    name: 'Trimestrial — stații',
+    name: PROFILE_QUARTERLY,
     description: 'Fișa de stație, o dată la trei luni.',
     isActive: true,
   }).catch(ignoreConflict);
 
   await createInspectionProfile(actor('seed'), {
-    name: 'Lunar — obiective critice',
+    name: PROFILE_MONTHLY,
     description: 'Obiectivele care nu suportă trei luni fără verificare.',
     isActive: true,
   }).catch(ignoreConflict);
@@ -221,8 +252,8 @@ async function inspectionLibrary(): Promise<void> {
   const profiles = await withActor(actor(), async (tx) =>
     tx.select().from(schema.inspectionProfiles),
   );
-  const quarterly = profiles.find((profile) => profile.name.startsWith('Trimestrial'));
-  const monthly = profiles.find((profile) => profile.name.startsWith('Lunar'));
+  const quarterly = profiles.find((profile) => profile.name === PROFILE_QUARTERLY);
+  const monthly = profiles.find((profile) => profile.name === PROFILE_MONTHLY);
 
   if (quarterly !== undefined) {
     await addProfileItem(actor('seed'), {
@@ -264,8 +295,8 @@ async function main(): Promise<void> {
   const profiles = await withActor(actor(), async (tx) =>
     tx.select().from(schema.inspectionProfiles),
   );
-  const quarterly = profiles.find((profile) => profile.name.startsWith('Trimestrial'))?.id ?? '';
-  const monthly = profiles.find((profile) => profile.name.startsWith('Lunar'))?.id ?? '';
+  const quarterly = profiles.find((profile) => profile.name === PROFILE_QUARTERLY)?.id ?? '';
+  const monthly = profiles.find((profile) => profile.name === PROFILE_MONTHLY)?.id ?? '';
 
   // ── Cele 20 de obiective ───────────────────────────────────────────────────
   const objectiveIds: string[] = [];
@@ -306,7 +337,7 @@ async function main(): Promise<void> {
     ownerPersonId: IDS.pm,
     overheadPct: '12',
     status: 'activ',
-  });
+  }, IDS.contractMaintenance);
 
   const components = {
     maintenance: await createComponent(actor('seed'), {
@@ -408,7 +439,7 @@ async function main(): Promise<void> {
     ownerPersonId: IDS.pm,
     overheadPct: '',
     status: 'activ',
-  });
+  }, IDS.contractIndividual);
 
   await createComponent(actor('seed'), {
     contractId: individual.id,
