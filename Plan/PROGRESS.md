@@ -40,7 +40,7 @@ Motivul tăierii: pasul întreg are 19 verificări, 5 tabele, 6 use-case-uri și
 **21 de verificări**, registrul de cost cu ~25 de coloane, rollup-uri întreținute prin trigger, un job
 de control, mașina de închidere cu checklist ca date, șase ecrane și ~20 de fișiere `.sql`.
 
-**06a e gata, cu CI verde** (run `32030892549`). Verificările au fost rulate întâi pe Supabase dev,
+**06a și 06b sunt gata, cu CI verde** (rulările `32030892549` și `32033174957`). Rămâne **06c** — ecranele. Verificările au fost rulate întâi pe Supabase dev,
 pe Postgres 17.6 real, apoi confirmate de suita de bază de date în CI.
 
 | Sub-etapă | Conținut | Verificări din §6 |
@@ -149,7 +149,7 @@ scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat: #8, #10, #13, #14) | 2026-08-15 |
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
-| 06 — Registrul de cost, închidere | 🟨 în lucru (06a gata cu CI verde; 06b gata local; 06c neînceput) | 2026-08-17 |
+| 06 — Registrul de cost, închidere | 🟨 în lucru (06a + 06b gata, CI verde; 06c neînceput) | 2026-08-17 |
 | 07 — File management (R2) | ⬜ neînceput | — |
 | 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
 | 09 — Fișe de lucru | ⬜ neînceput | — |
@@ -1667,7 +1667,7 @@ efectiv aplicat:
 
 ---
 
-### 2026-08-17 — [status: gata local, CI de confirmat] — 06b, use-case-urile și închiderea
+### 2026-08-17 — [status: gata] — 06b, use-case-urile și închiderea
 
 **Pachet nou de use-case-uri: `packages/services/cost.ts`** — `recordCost`, `stornoCost`,
 `rechargeCostLines`, `costLineIdsForMove`, `listCostLines` (paginare **cursor**, niciodată `OFFSET`),
@@ -1702,8 +1702,11 @@ Rulate pe **Supabase dev (Postgres 17.6) real**, prin use-case-uri, nu prin SQL:
   `sum(committed+received+consumed+invoiced)` din rollup-uri, la leu — `548360.00` — și
   `rollup_verify()` întoarce **zero** divergențe
 - [x] `pnpm typecheck` 12/12 · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets` — verzi
-- [ ] Cele **17 teste noi** din `packages/services/tests/cost.test.ts` — nerulate local (fără Docker).
-  Se confirmă la primul CI. Toate scenariile lor au trecut însă prin harness-ul de pe Supabase dev.
+- [x] Cele **18 teste noi** din `packages/services/tests/cost.test.ts` — suita de servicii a urcat de
+  la 74 la **92**. **CI verde din prima, toate 4 joburile** (run `32033174957`, commit `a18b99f`).
+  Niciun bug la primul CI, spre deosebire de 06a: scenariile fuseseră rulate întâi prin harness-ul de
+  pe Supabase dev, iar cele două capcane de acolo (alocare într-o lună deja închisă, serie `NRA`
+  lipsă) au fost prinse înainte de push.
 
 **Observații / decizii luate / abateri de la plan:**
 
@@ -1778,5 +1781,6 @@ Rulate pe **Supabase dev (Postgres 17.6) real**, prin use-case-uri, nu prin SQL:
 **Ce rămâne pentru sesiunea următoare:**
 - ...
 ```
+
 
 
