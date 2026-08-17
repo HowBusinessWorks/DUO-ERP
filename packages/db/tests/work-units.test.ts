@@ -117,6 +117,10 @@ async function makeAllocation(
   } = {},
 ): Promise<string> {
   const id = uuidv7();
+  // `??` nu se poate folosi pentru suma: `null` e o VALOARE ceruta de teste (o
+  // alocare exprimata in procent n-are suma), iar `null ?? '12500.00'` ar da
+  // implicitul — adica testul „nici suma, nici procent" ar trimite o suma.
+  const amount = overrides.amount === undefined ? '12500.00' : overrides.amount;
   await tx.execute(sql`
     insert into app.funding_allocations
       (id, work_unit_id, contract_id, component_id, period_id,
@@ -124,7 +128,7 @@ async function makeAllocation(
     values (
       ${id}, ${workUnitId}, ${overrides.contractId ?? contractId},
       ${overrides.componentId ?? componentDelta}, ${overrides.periodId ?? periodAugust},
-      ${overrides.amount ?? '12500.00'}, ${overrides.pct ?? null},
+      ${amount}, ${overrides.pct ?? null},
       'finantare initiala de test', ${pmId}
     )`);
   return id;
@@ -357,7 +361,7 @@ describe('asignari', () => {
       withActor(officeActor(), async (tx) => {
         await tx.execute(sql`
           insert into app.persons (id, persona, category, full_name)
-          values (${strangerId}, 'field', 'muncitor', 'Fara autorizatii')`);
+          values (${strangerId}, 'field', 'sef_santier', 'Fara autorizatii')`);
         const workUnitId = await makeWorkUnit(tx);
         await tx.execute(sql`
           insert into app.work_unit_assignments (id, work_unit_id, person_id, role)
