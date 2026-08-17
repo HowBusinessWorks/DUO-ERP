@@ -13,6 +13,10 @@ import type { EntityHeaderModel } from '../../registry/types';
  *
  * Maximum doua bare de progres, si sunt cele pe care se ia decizia. Restul
  * indicatorilor stau in tab-uri.
+ *
+ * `sticky top-0`, nu `top-(--spacing-topbar)`: containerul care face scroll
+ * (`#continut`) incepe DEJA sub bara globala. Un offset in plus lipea antetul cu
+ * 3rem mai jos, lasa o banda goala deasupra lui si taia primul rand de continut.
  */
 export function EntityHeader({
   header,
@@ -28,7 +32,7 @@ export function EntityHeader({
   const progress = (header.progress ?? []).slice(0, 2);
 
   return (
-    <div className="sticky top-(--spacing-topbar) z-20 border-b border-border bg-surface">
+    <div className="sticky top-0 z-20 border-b border-border bg-surface">
       <div className="px-5 pt-3 pb-2">
         {/* Breadcrumb SEMANTIC: nume, nu ID-uri. */}
         <nav aria-label="Traseu semantic">

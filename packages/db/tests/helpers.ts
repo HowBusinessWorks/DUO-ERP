@@ -39,23 +39,55 @@ export async function rejection(promise: Promise<unknown>): Promise<unknown> {
   );
 }
 
+/**
+ * Ce se pune in `request.jwt.claims`. De la 02b incoace conteaza: politicile
+ * RLS citesc de acolo, deci un actor de test fara claim-uri vede exact ce vede
+ * un utilizator fara drepturi — adica nimic.
+ */
+export interface ActorOptions {
+  readonly reason?: string;
+  readonly personId?: string;
+  /** Firmele vizibile. Lipsa lor + rol `admin` = tot grupul (vezi `0011`). */
+  readonly companyIds?: readonly string[];
+  readonly officeRoles?: readonly string[];
+}
+
 export function actorFor(
   persona: Actor['persona'],
   pgRole: Actor['pgRole'],
-  reason?: string,
+  options: ActorOptions = {},
 ): Actor {
-  const personId = uuidv7();
+  const personId = options.personId ?? uuidv7();
   return {
     personId,
     persona,
     pgRole,
-    claims: {},
-    ...(reason === undefined ? {} : { reason }),
+    claims: {
+      ...(options.officeRoles === undefined ? {} : { office_roles: options.officeRoles }),
+      ...(options.companyIds === undefined ? {} : { company_ids: options.companyIds }),
+    },
+    ...(options.reason === undefined ? {} : { reason: options.reason }),
   };
 }
 
-export const officeActor = (reason?: string): Actor => actorFor('office', 'app_office', reason);
-export const fieldActor = (): Actor => actorFor('field', 'app_field');
+/**
+ * Biroul din teste e ADMINISTRATOR, si asta nu e comoditate: fara rolul de
+ * admin n-ar putea crea firme (politica `office` de pe `app.companies` cere
+ * explicit rolul), iar fara firme n-ar avea ce testa. Testele care verifica ce
+ * NU poate face un birou obisnuit isi construiesc actorul lor.
+ */
+export const officeActor = (
+  reason?: string,
+  options: Omit<ActorOptions, 'reason'> = {},
+): Actor =>
+  actorFor('office', 'app_office', {
+    officeRoles: ['admin'],
+    ...options,
+    ...(reason === undefined ? {} : { reason }),
+  });
+
+export const fieldActor = (options: Omit<ActorOptions, 'reason' | 'officeRoles'> = {}): Actor =>
+  actorFor('field', 'app_field', options);
 
 /** SQLSTATE-urile pe care le asteptam explicit in teste. */
 export const SQLSTATE = {

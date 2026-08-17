@@ -78,6 +78,20 @@
       "when": 1786792467166,
       "tag": "0010_objectives",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786792468166,
+      "tag": "0011_rls_policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786792469166,
+      "tag": "0012_price_isolation",
+      "breakpoints": true
     }
   ]
 }

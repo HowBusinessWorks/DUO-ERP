@@ -25,7 +25,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import type { IconName, NavGroup, NavItem } from '../../registry/navigation';
 
@@ -72,6 +72,10 @@ export interface SidebarProps {
  */
 export function Sidebar({ items, badges }: SidebarProps) {
   const pathname = usePathname();
+  // Sub-sectiunile listelor stau in `?view=`, nu intr-un al doilea segment de
+  // ruta: `/obiective/profile` face redirect la `/obiective?view=profile`. Fara
+  // parametru, sidebar-ul ar arata mereu prima sub-sectiune ca activa.
+  const view = useSearchParams().get('view') ?? '';
   const [collapsed, setCollapsed] = useState(false);
 
   const activeSlug = pathname.split('/')[1] ?? '';
@@ -99,6 +103,7 @@ export function Sidebar({ items, badges }: SidebarProps) {
                 item={item}
                 active={item.slug === activeSlug}
                 pathname={pathname}
+                view={view}
                 badge={badges[item.slug] ?? 0}
                 collapsed={collapsed}
               />
@@ -129,6 +134,7 @@ export function Sidebar({ items, badges }: SidebarProps) {
                     item={item}
                     active={item.slug === activeSlug}
                     pathname={pathname}
+                    view={view}
                     badge={badges[item.slug] ?? 0}
                     collapsed={collapsed}
                   />
@@ -164,12 +170,14 @@ function SidebarItem({
   item,
   active,
   pathname,
+  view,
   badge,
   collapsed,
 }: {
   item: NavItem;
   active: boolean;
   pathname: string;
+  view: string;
   badge: number;
   collapsed: boolean;
 }) {
@@ -208,7 +216,10 @@ function SidebarItem({
         <ul className="mt-px mb-1 ml-[1.4rem] space-y-px border-l border-brand-700/70 pl-2">
           {item.children.map((child) => {
             const childHref = child.slug === '' ? href : `${href}/${child.slug}`;
-            const childActive = pathname === childHref;
+            // Pe pagina modulului, sub-sectiunea activa o da `?view=`; pe o
+            // ruta proprie (ex. `/panou/grup`), o da calea.
+            const childActive =
+              pathname === href ? view === child.slug : pathname === childHref;
             return (
               <li key={child.slug}>
                 <Link
@@ -216,9 +227,12 @@ function SidebarItem({
                   aria-current={childActive ? 'page' : undefined}
                   className={cn(
                     'flex h-7 items-center gap-1.5 rounded px-2 text-sm',
+                    // Sub-sectiunile se disting prin TEXT, nu prin fundal: un al
+                    // doilea dreptunghi colorat sub modulul activ ar concura cu
+                    // el si s-ar citi ca doua selectii deodata.
                     childActive
-                      ? 'bg-brand-800 font-medium text-white'
-                      : 'text-brand-200/75 hover:bg-brand-800/70 hover:text-white',
+                      ? 'font-semibold text-white'
+                      : 'text-brand-200/70 hover:text-white',
                   )}
                 >
                   <ChevronRight

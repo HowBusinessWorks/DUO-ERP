@@ -14,7 +14,7 @@
 | Pas | Status | Ultima actualizare |
 |---|---|---|
 | 01 — Fundația | 🟩 gata (15/15, CI verde) | 2026-08-15 |
-| 02 — Identitate, acces, RLS | 🟨 în lucru (02a din 4) | 2026-08-15 |
+| 02 — Identitate, acces, RLS | 🟨 în lucru (02a + 02b din 4) | 2026-08-16 |
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat) | 2026-08-15 |
 | 04 — Contracte, obiective | 🟨 în lucru (04b livrat, de rulat pe date reale) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | ⬜ neînceput | — |
@@ -154,7 +154,7 @@ utilizatorului, 15 august 2026). Motivul: dacă schema de organizație e greșit
 | Sub-etapă | Conținut | Verificări | Stare |
 |---|---|---|---|
 | **02a** | Organizație, perioade, serii, audit (migrările `0004`–`0007`) | 5–11 | 🟩 gata |
-| **02b** | RLS + izolarea prețului (`0008`–`0009`) | 1–4 | ⬜ |
+| **02b** | RLS + izolarea prețului (`0011`–`0012`) | 1–4 | 🟩 gata |
 | **02c** | Supabase Auth, JWT hook, `packages/auth`, rutare pe personas | 12–16 | ⬜ |
 | **02d** | Ecran de administrare, seed determinist, `docs/security.md` | 17–19 | ⬜ |
 
@@ -211,6 +211,91 @@ care adaugă tipuri trebuie să adauge și acolo. Nu e o bătaie de cap — e te
 imposibil să apară un tip în bază fără ca cineva să-l fi vrut acolo.
 
 **02a e gata. Următorul: 02b — RLS pe toate tabelele din `app` + izolarea prețului.**
+
+### 2026-08-16 — [status: gata] — 02b, RLS pe toată schema și izolarea prețului
+
+**Migrări noi:**
+- `0011_rls_policies` — funcțiile de identitate, `enable` + `force row level security` pe
+  **toate cele 30 de tabele** din `app`, politicile per tabelă, plus RLS pe `audit.entries`.
+- `0012_price_isolation` — `revoke` pe `app.companies` și grant pe cele 9 coloane
+  necomerciale; `revoke` explicit pe `rate_cards`, `contract_years`, `component_ceilings`;
+  o poartă la migrare care caută singură coloanele de bani scăpate.
+
+**Verificări din pas care trec / nu trec:**
+- [x] #1 test generat din catalog: nicio coloană `price|pret|cost|amount|margin|salary` nu e
+  vizibilă lui `app_field`/`app_subcontractor`/`app_client`; fiecare din cele trei chiar
+  primește `42501` pe `rate_cards.hourly_cost`
+- [x] #2 zero tabele din `app` fără `rowsecurity` — și zero fără `force`
+- [x] #3 zero tabele cu RLS și fără nicio politică
+- [x] #4 `app_field` cu acces la firma A vede A și **nu** vede B — zero rânduri, nu eroare.
+  La fel pentru contracte: `stranger 0 / owner 1`
+- [x] (bonus) izolarea subcontractant ↔ subcontractant, `financiar` nu citește jurnalul iar
+  `admin` da, un `pm` nu poate crea firme
+- [ ] CI — **nu s-a putut rula local, nu există Docker pe mașină.** Verificările de mai sus au
+  fost rulate pe **Supabase dev (Postgres 17.6)**, într-un bloc anulat la final, plus
+  `pnpm db:migrate` + `pnpm db:seed --force` reale.
+
+**Cum s-au dat cele trei straturi din §3.9, în ordinea lor:**
+
+1. **Coloana.** `app.companies` era acordată întreagă tuturor personelor încă din `0002`, iar
+   între timp a căpătat `default_indexation_pct`, `default_delta_threshold` și
+   `efactura_config`. Acum terenul are grant pe 9 coloane de identitate. `is_active` e printre
+   ele dinadins: selectorul de firmă filtrează pe ea, iar o coloană citită într-un `where` cere
+   exact același privilegiu ca una din `select`.
+2. **Rândul.** Politicile, pe cinci tipare: scop pe firmă · scop prin părinte
+   (`contract_in_scope` și frații lui) · nomenclator comun · personal (`person_id = eu`) ·
+   propria fișă (subcontractant/client).
+3. DTO-urile Zod există deja din pașii 03–04.
+
+**Decizii luate / abateri de la plan:**
+
+- **Politicile stau în migrare, nu în `packages/db/policies/`** cum cere §3.8. Un director de
+  fișiere ar fi trebuit oricum concatenat într-o migrare ca să fie versionat; fișierul unic
+  ține politica lângă `grant`-ul care o însoțește. Rețeta de tabelă nouă e în `docs/security.md`.
+- **`app.has_office_role()` citește DOAR claim-ul.** Nu e o scurtătură de performanță:
+  `person_office_roles` e ea însăși sub RLS, iar politica ei ar chema înapoi funcția →
+  „infinite recursion detected in policy”, adică o eroare care apare exact în producție.
+- **`app.current_company_ids()` are trei surse**: claim → `person_company_access` → *(admin
+  fără nicio firmă)* tot grupul. Regula a treia nu deschide nimic — un admin poate oricum să-și
+  scrie singur rândul de acces — dar fără ea prima instalare n-ar putea fi configurată, și tot
+  ea e ce ține harness-urile de test și sesiunea de dezvoltare (`companyIds: []`) funcționale.
+- **Politica `definer`, pe fiecare tabelă.** `force row level security` se aplică ȘI
+  proprietarului, iar jumătate din mecanica pașilor 02a–04 trăiește în funcții
+  `security definer` care rulează ca el: alocatorul de numere face `update` pe serie,
+  `app.period_of` creează luna lipsă, triggerul de audit scrie în jurnal. Fără politica asta,
+  toate ar fi picat pe Supabase (unde proprietarul nu e superuser) și ar fi trecut în CI (unde
+  e) — cel mai prost fel de divergență posibil.
+- **`audit.entries` primește RLS fără `force`**, singura excepție. Cu `force` ar fi trebuit să-i
+  dăm proprietarului o politică de *scriere* pe jurnal, iar o politică de scriere pe jurnal e
+  exact lucrul care nu trebuie să existe.
+- **`app.rls_enable()` rămâne în bază după migrare**, dinadins: pașii 05–10 adaugă tabele, iar
+  rețeta din `docs/security.md` are nevoie de ea.
+- **Crearea unei firme e rezervată rolului `admin`** (`with check app.has_office_role('admin')`).
+  Un PM primește `42501`. Consecință în teste: actorul de birou al harness-urilor e acum admin.
+- **Portalurile nu mai văd nomenclatorul intern.** `clients` și `subcontractors` se filtrează la
+  propria fișă, iar produsele/calificările rămân vizibile tuturor personelor interne.
+
+**Capcane întâlnite:**
+- `aclexplode(coalesce(relacl, '{}'::aclitem[]))` pică cu `22023 ACL arrays must be
+  one-dimensional` — un array gol are `ndims = 0`. Scanul de coloane de bani folosește
+  `has_column_privilege(rol, oid, attnum, 'select')`, care merge și când interoghezi despre un
+  rol al cărui membru nu ești (contrar temerii inițiale) și prinde și drepturile moștenite.
+- Prima rulare de `db:migrate` a picat pe capcana de mai sus, în `0012`. Drizzle rulează **toate**
+  migrările în aceeași tranzacție, deci `0011` a fost și el anulat — baza n-a rămas pe jumătate.
+
+**Ce a trebuit atins în afara pasului:**
+- `packages/db/tests/helpers.ts` — actorii de test primesc claim-uri (`office_roles`,
+  `company_ids`, `personId` impus). `officeActor()` e admin, `fieldActor({companyIds})` primește firme.
+- `packages/services/tests/helpers.ts` — la fel.
+- Trei teste existente citeau rânduri ca `app_field` sau ca alt om decât proprietarul cozii;
+  acum primesc firma, respectiv persoana potrivită. Nicio aserție n-a fost slăbită.
+
+**Ce rămâne pentru sesiunea următoare:**
+1. Push → CI: testele de bază de date urcă de la 182 la **194** (12 teste noi în `rls.test.ts`).
+   E singura verificare a lui 02b nerulată, pentru că mașina n-are Docker.
+2. 02c — Supabase Auth, JWT hook (care umple `company_ids`, `office_roles`, `subcontractor_id`),
+   `packages/auth`, rutarea pe personas. Politicile îl așteaptă deja.
+3. 02d — ecranul de administrare, seed determinist cu câte un utilizator per persona.
 
 ---
 

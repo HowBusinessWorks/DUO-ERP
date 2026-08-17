@@ -14,18 +14,30 @@ export function actorFor(
   persona: Actor['persona'],
   pgRole: Actor['pgRole'],
   reason?: string,
+  claims: Record<string, unknown> = {},
 ): Actor {
   return {
     personId: TEST_PERSON_ID,
     persona,
     pgRole,
-    claims: {},
+    claims,
     ...(reason === undefined ? {} : { reason }),
   };
 }
 
-export const officeActor = (reason?: string): Actor => actorFor('office', 'app_office', reason);
-export const fieldActor = (): Actor => actorFor('field', 'app_field');
+/**
+ * De la 02b (RLS) incoace, actorul de birou al testelor e ADMINISTRATOR.
+ *
+ * Fara rolul asta n-ar putea crea firme — politica de pe `app.companies` cere
+ * explicit `admin` la scriere — iar fara `company_ids` in claim si fara randuri
+ * in `person_company_access`, `app.current_company_ids()` cade pe regula
+ * administratorului si intoarce tot grupul. Exact ce trebuie unui harness.
+ */
+export const officeActor = (reason?: string): Actor =>
+  actorFor('office', 'app_office', reason, { office_roles: ['admin'] });
+
+export const fieldActor = (companyIds: readonly string[] = []): Actor =>
+  actorFor('field', 'app_field', undefined, { company_ids: companyIds });
 
 /** Prinde respingerea unei promisiuni fara sa o transforme in esec de test. */
 export async function rejection(promise: Promise<unknown>): Promise<unknown> {

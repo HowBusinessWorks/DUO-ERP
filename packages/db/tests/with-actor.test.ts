@@ -9,7 +9,8 @@ function actorFor(persona: keyof typeof PG_ROLE_BY_PERSONA, personId = uuidv7())
     personId,
     persona,
     pgRole: PG_ROLE_BY_PERSONA[persona],
-    claims: { sub: personId, persona },
+    // `admin`: de la 0011, scrierea in `app.companies` cere rolul.
+    claims: { sub: personId, persona, office_roles: ['admin'] },
   };
 }
 

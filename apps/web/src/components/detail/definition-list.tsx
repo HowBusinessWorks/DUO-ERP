@@ -15,6 +15,9 @@ export interface DefinitionItem {
  * Eticheta deasupra, nu la stanga: pe doua coloane, etichetele laterale de
  * lungimi diferite produc o coloana de valori zimtata, si ochiul nu mai poate
  * scana in jos.
+ *
+ * Latime marginita si fundal de card: pe un ecran lat, o grila intinsa pe 1600px
+ * pune eticheta si valoarea la doua palme una de alta si le rupe perechea.
  */
 export function DefinitionList({
   items,
@@ -28,7 +31,7 @@ export function DefinitionList({
   return (
     <dl
       className={cn(
-        'grid grid-cols-1 gap-x-8 gap-y-5',
+        'grid max-w-4xl grid-cols-1 gap-x-10 gap-y-5 rounded-lg border border-border bg-surface p-4',
         columns === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3',
         className,
       )}

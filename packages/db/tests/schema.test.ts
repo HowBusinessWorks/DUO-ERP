@@ -8,7 +8,8 @@ const officeActor: Actor = {
   personId: uuidv7(),
   persona: 'office',
   pgRole: 'app_office',
-  claims: {},
+  // `admin`: de la 0011, crearea unei firme e rezervata administratorului.
+  claims: { office_roles: ['admin'] },
 };
 
 afterAll(async () => {

@@ -415,10 +415,10 @@ describe('plafoane — cele trei numere nu se amesteca', () => {
 // Verificarea #15 din pasul 04 — izolarea pretului, la nivel de coloana.
 describe('izolarea pretului pe contracte', () => {
   it('app_field citeste contractul, dar nu si valorile lui', async () => {
-    const { contractId } = await withActor(officeActor(), (tx) => makeContract(tx));
+    const { companyId, contractId } = await withActor(officeActor(), (tx) => makeContract(tx));
 
     // Coloanele fara bani: trec.
-    const visible = await withActor(fieldActor(), async (tx) => {
+    const visible = await withActor(fieldActor({ companyIds: [companyId] }), async (tx) => {
       const result = await tx.execute(
         sql`select code, starts_on, ends_on, status from app.contracts where id = ${contractId}`,
       );
@@ -465,9 +465,9 @@ describe('izolarea pretului pe contracte', () => {
 
   it('app_field vede componentele — structura, nu bani', async () => {
     const rows = await withActor(officeActor(), (tx) => makeContract(tx)).then(
-      async ({ contractId }) => {
+      async ({ companyId, contractId }) => {
         await withActor(officeActor(), (tx) => makeComponent(tx, contractId, 'delta'));
-        return withActor(fieldActor(), async (tx) => {
+        return withActor(fieldActor({ companyIds: [companyId] }), async (tx) => {
           const result = await tx.execute(
             sql`select name from app.contract_components where contract_id = ${contractId}`,
           );

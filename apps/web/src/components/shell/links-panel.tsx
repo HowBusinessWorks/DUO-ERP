@@ -54,7 +54,8 @@ export function LinksPanel({
       aria-label={t('links.title')}
       className="hidden w-(--spacing-links) shrink-0 border-l border-border bg-surface lg:block"
     >
-      <div className="scrollbar-thin sticky top-(--spacing-topbar) max-h-[calc(100vh-var(--spacing-topbar))] overflow-y-auto">
+      {/* `top-0`: containerul de scroll incepe deja sub bara globala. */}
+      <div className="scrollbar-thin sticky top-0 max-h-[calc(100dvh-var(--spacing-topbar))] overflow-y-auto">
         <header className="flex items-center justify-between border-b border-border px-3 py-2">
           <h2 className="text-xs font-semibold tracking-wide text-ink-muted uppercase">
             {t('links.title')}
@@ -78,7 +79,7 @@ export function LinksPanel({
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className="flex items-center gap-1.5 rounded px-1.5 py-1 text-base text-ink-muted hover:bg-surface-hover hover:text-brand-700"
+                    className="flex items-center gap-1.5 rounded px-1.5 py-1 text-sm text-ink-muted hover:bg-surface-hover hover:text-brand-700"
                   >
                     <ArrowUp className="size-3.5 shrink-0 text-ink-subtle" aria-hidden="true" />
                     <span className="truncate">{item.label}</span>
@@ -106,7 +107,7 @@ export function LinksPanel({
                       size="sm"
                       disabled
                       disabledReason={action.disabledReason}
-                      className="justify-start"
+                      className="w-full justify-center"
                     >
                       {action.label}
                     </Button>
@@ -115,10 +116,12 @@ export function LinksPanel({
                       key={action.label}
                       href={action.href}
                       className={cn(
-                        'flex h-7 items-center rounded-md px-2.5 text-xs font-medium',
+                        // Aceleasi cote ca `Button size="sm"`: actiunile rapide
+                        // stau una sub alta, iar doua inaltimi diferite se vad.
+                        'flex h-7 w-full items-center justify-center rounded-md px-2.5 text-xs font-medium transition-colors duration-100',
                         action.tone === 'primary'
-                          ? 'bg-brand-600 text-white hover:bg-brand-700'
-                          : 'border border-border bg-surface text-ink hover:bg-surface-hover',
+                          ? 'bg-brand-600 text-white shadow-xs hover:bg-brand-700'
+                          : 'border border-border bg-surface text-ink shadow-xs hover:border-border-strong hover:bg-surface-hover',
                       )}
                     >
                       {action.label}
@@ -172,7 +175,7 @@ function LinkGroupBlock({ group }: { group: LinkGroup }) {
               <li key={`${item.href}-${item.label}`}>
                 <Link
                   href={item.href}
-                  className="flex items-baseline justify-between gap-2 rounded px-1.5 py-1 text-base hover:bg-surface-hover hover:text-brand-700"
+                  className="flex items-baseline justify-between gap-2 rounded px-1.5 py-1 text-sm hover:bg-surface-hover hover:text-brand-700"
                 >
                   <span className="truncate">{item.label}</span>
                   {item.meta === undefined ? null : (

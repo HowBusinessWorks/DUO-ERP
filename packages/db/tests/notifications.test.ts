@@ -90,8 +90,11 @@ describe('coada de lucru', () => {
     const companyId = await makeCompany();
     const personId = await makePerson();
 
+    // Coada e PERSONALA: de la 0011, o citeste doar cel al carui nume e pe ea.
+    const owner = officeActor(undefined, { personId });
+
     const open = async (): Promise<string | undefined> =>
-      withActor(officeActor(), async (tx) => {
+      withActor(owner, async (tx) => {
         const r = await tx.execute<{ count: string }>(
           sql`select count(*)::text as count from app.work_queue_items
               where person_id = ${personId} and resolved_at is null`,
@@ -111,7 +114,7 @@ describe('coada de lucru', () => {
 
     expect(await open()).toBe('1');
 
-    await withActor(officeActor(), async (tx) => {
+    await withActor(owner, async (tx) => {
       await tx.execute(sql`update app.work_queue_items set resolved_at = now() where id = ${itemId}`);
     });
 
