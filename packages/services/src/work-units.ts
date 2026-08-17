@@ -468,6 +468,21 @@ export async function createWorkUnit(
         'Persoana are deja același rol pe unitatea asta, în perioada aleasă.',
       );
     }
+    /*
+     * Codul e unic pe (firma, cod), dar contorul de serie e per (firma, TIP,
+     * serie). Doua tipuri configurate cu acelasi text de serie produc deci
+     * amandoua `X-000001`, si al doilea cade — descoperit la primul CI.
+     *
+     * Mesajul spune cauza, nu simptomul: „cod duplicat" l-ar trimite pe om sa
+     * caute unitatea care are deja codul, iar ea e de alt tip si arata nevinovata.
+     */
+    if (sqlstate(error) === SQLSTATE.UNIQUE_VIOLATION) {
+      throw new AppError(
+        'CONFLICT',
+        `Seria „${values.series}" e folosită și de alt tip de unitate la firma asta, ` +
+          'deci codurile se suprapun. Dă-i fiecărui tip seria lui.',
+      );
+    }
     return translateDbError(error);
   }
 }
@@ -934,11 +949,16 @@ export async function createStage(
 /**
  * Rescrie pozitiile 1..n, in ordinea trimisa.
  *
- * Se face in doi pasi, prin pozitii negative temporare: unicul
- * `(work_unit_id, position)` e verificat la fiecare rand, nu la finalul
+ * **Doi pasi, cu un decalaj peste maximul existent.** Unicul
+ * `(work_unit_id, position)` se verifica la fiecare rand, nu la finalul
  * tranzactiei, deci o permutare scrisa direct s-ar lovi de o pozitie inca
- * ocupata. Negativele nu se ciocnesc cu nimic, pentru ca `check`-ul din baza
- * cere pozitii pozitive — deci nicio etapa reala nu poate sta acolo.
+ * ocupata: „mut etapa 3 pe locul 1" cade cat timp locul 1 mai e al altcuiva.
+ *
+ * Primul pas le duce pe toate deasupra maximului, unde nu se pot ciocni cu
+ * nimic; al doilea le aduce la locul lor. Decalajul e POZITIV dinadins:
+ * `check`-ul `work_stages_position_positive` refuza si valorile temporare, nu
+ * doar pe cele finale — prima versiune a functiei folosea negative si a picat
+ * exact acolo, la primul CI.
  */
 export async function reorderStages(
   actor: Actor,
@@ -949,7 +969,7 @@ export async function reorderStages(
   try {
     return await withActor(actor, async (tx) => {
       const existing = await tx
-        .select({ id: schema.workStages.id })
+        .select({ id: schema.workStages.id, position: schema.workStages.position })
         .from(schema.workStages)
         .where(eq(schema.workStages.workUnitId, values.workUnitId));
 
@@ -961,10 +981,21 @@ export async function reorderStages(
         );
       }
 
+      const offset = Math.max(...existing.map((row) => row.position), 0);
+      // `position` e `smallint`. Decalajul plus numarul de etape trebuie sa
+      // incapa, altfel pasul intai ar cadea pe depasire — cu un mesaj din care
+      // nimeni n-ar ghici ca a fost o reordonare.
+      if (offset + values.stageIds.length > 32767) {
+        throw new AppError(
+          'VALIDATION_FAILED',
+          'Prea multe etape pentru reordonare. Renumerotează-le de la 1 înainte.',
+        );
+      }
+
       for (const [index, stageId] of values.stageIds.entries()) {
         await tx
           .update(schema.workStages)
-          .set({ position: -(index + 1) })
+          .set({ position: offset + index + 1 })
           .where(eq(schema.workStages.id, stageId));
       }
       for (const [index, stageId] of values.stageIds.entries()) {

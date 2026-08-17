@@ -33,7 +33,19 @@ afterAll(async () => {
  * obiectivului nu se clinteste, si ca inchiderea chiar se opreste in checklist.
  */
 
-const SERIES = 'TL';
+/**
+ * O serie PE FIECARE TIP, cu litere distincte.
+ *
+ * Contorul din `app.document_series` e per (firma, tip de document, serie), iar
+ * codul unitatii e unic pe (firma, cod). Deci doua tipuri care ar folosi acelasi
+ * text de serie ar produce amandoua `TL-000001` si al doilea ar cadea. Seed-ul
+ * face la fel: `L`, `IV`, `I`.
+ */
+const SERIES_BY_TYPE = {
+  lucrare: 'TL',
+  interventie: 'TIV',
+  inspectie: 'TI',
+} as const;
 
 interface Ground {
   readonly companyId: string;
@@ -95,9 +107,9 @@ async function ground(): Promise<Ground> {
     // Doua serii: codurile unitatilor si numerele documentelor de re-alocare.
     await tx.execute(sql`
       insert into app.document_series (id, company_id, document_type, series, next_number)
-      values (${uuidv7()}, ${companyId}, 'lucrare', ${SERIES}, 1),
-             (${uuidv7()}, ${companyId}, 'interventie', ${SERIES}, 1),
-             (${uuidv7()}, ${companyId}, 'inspectie', ${SERIES}, 1),
+      values (${uuidv7()}, ${companyId}, 'lucrare', ${SERIES_BY_TYPE.lucrare}, 1),
+             (${uuidv7()}, ${companyId}, 'interventie', ${SERIES_BY_TYPE.interventie}, 1),
+             (${uuidv7()}, ${companyId}, 'inspectie', ${SERIES_BY_TYPE.inspectie}, 1),
              (${uuidv7()}, ${companyId}, 'nota_realocare', 'NRA', 1)`);
   });
 
@@ -169,10 +181,10 @@ describe('createWorkUnit', () => {
         allocationInput(base, third, '9800.00'),
       ],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.lucrare,
     });
 
-    expect(created.code).toBe(`${SERIES}-000001`);
+    expect(created.code).toBe(`${SERIES_BY_TYPE.lucrare}-000001`);
 
     const row = await getWorkUnit(officeActor(), created.id);
     expect(row.allocationCount).toBe(3);
@@ -189,13 +201,17 @@ describe('createWorkUnit', () => {
       const created = await createWorkUnit(officeActor(), {
         workUnit: workUnitInput(base),
         allocations: [],
-        series: SERIES,
+        series: SERIES_BY_TYPE.lucrare,
         assignments: [],
       });
       codes.push(created.code);
     }
 
-    expect(codes).toEqual([`${SERIES}-000001`, `${SERIES}-000002`, `${SERIES}-000003`]);
+    expect(codes).toEqual([
+      `${SERIES_BY_TYPE.lucrare}-000001`,
+      `${SERIES_BY_TYPE.lucrare}-000002`,
+      `${SERIES_BY_TYPE.lucrare}-000003`,
+    ]);
   });
 
   // Verificarea #16 a pasului, prin use-case: tranzactia cade INTREAGA.
@@ -207,7 +223,7 @@ describe('createWorkUnit', () => {
         workUnit: workUnitInput(base),
         allocations: [allocationInput(base, base.closedPast, '1000.00')],
         assignments: [],
-        series: SERIES,
+        series: SERIES_BY_TYPE.lucrare,
       }),
     );
 
@@ -227,11 +243,45 @@ describe('createWorkUnit', () => {
         workUnit: workUnitInput(base, { type: 'interventie' }),
         allocations: [],
         assignments: [],
-        series: SERIES,
+        series: SERIES_BY_TYPE.interventie,
       }),
     );
 
     expect((error as AppError).code).toBe('VALIDATION_FAILED');
+  });
+
+  /*
+   * Gasit la primul CI al lui 05b: contorul de serie e per (firma, TIP, serie),
+   * dar codul e unic pe (firma, cod). Doua tipuri cu acelasi text de serie produc
+   * amandoua `X-000001`, si al doilea cade — cu un mesaj care trebuie sa spuna
+   * cauza, nu simptomul.
+   */
+  it('doua tipuri cu aceeasi serie: CONFLICT care spune ca seria e partajata', async () => {
+    const base = await ground();
+    await withActor(officeActor(), async (tx) => {
+      await tx.execute(sql`
+        insert into app.document_series (id, company_id, document_type, series, next_number)
+        values (${uuidv7()}, ${base.companyId}, 'inspectie', ${SERIES_BY_TYPE.lucrare}, 1)`);
+    });
+
+    await createWorkUnit(officeActor(), {
+      workUnit: workUnitInput(base),
+      allocations: [],
+      assignments: [],
+      series: SERIES_BY_TYPE.lucrare,
+    });
+
+    const error = await rejection(
+      createWorkUnit(officeActor(), {
+        workUnit: workUnitInput(base, { type: 'inspectie' }),
+        allocations: [],
+        assignments: [],
+        series: SERIES_BY_TYPE.lucrare,
+      }),
+    );
+
+    expect((error as AppError).code).toBe('CONFLICT');
+    expect((error as AppError).message).toMatch(/seria lui/);
   });
 
   it('seria inexistenta: NOT_FOUND cu mesaj despre serie', async () => {
@@ -263,7 +313,7 @@ describe('createWorkUnit', () => {
         workUnit: workUnitInput(base),
         allocations: [],
         assignments: [{ personId: worker, role: 'sef_santier', validFrom: '', validTo: '' }],
-        series: SERIES,
+        series: SERIES_BY_TYPE.lucrare,
       }),
     );
 
@@ -280,7 +330,7 @@ describe('promoteToLucrare', () => {
       workUnit: workUnitInput(base, { type: 'interventie' }),
       allocations: [allocationInput(base, base.openPast, '800.00', base.mentenanta)],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.interventie,
     });
 
     // Ceva atasat de unitate, ca sa se vada ca nu s-a copiat nimic: alocarea.
@@ -317,7 +367,7 @@ describe('promoteToLucrare', () => {
       workUnit: workUnitInput(base),
       allocations: [],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.lucrare,
     });
 
     const error = await rejection(
@@ -333,7 +383,7 @@ describe('promoteToLucrare', () => {
       workUnit: workUnitInput(base, { type: 'inspectie' }),
       allocations: [],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.inspectie,
     });
 
     const error = await rejection(
@@ -348,7 +398,7 @@ describe('promoteToLucrare', () => {
       workUnit: workUnitInput(base, { type: 'interventie' }),
       allocations: [allocationInput(base, base.openPast, '800.00')],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.interventie,
     });
 
     await expect(
@@ -358,17 +408,36 @@ describe('promoteToLucrare', () => {
 });
 
 describe('moveFunding', () => {
-  async function funded(base: Ground, periodId: string) {
+  /**
+   * O interventie finantata dintr-o luna, cu opțiunea de a inchide luna DUPA.
+   *
+   * Ordinea conteaza si e chiar ordinea din realitate: aloci in august, august se
+   * inchide, iar mutarea vine in septembrie. O alocare scrisa direct intr-o luna
+   * deja inchisa e refuzata de `guard_closed_period` — asta e verificarea #16, nu
+   * o piedica de harness.
+   */
+  async function funded(base: Ground, periodId: string, closeAfter = false) {
     const created = await createWorkUnit(officeActor(), {
       workUnit: workUnitInput(base, { type: 'interventie' }),
       allocations: [allocationInput(base, periodId, '800.00', base.mentenanta)],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.interventie,
     });
     const [allocation] = await listAllocations(officeActor(), created.id);
     if (allocation === undefined) {
       throw new Error('alocarea de test lipseste');
     }
+
+    if (closeAfter) {
+      await withActor(officeActor('inchidere de luna pentru test'), async (tx) => {
+        await tx.execute(
+          sql`update app.periods
+                 set status = 'closed', closed_at = now(), closed_by = ${TEST_PERSON_ID}
+               where id = ${periodId}`,
+        );
+      });
+    }
+
     return { workUnitId: created.id, allocationId: allocation.id };
   }
 
@@ -408,7 +477,10 @@ describe('moveFunding', () => {
   // Verificarea #6 a pasului.
   it('luna inchisa: document de re-alocare in luna CURENTA, alocarea veche neatinsa', async () => {
     const base = await ground();
-    const { workUnitId, allocationId } = await funded(base, base.closedPast);
+    // Alocarea se face cat luna e deschisa, apoi luna se inchide. Exact ordinea
+    // din realitate — si singura posibila, pentru ca o alocare scrisa direct
+    // intr-o luna inchisa e refuzata de trigger.
+    const { workUnitId, allocationId } = await funded(base, base.openPast, true);
 
     const preview = await previewFundingMove(officeActor(), allocationId);
     expect(preview.kind).toBe('reallocation-document');
@@ -562,7 +634,7 @@ describe('alocari suplimentare', () => {
       workUnit: workUnitInput(base),
       allocations: [allocationInput(base, base.openPast, '1000.00')],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.lucrare,
     });
 
     const error = await rejection(
@@ -578,7 +650,7 @@ describe('alocari suplimentare', () => {
       workUnit: workUnitInput(base),
       allocations: [],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.lucrare,
     });
 
     await allocateFunding(officeActor(), created.id, {
@@ -611,7 +683,7 @@ describe('etape', () => {
       workUnit: workUnitInput(base),
       allocations: [],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.lucrare,
     });
     return created.id;
   }
@@ -644,7 +716,7 @@ describe('etape', () => {
       workUnit: workUnitInput(base, { type: 'inspectie' }),
       allocations: [],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.inspectie,
     });
 
     const error = await rejection(
@@ -749,7 +821,7 @@ describe('inchidere', () => {
       workUnit: workUnitInput(base),
       allocations: [],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.lucrare,
     });
     await createStage(officeActor(), {
       workUnitId: created.id,
@@ -791,7 +863,7 @@ describe('inchidere', () => {
       workUnit: workUnitInput(base, { endsOn: '2020-05-30' }),
       allocations: [allocationInput(base, base.openPast, '12500.00')],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.lucrare,
     });
 
     const checklist = await getClosingChecklist(officeActor(), created.id);
@@ -814,7 +886,7 @@ describe('inchidere', () => {
       workUnit: workUnitInput(base, { endsOn: '2020-05-30' }),
       allocations: [allocationInput(base, base.openPast, '500.00')],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.lucrare,
     });
     await closeWorkUnit(officeActor(), { workUnitId: created.id, reason: 'gata' });
 
@@ -830,7 +902,7 @@ describe('inchidere', () => {
       workUnit: workUnitInput(base, { type: 'inspectie', endsOn: '2020-05-06' }),
       allocations: [],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.inspectie,
     });
 
     const checklist = await getClosingChecklist(officeActor(), created.id);
@@ -848,7 +920,7 @@ describe('listWorkUnits', () => {
         allocationInput(base, base.currentPeriod, '12500.00'),
       ],
       assignments: [],
-      series: SERIES,
+      series: SERIES_BY_TYPE.lucrare,
     });
     expect(created.id).not.toBe('');
 
@@ -873,7 +945,7 @@ describe('listWorkUnits', () => {
         workUnit: workUnitInput(base, { estimatedValue: amount }),
         allocations: [allocationInput(base, base.openPast, amount)],
         assignments: [],
-        series: SERIES,
+        series: SERIES_BY_TYPE.lucrare,
       });
     }
 
@@ -899,7 +971,7 @@ describe('listWorkUnits', () => {
         workUnit: workUnitInput(base, { type }),
         allocations: [],
         assignments: [],
-        series: SERIES,
+        series: SERIES_BY_TYPE[type],
       });
     }
 
