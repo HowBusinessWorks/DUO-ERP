@@ -1,5 +1,7 @@
 # Damina ERP — jurnal de progres
 
+> **Sesiune nouă? Citește întâi „De unde continui" de mai jos.**
+>
 > **Regulă pentru orice sesiune AI care lucrează la un pas din `Plan/`:**
 > - La **început de sesiune**, citește secțiunea pasului tău de mai jos (dacă există) înainte să începi.
 > - **După ce termini pasul** (sau o bucată semnificativă din el), adaugă/actualizează intrarea lui.
@@ -9,12 +11,88 @@
 
 ---
 
+## De unde continui — predare către sesiunea următoare
+
+*Scris la finalul lui 02c′ (17 august 2026). Citește-l primul; restul fișierului e istoric.*
+
+### Unde s-a ajuns
+
+Pașii **01, 02 și 04 sunt gata**. Pasul **03 e complet ca implementare**, dar are 4 verificări
+nerulate. Următorul pas de conținut neînceput e **05 — Unitate de Lucru, finanțare**.
+
+### Primul lucru de făcut, înainte de orice cod
+
+1. `git fetch && git status && git log HEAD..origin/<branch> --oneline` — regula din `CLAUDE.md`,
+   care se aplică oricărei modificări de cod, oricât de mică.
+2. Verifică tabelul **„Stare care NU trăiește în repo”** de mai sus. Acolo scrie ce e adevărat
+   despre mediu și nu se poate afla citind codul: hook-ul activat manual în Supabase, conturile de
+   test, porturi ocupate, pragul de teste. **Verifică-l înainte să tragi concluzia că ceva e
+   stricat.**
+
+### Datorii deschise, în ordinea în care le-aș lua
+
+| # | Ce | De ce contează |
+|---|---|---|
+| 1 | **Rotește `SUPABASE_SERVICE_ROLE_KEY`** (Project Settings → API) | A trecut printr-o fereastră de chat pe 17 august. După 02c′ singurul cod care o folosește e `resetMfaFactors` din `apps/web/src/app/api/admin/service.ts`, deci rotația e ieftină acum. |
+| 2 | **Playwright** | Neinstalat. Blochează #13 din pasul 03 și clicul pe hartă din 04b (#14). Vezi mai jos ce am aflat despre testarea fără el. |
+| 3 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Decizie deschisă: ori `grant select` pe `work_queue_items`/`notifications` către `authenticated` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
+| 4 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — atenție, `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
+| 5 | **`pnpm db:generate` e blocat** din 02c | `drizzle-kit` refuză cu „snapshots are pointing to a parent snapshot … collision”. Migrările `0013`–`0015` sunt scrise de mână. Ca să reînvie, cineva trebuie să refacă lanțul `id`/`prevId` din `migrations/meta/`. Până atunci: **scrii migrarea de mână**, adaugi intrarea în `_journal.json` și un `NNNN_snapshot.json` care conține chiar schema nouă (nu o copie oarbă). |
+
+### Lucruri pe care le-am aflat greu și te scutesc de o zi
+
+- **Testele de bază de date rulează DOAR în CI.** Mașina n-are Docker. Consecința practică: scrii
+  testul, dai push, și afli abia acolo. La 02c′ un test de guard a picat în CI deși guard-ul
+  funcționa — pentru că `DrizzleQueryError` are ca mesaj doar „Failed query: …”. Folosește
+  `pgMessage(error)` din `tests/helpers.ts` (există în `packages/db` și, din 02c′, și în
+  `packages/services`), sau `sqlstate(error)`. **Nu potrivi pe `String(error)`.**
+- **Formularele pe `useActionState` au progressive enhancement** (React 19 emite `$ACTION_REF_1`,
+  `$ACTION_1:0`, `$ACTION_KEY` ca input-uri ascunse în HTML-ul randat pe server). Poți deci apela un
+  server action prin HTTP, fără browser: citești input-urile ascunse din `<form>`, le pui într-un
+  `FormData` împreună cu câmpurile reale și faci POST pe URL-ul paginii. Așa a fost testată limita
+  de login la 02c′. **E cea mai bună unealtă până apare Playwright.**
+- **Sesiunea se poate fabrica dintr-un script**: `POST /auth/v1/token?grant_type=password` la
+  Supabase, apoi cookie-ul `sb-<ref>-auth-token` = `base64-` + JSON-ul răspunsului, tăiat în bucăți
+  de 3180 de caractere dacă e lung. Cu el poți lovi orice rută ca orice persona.
+- **`getUser()` ≠ `getSession()` ≠ `mfa.listFactors()`.** Primul întreabă serverul Auth; celelalte
+  două citesc din cookie. Cookie-ul se scrie la login și nu se rescrie când se schimbă ceva la
+  utilizator — de aici un bug real la 02c′. **Unde iei o decizie, întreabă serverul.**
+- **`@damina/auth` NU se importă din middleware.** Bariera reexportă `@damina/db`, deci driverul de
+  Postgres, deci `node:fs`, care nu există pe Edge. Middleware-ul importă din **`@damina/auth/edge`**.
+  Dacă vezi „Reading from node:fs is not handled by plugins”, asta e.
+- **Rutele `/api` nu primesc redirect din middleware** pentru poarta de al doilea factor, dinadins:
+  un `fetch` urmează redirect-ul și încearcă să citească JSON dintr-o pagină HTML. Orice rută `/api`
+  nouă care are nevoie de drepturi își cheamă singură `can()` și `requireMfa()`.
+- **Admin API-ul GoTrue nu poate deconecta pe cineva după id.** Dacă vreun pas viitor cere asta,
+  răspunsul e `app.revoke_sessions()` din migrarea `0015`, nu Admin API.
+
+### Reguli ale casei care nu se negociază
+
+- **Un modul nou = o intrare în `entityRegistry`**, nu fișiere de pagină. Lista și detaliul sunt
+  două pagini fractale pentru tot ERP-ul. Vezi `docs/entity-registry.md`.
+- **RLS e primul strat, guard-urile din `packages/auth` al doilea.** Guard-urile dau erori bune
+  (403 cu mesaj în română), nu apără. Adevărul despre ce rânduri și ce coloane ies din bază e în
+  politici și în grant-urile pe coloană.
+- **Nimic din dashboard.** Politici, grant-uri, coloane — totul în migrări versionate. Singura
+  excepție cunoscută e activarea hook-ului de token, care nu se poate versiona; de-aia e scrisă în
+  tabelul de mai sus.
+- **Codurile `AppError` sunt exact acestea:** `PERIOD_CLOSED`, `PRICE_FORBIDDEN`,
+  `AUTHORIZATION_EXPIRED`, `QUANTITY_EXCEEDS_CONTRACT`, `VALIDATION_FAILED`, `NOT_FOUND`,
+  `FORBIDDEN`, `CONFLICT`. Nu inventa altele — nu există `INTERNAL` sau `CONFIG_MISSING`.
+- **Comentariile din cod se scriu fără diacritice; textul de pe ecran, cu diacritice.**
+- **Există un agent de design** și utilizatorul a cerut explicit să fie folosit pentru ecrane.
+- Înainte de commit: `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets`.
+  Ultimul cere un build proaspăt, iar build-ul cade dacă un `next dev` ține `.next` ocupat — oprește
+  serverele de dezvoltare înainte.
+
+---
+
 ## Stare curentă
 
 | Pas | Status | Ultima actualizare |
 |---|---|---|
 | 01 — Fundația | 🟩 gata (15/15, CI verde) | 2026-08-15 |
-| 02 — Identitate, acces, RLS | 🟨 în lucru (02a + 02b + 02c + 02d gata; rămâne 02c′) | 2026-08-17 |
+| 02 — Identitate, acces, RLS | 🟩 **gata** (19/19 verificări; 02a–02d + 02c′) | 2026-08-17 |
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat: #8, #10, #13, #14) | 2026-08-15 |
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | ⬜ neînceput | — |
@@ -691,8 +769,11 @@ a intrat („modificare roluri de birou” / „închidere de sesiuni” / „re
 
 **Ce rămâne pentru sesiunea următoare:**
 
-1. Push → CI. Testele de servicii ar trebui să urce 38 → **41**, totalul **242**. E singura
-   verificare a lui 02c′ nerulată local.
+1. ~~Push → CI.~~ **Făcut.** Primul run (`32013932083`) a picat pe UN test: cel de guard din
+   `revokeSessions`. Guard-ul funcționa — `DrizzleQueryError` are ca mesaj doar „Failed query: …”,
+   deci potrivirea pe `String(error)` nu vedea niciodată mesajul bazei. Reparat cu `pgMessage()`,
+   adăugat în `packages/services/tests/helpers.ts`. **Regulă: nu potrivi pe textul erorii de la
+   suprafață; folosește `pgMessage()` sau `sqlstate()`.**
 2. **Cheia de service tot n-a fost rotită** (a trecut printr-un chat pe 17 august). Cu 02c′,
    singurul cod care o mai folosește e `resetMfaFactors` — rotația e ieftină acum.
 3. Pasul 02 e închis. Următorul pas de conținut e cel din plan după 04; Playwright (#13, clicul pe

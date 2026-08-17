@@ -46,3 +46,22 @@ export async function rejection(promise: Promise<unknown>): Promise<unknown> {
     (reason: unknown) => reason,
   );
 }
+
+/**
+ * Mesajul original al erorii Postgres, de sub ambalajul Drizzle.
+ *
+ * `DrizzleQueryError` are ca mesaj doar „Failed query: …”, deci o potrivire pe
+ * textul de la suprafata nu vede niciodata ce a spus baza. Acelasi helper
+ * exista si in `packages/db/tests`, din acelasi motiv; l-am aflat pe pielea
+ * noastra la 02c′, cand un test de guard a picat in CI desi guard-ul chiar
+ * daduse eroarea asteptata.
+ */
+export function pgMessage(error: unknown): string {
+  let current: unknown = error;
+  let last = '';
+  while (current instanceof Error) {
+    last = current.message;
+    current = current.cause;
+  }
+  return last;
+}

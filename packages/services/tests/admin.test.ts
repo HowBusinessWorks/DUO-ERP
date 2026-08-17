@@ -13,7 +13,7 @@ import {
   setOfficeRoles,
   updatePerson,
 } from '../src/admin';
-import { actorFor, officeActor, rejection } from './helpers';
+import { actorFor, officeActor, pgMessage, rejection } from './helpers';
 
 afterAll(async () => {
   await closeConnections();
@@ -238,6 +238,7 @@ describe('inchiderea sesiunilor (verificarea #18)', () => {
       office_roles: ['magazie'],
     });
     const error = await rejection(revokeSessions(magazioner, id));
-    expect(String(error)).toMatch(/FORBIDDEN|administrator/i);
+    expect(error).toBeInstanceOf(Error);
+    expect(pgMessage(error)).toMatch(/FORBIDDEN.*administrator/i);
   });
 });
