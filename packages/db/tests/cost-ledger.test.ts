@@ -77,6 +77,34 @@ async function insertLine(tx: ActorTx, options: LineOptions = {}): Promise<strin
   return id;
 }
 
+/**
+ * O componenta noua, cu contractul ei.
+ *
+ * `contract_components` are unic pe (contract, tip), deci doua componente de
+ * acelasi tip cer doua contracte. Ar fi mers si tipuri diferite, dar atunci
+ * testele s-ar fi limitat la patru — si prima adaugare de test ar fi cazut pe
+ * aceeasi constrangere, cu alt mesaj.
+ */
+async function makeComponent(
+  label: string,
+  type: 'mentenanta' | 'lucrari' | 'delta' | 'individual' = 'lucrari',
+): Promise<{ contractId: string; componentId: string }> {
+  const contract = uuidv7();
+  const component = uuidv7();
+
+  await withActor(officeActor(), async (tx) => {
+    await tx.execute(sql`
+      insert into app.contracts (id, company_id, client_id, code, type, starts_on, ends_on, status)
+      values (${contract}, ${companyId}, ${clientId}, ${`CT-${contract.slice(-6)}`},
+              'mentenanta_multianual', '2026-01-01', '2029-12-31', 'activ')`);
+    await tx.execute(sql`
+      insert into app.contract_components (id, contract_id, type, name, budget_cadence, is_fill_target)
+      values (${component}, ${contract}, ${type}, ${label}, 'lunar', ${type === 'delta'})`);
+  });
+
+  return { contractId: contract, componentId: component };
+}
+
 async function rollupOf(component: string, period: string): Promise<Record<string, string>> {
   return withActor(officeActor(), async (tx) => {
     const rows = await tx.execute(sql`
@@ -303,23 +331,17 @@ describe('#5, #6, #7 registrul e append-only', () => {
   });
 
   it('#7 corectia se face prin storno: ambele linii raman vizibile', async () => {
-    const component = uuidv7();
-    await withActor(officeActor(), async (tx) => {
-      await tx.execute(sql`
-        insert into app.contract_components (id, contract_id, type, name, budget_cadence)
-        values (${component}, ${contractId}, 'lucrari', 'Lucrari storno', 'lunar')`);
-    });
+    const { contractId: contract, componentId: component } = await makeComponent('Lucrari storno');
+    const line = { chargedContractId: contract, chargedComponentId: component };
 
     const gresita = await withActor(officeActor(), (tx) =>
-      insertLine(tx, { chargedComponentId: component, amount: '2500.00' }),
+      insertLine(tx, { ...line, amount: '2500.00' }),
     );
 
-    await withActor(officeActor(), (tx) =>
-      insertLine(tx, { chargedComponentId: component, amount: '-2500.00' }),
-    );
+    await withActor(officeActor(), (tx) => insertLine(tx, { ...line, amount: '-2500.00' }));
 
     const corecta = await withActor(officeActor(), (tx) =>
-      insertLine(tx, { chargedComponentId: component, amount: '250.00' }),
+      insertLine(tx, { ...line, amount: '250.00' }),
     );
 
     const lines = await withActor(officeActor(), async (tx) => {
@@ -341,17 +363,13 @@ describe('#5, #6, #7 registrul e append-only', () => {
 
 describe('#8 rollup-ul da exact suma din registru', () => {
   it('doua sute de linii pe patru stadii, verificate cu interogare independenta', async () => {
-    const component = uuidv7();
-    await withActor(officeActor(), async (tx) => {
-      await tx.execute(sql`
-        insert into app.contract_components (id, contract_id, type, name, budget_cadence)
-        values (${component}, ${contractId}, 'lucrari', 'Lucrari rollup', 'lunar')`);
-    });
+    const { contractId: contract, componentId: component } = await makeComponent('Lucrari rollup');
 
     const stages = ['angajat', 'receptionat', 'consumat', 'facturat'] as const;
     await withActor(officeActor(), async (tx) => {
       for (let i = 0; i < 200; i += 1) {
         await insertLine(tx, {
+          chargedContractId: contract,
           chargedComponentId: component,
           stage: stages[i % stages.length],
           amount: `${(i + 1) * 10}.00`,
@@ -388,15 +406,14 @@ describe('#8 rollup-ul da exact suma din registru', () => {
   });
 
   it('#9 o coruptere a rollup-ului iese la verificare, cu componenta si diferenta', async () => {
-    const component = uuidv7();
-    await withActor(officeActor(), async (tx) => {
-      await tx.execute(sql`
-        insert into app.contract_components (id, contract_id, type, name, budget_cadence)
-        values (${component}, ${contractId}, 'lucrari', 'Lucrari corupte', 'lunar')`);
-    });
+    const { contractId: contract, componentId: component } = await makeComponent('Lucrari corupte');
 
     await withActor(officeActor(), (tx) =>
-      insertLine(tx, { chargedComponentId: component, amount: '700.00' }),
+      insertLine(tx, {
+        chargedContractId: contract,
+        chargedComponentId: component,
+        amount: '700.00',
+      }),
     );
 
     // Corupem rollup-ul pe singura usa care exista: functia de intretinere, data
@@ -456,25 +473,26 @@ describe('#12 luna inchisa', () => {
 
 describe('rescrierea analiticei „descarcat" — usa din §13.1', () => {
   it('muta banii intre componente si actualizeaza AMBELE rollup-uri', async () => {
-    const dinCare = uuidv7();
-    const inCare = uuidv7();
-    await withActor(officeActor(), async (tx) => {
-      await tx.execute(sql`
-        insert into app.contract_components (id, contract_id, type, name, budget_cadence)
-        values (${dinCare}, ${contractId}, 'lucrari', 'Sursa mutarii', 'lunar'),
-               (${inCare}, ${contractId}, 'lucrari', 'Tinta mutarii', 'lunar')`);
-    });
+    const sursa = await makeComponent('Sursa mutarii');
+    const tinta = await makeComponent('Tinta mutarii');
 
     const id = await withActor(officeActor(), (tx) =>
-      insertLine(tx, { chargedComponentId: dinCare, amount: '800.00' }),
+      insertLine(tx, {
+        chargedContractId: sursa.contractId,
+        chargedComponentId: sursa.componentId,
+        amount: '800.00',
+      }),
     );
 
     await withActor(officeActor(), async (tx) => {
       await tx.execute(sql`
         select app.recharge_cost_line(
-          ${id}, ${contractId}, ${inCare}, 'interventia a trecut pe Delta'
+          ${id}, ${tinta.contractId}, ${tinta.componentId}, 'interventia a trecut pe Delta'
         )`);
     });
+
+    const dinCare = sursa.componentId;
+    const inCare = tinta.componentId;
 
     expect((await rollupOf(dinCare, periodAugust)).consumed).toBe('0.00');
     expect((await rollupOf(inCare, periodAugust)).consumed).toBe('800.00');
@@ -588,12 +606,19 @@ describe('#20 terenul nu vede registrul', () => {
   it('zero randuri si zero coloane de suma', async () => {
     await withActor(officeActor(), (tx) => insertLine(tx, { amount: '5000.00' }));
 
-    const rows = await withActor(fieldActor({ companyIds: [companyId] }), async (tx) => {
-      const result = await tx.execute(sql`select id from app.cost_lines`);
-      return result.rows;
-    });
+    /*
+     * Nu „zero randuri", ci 42501: terenul n-are nici macar `select` pe tabela,
+     * deci interogarea moare inainte sa ajunga la RLS. E mai tare decat cerea
+     * verificarea #20 — o lista goala se poate obtine si dintr-un filtru gresit,
+     * pe cand privilegiul lipsa nu se poate obtine din greseala.
+     */
+    const error = await rejection(
+      withActor(fieldActor({ companyIds: [companyId] }), async (tx) => {
+        await tx.execute(sql`select id from app.cost_lines`);
+      }),
+    );
 
-    expect(rows).toEqual([]);
+    expect(sqlstate(error)).toBe(SQLSTATE.INSUFFICIENT_PRIVILEGE);
 
     const privileges = await withActor(officeActor(), async (tx) => {
       const result = await tx.execute(sql`
