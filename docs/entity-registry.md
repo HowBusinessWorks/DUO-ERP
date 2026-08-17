@@ -48,6 +48,12 @@ Restul — antet, tab-uri, Legături, formular — se adaugă când ai nevoie de
 - **`empty` nu e opțional.** Nu poți livra o listă fără stare goală proiectată (§30.11).
 - **`Tabs` nu are `disabled`.** Un tab fără drept se filtrează cu `visible` și
   **lipsește din DOM** — nu apare gri (§30.5). Ruta lui răspunde „nu ai acces”.
+- **`visible(session, entity)` primește și rândul**, din pasul 05. Unitatea de lucru
+  are trei seturi de tab-uri, unul pe fiecare tip: o inspecție n-are Deviz, o lucrare
+  n-are Constatări. Fără al doilea parametru, singurele variante erau un tab „nu se
+  aplică tipului ăsta" — adică tab-ul gri interzis mai sus — sau a doua pagină de
+  detaliu, interzisă și mai apăsat. Implementările care se uită doar la sesiune rămân
+  valabile: un parametru în plus nu strică o funcție care nu-l citește.
 - **`Stat.context` nu e opțional.** O cifră fără referință nu susține nicio decizie.
 - **`Money` nu acceptă `number`.** Doar tipul `Money` din `@damina/shared`.
 - **Maximum două bare de progres în antet.** Restul indicatorilor stau în tab-uri.

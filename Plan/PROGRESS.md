@@ -32,6 +32,30 @@ cu CI verde propriu. Următorul pas de conținut neînceput e **06 — Registrul
 Motivul tăierii: pasul întreg are 19 verificări, 5 tabele, 6 use-case-uri și 7 ecrane — nu încape
 într-o sesiune fără să se rupă la mijloc.
 
+### Pasul 06 — cum aș tăia-o, dacă ești de acord cu utilizatorul
+
+**Propunere, NU decizie luată** — utilizatorul n-a aprobat-o încă, pentru că sesiunea a plecat pe
+altceva. Motivul e același ca la 05, doar mai apăsat: pasul are **21 de verificări**, registrul de
+cost cu ~25 de coloane, rollup-uri întreținute prin trigger, un job de control, mașina de închidere
+cu checklist ca date, șase ecrane și ~20 de fișiere `.sql`.
+
+| Sub-etapă | Conținut | Verificări din §6 |
+|---|---|---|
+| **06a** | `0017_cost_ledger` (append-only, triggere de `period_id` / `stage_id` / analitică, indecșii — inclusiv cel parțial de reconciliere) + `0018_rollups` (`component_period_rollup`, `overhead_snapshots`, întreținere prin trigger) | 1–8, 12, 20 |
+| **06b** | `recordCost`, storno, extinderea lui `moveFunding` (rescrie „descărcat" pe linii + liniile de re-alocare), jobul `rollup.verify`, registrul de check-uri de închidere, metricile de integritate, seed cu 10.000 de linii | 9, 13, 14, 16, 17, 18 |
+| **06c** | Ecranele: tab-ul Costuri cu drill-down până la document, *Marjă și plafoane* cu comutator brut/net, *Reconciliere folosit vs descărcat*, cifrele reale în Contract › Prezentare, Obiectiv › Istoric, Panou › Rapoarte | 10, 11, 15, 19, 21 |
+
+**Blocante în CI**, după §7 al pasului: 1–7, 12, 16–17. Restul se pot valida pe date reale.
+
+Două lucruri pe care le-am lăsat pregătite pentru 06 și care se pierd dacă nu le vezi:
+
+- **`moveFunding` are deja `costLineIds: []`** în planul de domain, cu un comentariu care spune de ce.
+  Când există linii de cost, ramura de lună deschisă le rescrie analitica „descărcat" — nu inventa un
+  al doilea mecanism, el e deja proiectat acolo.
+- **`app.assert_no_money_leak(text[])`** din 05a rămâne în bază pentru pașii următori. Registrul de
+  cost aduce `amount`, deci regexul îl prinde; dar dacă adaugi coloane de bani cu nume care nu conțin
+  `price|pret|cost|amount|margin|salary`, treci-le explicit în lista funcției.
+
 **Ce te așteaptă la pasul 06.** Toată structura de cost e deja pe ecran, cu eticheta corectă și
 cifra „—”:
 
@@ -73,6 +97,8 @@ scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu
   server action prin HTTP, fără browser: citești input-urile ascunse din `<form>`, le pui într-un
   `FormData` împreună cu câmpurile reale și faci POST pe URL-ul paginii. Așa a fost testată limita
   de login la 02c′. **E cea mai bună unealtă până apare Playwright.**
+- **Ecranele se verifică fără browser, cu un harness de 150 de linii.** Pornești `next dev`, fabrici cookie-ul de sesiune (mai jos), ceri paginile cu `fetch` și afirmi pe HTML-ul randat: „codul `L-000001` apare", „tab-ul Deviz NU apare pe inspecție", „cuvântul «Unitate de Lucru» nu apare nicăieri". Așa s-au bifat #11, #14 și #15 la 05c, 22 de verificări într-o rulare.
+  **Ce prinde**: rutare, drepturi, ce ajunge în DOM, texte interzise, redirecturi. **Ce nu prinde**: click, hover, focus, layout — alea rămân pentru Playwright (datoria #2). Un lucru la care să te aștepți: rolul `admin` cere al doilea factor, deci fără `MFA_ENFORCED=0` harness-ul primește 307 pe tot, iar simptomul arată exact ca „ecranul e stricat".
 - **Sesiunea se poate fabrica dintr-un script**: `POST /auth/v1/token?grant_type=password` la
   Supabase, apoi cookie-ul `sb-<ref>-auth-token` = `base64-` + JSON-ul răspunsului, tăiat în bucăți
   de 3180 de caractere dacă e lung. Cu el poți lovi orice rută ca orice persona.
@@ -146,12 +172,13 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași** — ceea ce e chiar comportamentul cerut de #16 — **dacă `MFA_ENFORCED` nu e `0`** (vezi rândul de mai jos). |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **362** | 163 unitare (`shared` 39 · `domain` 82 · `auth` 33 · `storage` 6 · `i18n` 3) + 125 `packages/db` + **74** `packages/services`. Confirmate în CI `32024540915`, pe `8f17b7b` (05c n-a adăugat teste automate: ecranele s-au verificat pe aplicația care rulează). Testele de bază de date **și cele de servicii** rulează doar în CI — mașina n-are Docker. Praguri anterioare: 242 (02c′), 329 (05a). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **364** | 165 unitare (`shared` 39 · `domain` 82 · **`auth` 35** · `storage` 6 · `i18n` 3) + 125 `packages/db` + 74 `packages/services`. Cele 362 de dinainte au fost confirmate în CI `32024540915` pe `8f17b7b`; cele două în plus sunt testele de `MFA_ENFORCED`, rulate local (`auth` n-are nevoie de Docker). 05c n-a adăugat teste automate — ecranele s-au verificat pe aplicația care rulează. Testele de bază de date **și cele de servicii** rulează doar în CI — mașina n-are Docker. Praguri anterioare: 242 (02c′), 329 (05a). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
 | **Martie 2026 e ÎNCHISĂ la firma A pe Supabase dev**, din 05c | Închisă dinadins, ca ecranul de re-alocări să aibă ce arăta: mutarea finanțării intervenției `IV-000001` de acolo a emis `NRA-000001` în august. Dacă un ecran refuză o scriere pe martie, ăsta e motivul — nu un bug. |
 | **Aplicația e deployată pe Vercel**, pe același proiect Supabase (`cspjtesltraiaveypuya`) | Deci datele de pe dev sunt aceleași care se văd în aplicația deployată — inclusiv seed-ul și luna închisă de mai sus. `next.config.ts` încarcă `.env.local` din rădăcina repo-ului, fișier care pe Vercel **nu există**: toate variabilele trebuie puse în Project Settings. |
-| **`MFA_ENFORCED=0` pe deploy-ul de test** (cerut de utilizator, 17 august 2026) | Oprește **poarta** de al doilea factor, ca testarea să nu ceară un cod de 6 cifre la fiecare intrare. Nu atinge drepturile: `requiresMfa()` răspunde în continuare `true` pentru un admin. Cât timp e pornit, shell-ul de birou arată o **bandă roșie** pe fiecare ecran — dacă o vezi în capturi sau în HTML, nu e un bug de stil, e comutatorul. Detaliile în `docs/security.md`. |
+| **`MFA_ENFORCED=0` pe deploy-ul de test** — pus în Vercel de utilizator și **confirmat că merge**, 17 august 2026 | Oprește **poarta** de al doilea factor, ca testarea să nu ceară un cod de 6 cifre la fiecare intrare. Nu atinge drepturile: `requiresMfa()` răspunde în continuare `true` pentru un admin. Cât timp e pornit, shell-ul de birou arată o **bandă roșie** pe fiecare ecran — dacă o vezi în capturi sau în HTML, nu e un bug de stil, e comutatorul. Detaliile în `docs/security.md`. |
 | Rolurile lui Andrei sunt `pm` + `admin` | Le-am dus temporar la `pm` la 05c, ca să pot trece de poarta de MFA fără TOTP, și **le-am restaurat la final**. Dacă găsești altceva, s-a oprit o sesiune la mijloc. |
+| **`git push` poate cădea cu „Repository not found"** deși repo-ul există | Remote-ul e **privat** (`SurviveANDcraft/DUO-ERP`) și e vizibil doar contului GitHub `SergioFir`. Mașina are două conturi în `gh`, iar git folosește Windows Credential Manager, **nu** tokenul lui `gh` — deci `gh auth switch` singur nu rezolvă, și nici `git -c credential.helper='!gh auth git-credential'`. GitHub nu distinge „n-ai acces" de „nu există", de aceea mesajul minte. **Nu trage concluzia că repo-ul a fost șters sau redenumit:** verifică `gh api user --jq .login`, apoi `gh repo view SurviveANDcraft/DUO-ERP --json name,visibility`. Fă commit local ca munca să fie în siguranță și cere utilizatorului să se logheze — o rezolvă în câteva secunde. |
 | Docker nu există pe mașina de dezvoltare | Testele de bază de date rulează **doar în CI**. Verificările pe date reale se fac pe Supabase dev, în blocuri anulate la final. |
 
 ---
