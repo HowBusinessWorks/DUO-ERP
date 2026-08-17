@@ -40,9 +40,8 @@ Motivul tăierii: pasul întreg are 19 verificări, 5 tabele, 6 use-case-uri și
 **21 de verificări**, registrul de cost cu ~25 de coloane, rollup-uri întreținute prin trigger, un job
 de control, mașina de închidere cu checklist ca date, șase ecrane și ~20 de fișiere `.sql`.
 
-**06a e gata** (vezi intrarea de la pasul 06), cu o singură rezervă: testele de bază de date n-au
-rulat local — mașina n-are Docker. Primul CI e cel care confirmă. Migrările sunt însă aplicate pe
-Supabase dev, iar toate verificările de mai jos au fost rulate acolo pe Postgres 17.6 real.
+**06a e gata, cu CI verde** (run `32030892549`). Verificările au fost rulate întâi pe Supabase dev,
+pe Postgres 17.6 real, apoi confirmate de suita de bază de date în CI.
 
 | Sub-etapă | Conținut | Verificări din §6 |
 |---|---|---|
@@ -150,7 +149,7 @@ scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat: #8, #10, #13, #14) | 2026-08-15 |
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
-| 06 — Registrul de cost, închidere | 🟨 în lucru (06a gata local, CI de confirmat; 06b, 06c neîncepute) | 2026-08-17 |
+| 06 — Registrul de cost, închidere | 🟨 în lucru (06a gata, CI verde; 06b, 06c neîncepute) | 2026-08-17 |
 | 07 — File management (R2) | ⬜ neînceput | — |
 | 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
 | 09 — Fișe de lucru | ⬜ neînceput | — |
@@ -1572,7 +1571,7 @@ sesiunii anterioare: **06a** schema de cost + rollup-uri · **06b** use-case-uri
 checklist-ul de închidere · **06c** ecranele. Motivul e mărimea: 21 de verificări, un registru cu 28
 de coloane, rollup-uri întreținute prin trigger și șase ecrane nu încap într-o sesiune.
 
-### 2026-08-17 — [status: gata local, CI de confirmat] — 06a, schema de cost și rollup-urile
+### 2026-08-17 — [status: gata] — 06a, schema de cost și rollup-urile
 
 **Două migrări noi: `0017_cost_ledger` și `0018_rollups`.** Amândouă **generate** cu
 `pnpm db:generate`, cu completările scrise de mână dedesubt — datoria plătită la 05a ține.
@@ -1616,8 +1615,16 @@ efectiv aplicat:
 - [x] **#20** `app_field` nu vede niciun rând și nicio coloană din registru sau din rollup-uri
 - [x] `pnpm typecheck` 12/12 · `pnpm lint` verde · `pnpm test` verde · `pnpm build` verde ·
   `pnpm scan:secrets` curat
-- [ ] Cele **19 teste noi** din `packages/db/tests/cost-ledger.test.ts` — **nerulate local**, mașina
-  n-are Docker. Se confirmă la primul CI.
+- [x] Cele **21 de teste noi** din `packages/db/tests/cost-ledger.test.ts` — suita de bază de date a
+  urcat de la 125 la **146**. **CI verde, toate 4 joburile** (run `32030892549`, commit `869b54f`).
+
+**Două bug-uri de test, găsite la primul CI** (142/146 treceau din prima), amândouă în test, nu în schemă:
+1. `contract_components` are unic pe **(contract, tip)**, deci trei teste care își făceau fiecare câte
+   o componentă „lucrări" pe același contract se călcau în picioare. Fiecare își ia acum contractul ei.
+2. Terenul nu primește „zero rânduri" pe `cost_lines`, ci **42501**: n-are nici măcar `select` pe
+   tabelă, deci interogarea moare înainte să ajungă la RLS. Așteptarea corectă e **mai tare** decât cea
+   scrisă în verificarea #20 — o listă goală se poate obține și dintr-un filtru greșit; privilegiul
+   lipsă, nu.
 
 **Observații / decizii luate / abateri de la plan:**
 
@@ -1702,3 +1709,4 @@ efectiv aplicat:
 **Ce rămâne pentru sesiunea următoare:**
 - ...
 ```
+
