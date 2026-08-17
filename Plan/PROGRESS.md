@@ -26,7 +26,7 @@ nerulate. Pasul **05 e tăiat în trei** (decizia utilizatorului, 17 august 2026
 
 | Sub-etapă | Conținut | Verificări din §6 | Stare |
 |---|---|---|---|
-| **05a** | Migrarea `0016_work_units` (5 tabele, 8 triggere, RLS, grant-uri pe coloană) + `packages/domain/funding` | 1, 2, 3, 9, 10, 12, 13, 16, 17, 18 | 🟩 gata |
+| **05a** | Migrarea `0016_work_units` (5 tabele, 8 triggere, RLS, grant-uri pe coloană) + `packages/domain/funding` | 1, 2, 3, 9, 10, 12, 13, 16, 17, 18 | 🟩 gata, CI verde |
 | **05b** | `packages/services/work-units`: `createWorkUnit`, `promoteToLucrare`, `moveFunding`, `allocateFunding`/`reallocate`, etape, `closeWorkUnit`, seed | 4, 5, 6, 7, 8 | ⬜ |
 | **05c** | Ecranele, cu agentul de design | 11, 14, 15, 19 | ⬜ |
 
@@ -148,7 +148,7 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași**, ceea ce e chiar comportamentul cerut de #16. |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **329** *(de confirmat la primul CI de după 05a)* | 163 unitare (`shared` 39 · **`domain` 82** · `auth` 33 · `storage` 6 · `i18n` 3) + **125** `packages/db` + 41 `packages/services`. Cele 163 unitare sunt confirmate local. Cele 34 de teste noi din `packages/db/tests/work-units.test.ts` **n-au rulat local** — mașina n-are Docker — deci `125` e cifra așteptată, nu una confirmată. Pragul de dinainte era 242, pe `570da2b`. Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **329** | 163 unitare (`shared` 39 · **`domain` 82** · `auth` 33 · `storage` 6 · `i18n` 3) + **125** `packages/db` + 41 `packages/services`. Confirmate în CI `32018805393`, pe `df22558`. Testele de bază de date rulează **doar în CI** — mașina de dezvoltare n-are Docker. Pragul de dinainte era 242. Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | Docker nu există pe mașina de dezvoltare | Testele de bază de date rulează **doar în CI**. Verificările pe date reale se fac pe Supabase dev, în blocuri anulate la final. |
 
 ---
@@ -1251,10 +1251,19 @@ efectiv aplicat:
   parțial; RLS aprins + `force` + politici pe toate cele 5 tabele
 - [x] `pnpm typecheck` 12/12 · `pnpm lint` verde · `pnpm test` verde · `pnpm build` verde ·
   `pnpm scan:secrets` curat
-- [ ] **#13** (coduri consecutive la creare în paralel) — testul e scris, dar **cere Docker**; se
-  validează la primul CI
-- [ ] Cele **34 de teste noi** din `packages/db/tests/work-units.test.ts` — scrise, **nerulate
-  local**. Ar trebui să urce suita de bază de date de la 91 la **125**.
+- [x] **#13** coduri consecutive la creare în paralel — trei tranzacții simultane primesc
+  `…-000001`, `…-000002`, `…-000003`. Confirmat în CI.
+- [x] Cele **34 de teste noi** din `packages/db/tests/work-units.test.ts` — suita de bază de date a
+  urcat de la 91 la **125**. **CI verde, toate 4 joburile** (run `32018805393`, commit `df22558`).
+  Pragul total: **329**.
+
+**Două bug-uri de test, găsite la primul CI** (123/125 treceau din prima):
+1. `muncitor` nu e valoare din `app.person_category` — lista are `angajat`, `sef_santier`,
+   `subcontractant`, `client_user`.
+2. Mai instructiv: `overrides.amount ?? '12500.00'` trata `null` ca **absent**, deci testul „nici
+   sumă, nici procent" trimitea de fapt o sumă și nu verifica nimic. **`??` nu se poate folosi când
+   `null` e o valoare cu sens** — și în tabela asta chiar e: o alocare exprimată în procent n-are
+   sumă. Genul de test care trece verde fără să verifice ce spune.
 
 **Observații / decizii luate / abateri de la plan:**
 
@@ -1323,11 +1332,9 @@ efectiv aplicat:
   dinadins: pe un șantier zugrăvitul începe într-o cameră în timp ce instalațiile se termină în alta.
 
 **Ce rămâne pentru sesiunea următoare:**
-1. Push → CI. Se validează #13 și cele 34 de teste de bază de date; pragul ar trebui să ajungă la
-   **329**.
-2. **05b** — `packages/services/work-units`, peste domain-ul care e deja gata. Nu rescrie
+1. **05b** — `packages/services/work-units`, peste domain-ul care e deja gata. Nu rescrie
    `planFundingMove`: serviciul execută ramura, nu o alege.
-3. **05c** — ecranele, cu agentul de design.
+2. **05c** — ecranele, cu agentul de design.
 
 ---
 
