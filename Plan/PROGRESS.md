@@ -103,6 +103,7 @@ scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu
   `FORBIDDEN`, `CONFLICT`. Nu inventa altele — nu există `INTERNAL` sau `CONFIG_MISSING`.
 - **Comentariile din cod se scriu fără diacritice; textul de pe ecran, cu diacritice.**
 - **Există un agent de design** și utilizatorul a cerut explicit să fie folosit pentru ecrane.
+- **`MFA_ENFORCED=0` e o poartă oprită, nu un drept dat.** Nu construi nimic pe el: niciun cod nu trebuie să întrebe „e MFA oprit?" ca să decidă altceva decât banda de avertizare. Dacă un ecran începe să se comporte diferit după comutator, comutatorul a devenit o a doua configurație de securitate — exact ce nu trebuie.
 - Înainte de commit: `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets`.
   Ultimul cere un build proaspăt, iar build-ul cade dacă un `next dev` ține `.next` ocupat — oprește
   serverele de dezvoltare înainte.
@@ -142,12 +143,15 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | `.env.local` (rădăcină, gitignored) are `SUPABASE_SERVICE_ROLE_KEY` și `SEED_USER_PASSWORD` | Fără prima, `pnpm db:seed:users` nu pornește. A doua ține parola conturilor de test stabilă între rulări. Ambele lipsesc pe o mașină nouă. |
 | Cheia de service a trecut printr-o fereastră de chat pe 17 august 2026 | **De rotit** din Project Settings → API. |
 | `pnpm db:generate` **merge din nou**, din 05a | Era blocat din 02c de trei snapshot-uri (`0013`–`0015`) cu `id`/`prevId` copiate din `0012`. Lanțul a fost refăcut la 05a; `0016` e generată cu drizzle. |
-| Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași**, ceea ce e chiar comportamentul cerut de #16. |
+| Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași** — ceea ce e chiar comportamentul cerut de #16 — **dacă `MFA_ENFORCED` nu e `0`** (vezi rândul de mai jos). |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
 | Prag de teste: **362** | 163 unitare (`shared` 39 · `domain` 82 · `auth` 33 · `storage` 6 · `i18n` 3) + 125 `packages/db` + **74** `packages/services`. Confirmate în CI `32024540915`, pe `8f17b7b` (05c n-a adăugat teste automate: ecranele s-au verificat pe aplicația care rulează). Testele de bază de date **și cele de servicii** rulează doar în CI — mașina n-are Docker. Praguri anterioare: 242 (02c′), 329 (05a). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
 | **Martie 2026 e ÎNCHISĂ la firma A pe Supabase dev**, din 05c | Închisă dinadins, ca ecranul de re-alocări să aibă ce arăta: mutarea finanțării intervenției `IV-000001` de acolo a emis `NRA-000001` în august. Dacă un ecran refuză o scriere pe martie, ăsta e motivul — nu un bug. |
+| **Aplicația e deployată pe Vercel**, pe același proiect Supabase (`cspjtesltraiaveypuya`) | Deci datele de pe dev sunt aceleași care se văd în aplicația deployată — inclusiv seed-ul și luna închisă de mai sus. `next.config.ts` încarcă `.env.local` din rădăcina repo-ului, fișier care pe Vercel **nu există**: toate variabilele trebuie puse în Project Settings. |
+| **`MFA_ENFORCED=0` pe deploy-ul de test** (cerut de utilizator, 17 august 2026) | Oprește **poarta** de al doilea factor, ca testarea să nu ceară un cod de 6 cifre la fiecare intrare. Nu atinge drepturile: `requiresMfa()` răspunde în continuare `true` pentru un admin. Cât timp e pornit, shell-ul de birou arată o **bandă roșie** pe fiecare ecran — dacă o vezi în capturi sau în HTML, nu e un bug de stil, e comutatorul. Detaliile în `docs/security.md`. |
+| Rolurile lui Andrei sunt `pm` + `admin` | Le-am dus temporar la `pm` la 05c, ca să pot trece de poarta de MFA fără TOTP, și **le-am restaurat la final**. Dacă găsești altceva, s-a oprit o sesiune la mijloc. |
 | Docker nu există pe mașina de dezvoltare | Testele de bază de date rulează **doar în CI**. Verificările pe date reale se fac pe Supabase dev, în blocuri anulate la final. |
 
 ---
@@ -592,6 +596,30 @@ Matricea completă, cu cele patru conturi × șase rute:
 - `SEED_USER_PASSWORD` e fixată în `.env.local`, deci rulările următoare ale seed-ului nu mai
   schimbă parola conturilor de test.
 - **Cheia de service a trecut prin chat** la configurare — de rotit din Project Settings → API.
+
+### 2026-08-17 — [addendum la 02c′] — `MFA_ENFORCED=0`, pentru deploy-ul de test
+
+Cerut de utilizator după 05c, când a încercat să vadă ecranele noi pe Vercel: rolul `admin` cere
+TOTP (regula din 02c′), Andrei n-are factor înrolat, deci era trimis la `/doi-pasi` la fiecare
+intrare. Pe un mediu de test asta nu face testarea mai sigură — o face să nu se mai facă.
+
+**Ce s-a executat:** `mfaBypassed()` în `packages/auth/src/permissions.ts`, citit de `mfaSatisfied()`
+— deci de toate cele trei locuri care aplicau poarta (middleware, login, `requireMfa()` din rutele
+`/api/admin`). Plus banda roșie în shell-ul de birou, `.env.example` și `docs/security.md`.
+**Două teste noi** (auth: 33 → 35).
+
+**Trei lucruri de reținut:**
+
+- **Oprește poarta, nu drepturile.** `requiresMfa()` întoarce în continuare `true` pentru un admin,
+  iar ecranul de administrare spune în continuare adevărul despre rol. Unul din cele două teste noi
+  blochează exact distincția asta — dacă cineva „simplifică" mai târziu făcând `requiresMfa()` să
+  răspundă `false`, testul cade.
+- **Nu se blochează pe `NODE_ENV === 'production'`**, deși ăsta era reflexul: pe Vercel `NODE_ENV` e
+  `production` pe **toate** deploy-urile, inclusiv preview. Verificarea ar fi fost ori inutilă, ori ar
+  fi blocat exact mediul pentru care comutatorul există. Garanția e deci **vizibilă** (banda), nu
+  ascunsă. Abaterea a fost spusă utilizatorului explicit, nu strecurată.
+- **O blocare tare rămâne posibilă** dacă apare un al doilea proiect Vercel: refuz pe hostul de
+  producție. Acum există unul singur, deci n-ar fi apărat nimic și ar fi blocat totul.
 
 ### 2026-08-17 — [status: gata] — 02d, ecranul de administrare
 
