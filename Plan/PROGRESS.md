@@ -123,7 +123,7 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași**, ceea ce e chiar comportamentul cerut de #16. |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **242** | 110 unitare (`shared` 39 · `domain` 29 · **`auth` 33** · `storage` 6 · `i18n` 3) + 91 `packages/db` + 41 `packages/services`. Baza de 225 e confirmată în CI `32009107114`, pe `d0d5d39`; 02c′ adaugă 14 unitare (rulate local) și 3 de bază de date (**nerulate local**, mașina n-are Docker). Testele de bază de date rulează **doar în CI** — mașina de dezvoltare n-are Docker. Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **242** | 110 unitare (`shared` 39 · `domain` 29 · **`auth` 33** · `storage` 6 · `i18n` 3) + 91 `packages/db` + 41 `packages/services`. Confirmate în CI `32014280507`, pe `570da2b`. Testele de bază de date rulează **doar în CI** — mașina de dezvoltare n-are Docker. Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | Docker nu există pe mașina de dezvoltare | Testele de bază de date rulează **doar în CI**. Verificările pe date reale se fac pe Supabase dev, în blocuri anulate la final. |
 
 ---
@@ -776,6 +776,8 @@ a intrat („modificare roluri de birou” / „închidere de sesiuni” / „re
    suprafață; folosește `pgMessage()` sau `sqlstate()`.**
 2. **Cheia de service tot n-a fost rotită** (a trecut printr-un chat pe 17 august). Cu 02c′,
    singurul cod care o mai folosește e `resetMfaFactors` — rotația e ieftină acum.
+   *(Adăugat după push: CI `32014280507` verde — servicii **41**, db 91, unitare 110, total
+   **242**, exact cifra prezisă.)*
 3. Pasul 02 e închis. Următorul pas de conținut e cel din plan după 04; Playwright (#13, clicul pe
    hartă din 04b) și decizia despre **#8** (Realtime vs. `authenticated`) rămân deschise.
 
