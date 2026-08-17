@@ -18,26 +18,37 @@
 ### Unde s-a ajuns
 
 Pașii **01, 02 și 04 sunt gata**. Pasul **03 e complet ca implementare**, dar are 4 verificări
-nerulate. Pasul **05 e tăiat în trei** (decizia utilizatorului, 17 august 2026), iar **05a — schema
-și domain-ul pur — e gata**. Următorul lucru de făcut e **05b: use-case-urile din
-`packages/services/work-units`**.
+nerulate. Pasul **05 e tăiat în trei** (decizia utilizatorului, 17 august 2026), iar **05a (schema + domain) și 05b (use-case-uri) sunt
+gata**. Următorul lucru de făcut e **05c: ecranele**, cu skill-ul de
+design — serviciile de care au nevoie există toate.
 
 ### Tăierea pasului 05, și ce e în fiecare bucată
 
 | Sub-etapă | Conținut | Verificări din §6 | Stare |
 |---|---|---|---|
 | **05a** | Migrarea `0016_work_units` (5 tabele, 8 triggere, RLS, grant-uri pe coloană) + `packages/domain/funding` | 1, 2, 3, 9, 10, 12, 13, 16, 17, 18 | 🟩 gata, CI verde |
-| **05b** | `packages/services/work-units`: `createWorkUnit`, `promoteToLucrare`, `moveFunding`, `allocateFunding`/`reallocate`, etape, `closeWorkUnit`, seed | 4, 5, 6, 7, 8 | ⬜ |
-| **05c** | Ecranele, cu agentul de design | 11, 14, 15, 19 | ⬜ |
+| **05b** | `packages/services/work-units` + DTO-uri + seed | 4, 5, 6, 7, 8, 14, 19 | 🟩 gata, CI verde |
+| **05c** | Ecranele, cu agentul de design | 11, 15, 17 | ⬜ |
 
 Motivul tăierii: pasul întreg are 19 verificări, 5 tabele, 6 use-case-uri și 7 ecrane — nu încape
 într-o sesiune fără să se rupă la mijloc.
 
-**Ce te așteaptă deja făcut la 05b:** planul mutării de finanțare e **funcție pură**, gata și
-testată (`planFundingMove`). Serviciul nu mai judecă nimic — execută ramura pe care i-o dă domain-ul.
-Tot acolo sunt `splitAcrossPeriods` (Delta pe 2–3 luni, fără ban pierdut), `validateAllocationSum`,
-`canPromote` (cu listele „ce se păstrează / ce se adaugă" pentru ecranul de confirmare),
-`stageScheduleIsCoherent` și `physicalProgress`.
+**Ce te așteaptă deja făcut la 05c.** Toate serviciile de care au nevoie ecranele există și sunt
+testate în CI:
+
+| Ecran din §3.4 | Ce cheamă |
+|---|---|
+| Vederea unificată | `listWorkUnits` (filtre pe tip, status, obiectiv, responsabil, executant, **contract/componentă/lună prin alocările active**) |
+| Prezentare (lucrare) | `getWorkUnit`, `listAllocations`, `getStageOverview` — bara de progres fizic vine din `physicalProgress`, cu `weighted` care spune dacă procentul e din ponderi sau presupus |
+| Etape + Gantt | `listStages`, `createStage`, `reorderStages`, `getStageOverview` |
+| Închidere | `getClosingChecklist` (rândurile modulelor viitoare vin deja `pending_module`), `closeWorkUnit` |
+| Mutarea finanțării | **`previewFundingMove`** pentru ce se anunță înainte de confirmare, `moveFunding` pentru execuție |
+| Bani › Re-alocările lunii | `listReallocationDocuments` |
+| Promovarea | `promoteToLucrare`; listele „ce se păstrează / ce se adaugă" vin din `canPromote` ca **chei stabile**, iar ecranul le traduce |
+
+Ce **nu** face niciun serviciu, dinadins: nu decide mecanica mutării. Aceea vine din
+`@damina/domain` (`planFundingMove`), iar ecranul o **anunță** din `previewFundingMove`, care citește
+aceeași sursă. Trei locuri, o singură părere.
 
 ### Primul lucru de făcut, înainte de orice cod
 
@@ -120,7 +131,7 @@ scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu
 | 02 — Identitate, acces, RLS | 🟩 **gata** (19/19 verificări; 02a–02d + 02c′) | 2026-08-17 |
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat: #8, #10, #13, #14) | 2026-08-15 |
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
-| 05 — Unitate de Lucru, finanțare | 🟨 în lucru (**05a gata**; 05b, 05c neînceput) | 2026-08-17 |
+| 05 — Unitate de Lucru, finanțare | 🟨 în lucru (**05a și 05b gata**; rămâne 05c — ecranele) | 2026-08-17 |
 | 06 — Registrul de cost, închidere | ⬜ neînceput | — |
 | 07 — File management (R2) | ⬜ neînceput | — |
 | 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
@@ -148,7 +159,8 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași**, ceea ce e chiar comportamentul cerut de #16. |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **329** | 163 unitare (`shared` 39 · **`domain` 82** · `auth` 33 · `storage` 6 · `i18n` 3) + **125** `packages/db` + 41 `packages/services`. Confirmate în CI `32018805393`, pe `df22558`. Testele de bază de date rulează **doar în CI** — mașina de dezvoltare n-are Docker. Pragul de dinainte era 242. Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **362** | 163 unitare (`shared` 39 · `domain` 82 · `auth` 33 · `storage` 6 · `i18n` 3) + 125 `packages/db` + **74** `packages/services`. Confirmate în CI `32021200540`, pe `4634b6b`. Testele de bază de date **și cele de servicii** rulează doar în CI — mașina n-are Docker. Praguri anterioare: 242 (02c′), 329 (05a). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
 | Docker nu există pe mașina de dezvoltare | Testele de bază de date rulează **doar în CI**. Verificările pe date reale se fac pe Supabase dev, în blocuri anulate la final. |
 
 ---
@@ -1331,10 +1343,93 @@ efectiv aplicat:
 - **Etapele au voie să se suprapună în timp**, și `stageScheduleIsCoherent` nu verifică asta
   dinadins: pe un șantier zugrăvitul începe într-o cameră în timp ce instalațiile se termină în alta.
 
-**Ce rămâne pentru sesiunea următoare:**
+**Ce rămâne pentru sesiunea următoare:** *(05b s-a făcut în aceeași zi — vezi intrarea de mai jos)*
 1. **05b** — `packages/services/work-units`, peste domain-ul care e deja gata. Nu rescrie
    `planFundingMove`: serviciul execută ramura, nu o alege.
 2. **05c** — ecranele, cu agentul de design.
+
+### 2026-08-17 — [status: gata] — 05b, use-case-urile
+
+**Ce s-a executat:**
+
+- **`packages/contracts/src/work-units.ts`** — DTO-urile Zod. Două reguli ale pasului se citesc
+  direct din forma lor: `workUnitInputSchema` **n-are `contractId`** (finanțarea nu e câmp pe UL),
+  iar `reason` din `moveFundingInputSchema` e obligatoriu **fără implicit**. Plus etichetele de tip,
+  status, executant și rol — „Unitate de Lucru" nu apare în niciuna.
+- **`packages/services/src/work-units.ts`** — `createWorkUnit` (unitate + cod din serie + alocări +
+  asignări, **o singură tranzacție**), `promoteToLucrare`, `moveFunding`, `previewFundingMove`,
+  `allocateFunding`, `createStage` / `reorderStages`, `getClosingChecklist` / `closeWorkUnit`, plus
+  citirile de care are nevoie 05c: `listWorkUnits` (vederea unificată, cu filtre pe finanțare),
+  `listAllocations`, `listStages`, `listAssignments`, `getStageOverview`,
+  `listReallocationDocuments`.
+- **`packages/services/src/db-errors.ts`** — traducerea `P0001` → `AppError` într-un singur loc, cu
+  listă închisă de prefixe. Cele trei copii vechi de `sqlstate` (`contracts`, `objectives`, `admin`)
+  **au rămas pe loc**; migrarea lor e curățenie separată, nu parte din pas.
+- **Seed** — o lucrare pe 3 luni de Delta, o intervenție, o inspecție, cu etape și asignări, plus
+  seriile de numerotare la ambele firme și Marius Dobre cu autorizație SSM valabilă.
+
+**Verificări din pas care trec / nu trec:**
+
+- [x] **#4** promovarea păstrează **`id`-ul și codul**, schimbă tipul, lasă motivul în audit, iar
+  alocarea rămâne același rând — nu o copie
+- [x] **#5** lună deschisă → alocarea nouă activă, cea veche `superseded` cu `superseded_by` pus
+- [x] **#6** lună închisă → `NRA-000001` în luna **curentă**, cu ambele capete și autorul
+- [x] **#7** fără motiv → nu se salvează nimic, alocarea rămâne singura și activă
+- [x] **#8** după mutare: același obiectiv, același cod, aceeași dată de start; istoricul
+  obiectivului are exact același număr de unități
+- [x] **#14** suma alocărilor active pe componentă × lună **dă exact** cifra de pe bandă — verificat
+  pe Supabase dev, pe toate cele trei luni de Delta din seed (7.600 · 15.200 · 3.100)
+- [x] **#19** checklist-ul de închidere blochează, fiecare rând blocant are link, iar rândurile
+  modulelor viitoare apar dezactivate cu explicație — nu lipsesc
+- [x] `pnpm typecheck` 12/12 · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets` —
+  toate verzi. **CI verde** (run `32021200540`, commit `4634b6b`), servicii 41 → **74** de teste.
+- [x] Seed-ul rulează cap-coadă pe Supabase dev: `L-000001`, `IV-000001`, `I-000001`, progres fizic
+  25% ponderat, grafic coerent
+- [ ] **#11, #15 (ecranul), #17** — cer interfață; rămân pentru 05c
+
+**Observații / decizii luate / abateri de la plan:**
+
+- **Cele două ramuri ale mutării diferă mai mult decât scria în plan.** Pe **luna închisă alocarea
+  veche NU se atinge** — nu e o scutire, e chiar regula: o lună raportată nu se rescrie, iar
+  `guard_closed_period` ar refuza oricum `update`-ul, pentru că rândul poartă luna închisă. Se emite
+  documentul în luna curentă și se deschide alocarea nouă pe luna țintă. Pe **luna deschisă**, în
+  schimb, supersedarea e chiar ce cere verificarea #5.
+- **`costLineIds` e listă goală, și planul o spune cinstit.** Registrul de cost vine la pasul 06;
+  ramura „rescrie descărcat" n-are ce rescrie acum. Efectul verificabil al lui #5 e supersedarea, și
+  ea se întâmplă.
+- **`moveFunding` cere luna curentă deschisă**, altfel refuză cu mesaj. Documentul de re-alocare se
+  emite acolo, iar o firmă care n-a deschis luna n-are unde să-l pună.
+- **Intervenția cere finanțare de la primul rând; inspecția și lucrarea, nu.** O intervenție e o
+  cheltuială care se face acum, deci cineva a aprobat-o de undeva. O lucrare începe ca draft,
+  înainte de deviz.
+- **Cifrele din seed nu sunt la întâmplare:** alocările pe Delta sunt exact veniturile alocate pe
+  cele trei luni, deci verificarea #14 e adevărată **prin construcție**, nu prin coincidență.
+- **Codurile ies `L-000001` / `IV-000001` / `I-000001`.** Seriile sunt distincte pe tip dinadins —
+  vezi bug-ul 2 mai jos.
+- **`previewFundingMove` există ca să nu fie două păreri.** Ecranul anunță mecanica înainte de
+  confirmare (§3.4); dacă ar calcula-o singur, ar putea promite o ramură și tranzacția ar face
+  cealaltă. Un test compară anunțul cu execuția pe toate cele trei stări de lună.
+
+**Trei buguri găsite la primul CI, toate reparate** (70 din 73 de teste treceau din prima):
+
+1. **`reorderStages` folosea poziții negative temporare** — pe care chiar
+   `work_stages_position_positive` le interzice. `check`-ul se aplică **și** valorilor intermediare,
+   nu doar celor finale; comentariul meu explica de ce negativele „nu se ciocnesc cu nimic", și
+   exact acela era motivul pentru care nu funcționau. Acum decalajul e peste maximul existent, deci
+   pozitiv, cu gardă pentru `smallint`.
+2. **Contorul de serie e per (firmă, TIP, serie), dar codul e unic pe (firmă, cod).** Două tipuri
+   configurate cu același text de serie produc amândouă `X-000001`, și al doilea cade. Mesajul spune
+   acum **cauza** — „seria e folosită și de alt tip" — nu simptomul: unitatea care ocupă deja codul e
+   de alt tip și arată nevinovată, deci „cod duplicat" l-ar trimite pe om să caute în locul greșit.
+3. **Un test crea alocarea direct în luna închisă**, ceea ce e corect respins (#16). Ordinea reală e
+   alta: aloci cât luna e deschisă, luna se închide, mutarea vine după.
+
+**Ce rămâne pentru sesiunea următoare:**
+1. **05c** — ecranele, cu skill-ul de design: vederea unificată, pagina de UL cu tab-uri pe tip,
+   Prezentare (cele două bare de progres), Etape + Gantt, Închidere, ecranul de mutare a finanțării,
+   *Bani › Re-alocările lunii*, Gantt general. Serviciile de care au nevoie există toate.
+2. Verificările **#11** (pagina etapei, prin același registry — recursivitatea), **#15** (ecranul de
+   re-alocări) și **#17** (teren pe UL asignată, fără cifre în lei).
 
 ---
 
