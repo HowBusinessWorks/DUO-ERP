@@ -1,6 +1,11 @@
 import { EmptyState } from '@damina/ui';
+import { requireWorkspace } from '../../../../lib/session';
 
-export default function ClientPortalPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function ClientPortalPage() {
+  await requireWorkspace('client');
+
   return (
     <EmptyState
       title="Portal client"

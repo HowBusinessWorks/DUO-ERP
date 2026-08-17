@@ -33,6 +33,11 @@ export interface Session {
   readonly officeRoles: readonly OfficeRole[];
   /** Firmele la care are acces. Selectorul de firma nu poate iesi din lista. */
   readonly companyIds: readonly string[];
+  /** Firma proprie, pentru personele de portal. `null` pentru birou si teren. */
+  readonly subcontractorId: string | null;
+  readonly clientId: string | null;
+  /** Parola temporara nu s-a schimbat inca — singurul ecran permis e cel de schimbare. */
+  readonly mustChangePassword: boolean;
 }
 
 /** Actorul de baza de date al sesiunii. `reason` se adauga per operatie. */
@@ -46,38 +51,23 @@ export function actorFor(session: Session, reason?: string): Actor {
       person_id: session.personId,
       office_roles: session.officeRoles,
       company_ids: session.companyIds,
+      // Se trimit si cand sunt null, ca setul de claim-uri vazut de RLS prin
+      // `withActor` sa fie IDENTIC cu cel din JWT. Un `null` se comporta ca o
+      // absenta — `app.current_subcontractor_id()` cade atunci pe `app.persons`
+      // — iar pentru birou si teren tabela raspunde tot null, garantat de
+      // `persons_subcontractor_consistent` din 0004.
+      subcontractor_id: session.subcontractorId,
+      client_id: session.clientId,
     },
     ...(reason === undefined ? {} : { reason }),
   };
 }
 
-/**
- * Are dreptul sa vada cifre financiare?
- *
- * De aici pleaca §30 regula 5: tab-urile financiare LIPSESC pentru cine n-are
- * dreptul, nu apar gri. Functia decide ce se pune in registry, nu ce se
- * coloreaza — un tab absent nu ajunge in DOM si nu poate fi deschis cu URL.
- *
- * Izolarea reala ramane la nivel de date (roluri Postgres fara `select` pe
- * coloanele de pret, decizia 3). Asta e stratul de interfata peste ea, nu in
- * locul ei: daca cele doua nu coincid, adevarul e in baza.
+/*
+ * `canSeeFinancials` si `canEditNomenclature` s-au mutat in `permissions.ts`,
+ * unde citesc din matricea rol × use-case. Suprafata publica e neschimbata: se
+ * importa tot din `@damina/auth`.
  */
-export function canSeeFinancials(session: Session): boolean {
-  if (session.persona !== 'office') {
-    return false;
-  }
-  return session.officeRoles.some((role) => role === 'admin' || role === 'financiar' || role === 'pm');
-}
-
-/** Poate modifica nomenclatoarele? Ele sunt comune celor 5 firme. */
-export function canEditNomenclature(session: Session): boolean {
-  if (session.persona !== 'office') {
-    return false;
-  }
-  return session.officeRoles.some(
-    (role) => role === 'admin' || role === 'achizitii' || role === 'devizist' || role === 'magazie',
-  );
-}
 
 export function hasRole(session: Session, ...roles: readonly OfficeRole[]): boolean {
   return session.officeRoles.some((role) => roles.includes(role));
@@ -103,6 +93,8 @@ export interface DevSessionSeed {
   readonly persona: string;
   readonly officeRoles: readonly string[];
   readonly companyIds: readonly string[];
+  readonly subcontractorId?: string | null;
+  readonly clientId?: string | null;
 }
 
 export function parseDevSession(raw: string | undefined): Session | null {
@@ -140,6 +132,11 @@ export function parseDevSession(raw: string | undefined): Session | null {
     persona: seed.persona,
     officeRoles,
     companyIds: seed.companyIds.filter((id): id is string => typeof id === 'string'),
+    subcontractorId: typeof seed.subcontractorId === 'string' ? seed.subcontractorId : null,
+    clientId: typeof seed.clientId === 'string' ? seed.clientId : null,
+    // Sesiunea de dezvoltare nu trece niciodata prin ecranul de schimbare a
+    // parolei: n-are parola.
+    mustChangePassword: false,
   };
 }
 
@@ -150,6 +147,8 @@ export function serializeDevSession(session: Session): string {
     persona: session.persona,
     officeRoles: session.officeRoles,
     companyIds: session.companyIds,
+    subcontractorId: session.subcontractorId,
+    clientId: session.clientId,
   });
 }
 

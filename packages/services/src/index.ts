@@ -6,6 +6,8 @@
  * mutatie, enqueue-ul intra in aceeasi tranzactie — daca ea da rollback,
  * jobul dispare cu ea.
  */
+export { clearMustChangePassword } from './auth';
+
 export { checkHealth } from './health';
 export type { HealthReport, ComponentStatus } from './health';
 

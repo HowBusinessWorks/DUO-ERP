@@ -9,6 +9,7 @@ import { NotificationBell } from './notification-bell';
 import { PeriodPicker } from './period-picker';
 import { QuickCreate } from './quick-create';
 import { RouteBreadcrumb } from './route-breadcrumb';
+import { UserMenu } from './user-menu';
 
 const ROUTE_LABELS: Readonly<Record<string, string>> = Object.fromEntries([
   ...NAVIGATION.map((item) => [item.slug, item.label] as const),
@@ -93,6 +94,8 @@ export async function Topbar({
             { label: 'Subcontractant nou', href: '/subcontractanti?new=1' },
           ]}
         />
+
+        <UserMenu session={ctx.session} />
       </div>
     </header>
   );

@@ -4,26 +4,32 @@ import {
   actorFor,
   DEV_SESSION_COOKIE,
   parseDevSession,
+  sessionFromClaims,
   type Actor,
+  type ClaimsRejection,
+  type Persona,
   type Session,
 } from '@damina/auth';
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { homeFor, LOGIN_PATH } from './personas';
+import { decodeAccessTokenClaims } from './supabase/claims';
+import { devSessionAllowed, supabaseConfig } from './supabase/config';
+import { supabaseServer } from './supabase/server';
 
 /**
  * Cine e in fata ecranului, citit o data per cerere.
  *
- * ATENTIE, e provizoriu: pasul 02c (Supabase Auth + JWT hook) inca nu e facut,
- * asa ca sesiunea vine dintr-un cookie de dezvoltare, iar cand acesta lipseste
- * se foloseste un administrator implicit. Nu e o gaura de securitate lasata din
- * neatentie — e o scara ridicata dinadins, si e SINGURUL loc care se schimba
- * cand soseste 02c. Tot ce e deasupra (shell, registry, ecrane) consuma deja
- * `Session` si nu va sti ca s-a schimbat ceva.
+ * Promisiunea din pasul 03 s-a tinut: 02c a schimbat FISIERUL ASTA si nimic
+ * deasupra lui. Shell-ul, registry-ul si ecranele consuma acelasi `Session`.
  *
- * Fallback-ul e activ cand `NODE_ENV !== 'production'`. Pentru build-urile de
- * productie rulate local (`next build && next start`, unde `NODE_ENV` e mereu
- * `production`) se poate reaprinde explicit cu `ALLOW_DEV_SESSION=1` in
- * `apps/web/.env.local` — fisier ignorat de git, deci nu ajunge in deploy.
- * In productie reala, lipsa sesiunii inseamna redirect la autentificare.
+ * Drumul normal: cookie-urile de sesiune → `getUser()` (care intreaba serverul
+ * Auth, nu are incredere in cookie) → claim-urile din access token, puse de
+ * `app.custom_access_token_hook` → `Session`.
+ *
+ * Sesiunea de dezvoltare a ramas ca scara laterala, cu conditiile stricte din
+ * `devSessionAllowed()`. Nu mai e drumul implicit: cu Supabase configurat, se
+ * intra prin login, altfel n-am putea nici testa login-ul.
  */
 
 /**
@@ -32,7 +38,7 @@ import { cookies } from 'next/headers';
  */
 const DEV_PERSON_ID = '00000000-0000-7000-8000-0000000000de';
 
-async function devFallbackSession(): Promise<Session> {
+function devFallbackSession(): Session {
   return {
     personId: DEV_PERSON_ID,
     fullName: 'Utilizator de dezvoltare',
@@ -41,19 +47,51 @@ async function devFallbackSession(): Promise<Session> {
     // Gol = toate firmele la care ajunge interogarea. `listCompanies` trateaza
     // lista goala ca „fara filtru”, nu ca „nicio firma”.
     companyIds: [],
+    subcontractorId: null,
+    clientId: null,
+    mustChangePassword: false,
   };
 }
 
-export async function getSession(): Promise<Session | null> {
-  const store = await cookies();
-  const fromCookie = parseDevSession(store.get(DEV_SESSION_COOKIE)?.value);
-  if (fromCookie !== null) {
-    return fromCookie;
-  }
-  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_SESSION !== '1') {
+async function devSession(): Promise<Session | null> {
+  if (!devSessionAllowed()) {
     return null;
   }
-  return devFallbackSession();
+  const store = await cookies();
+  return parseDevSession(store.get(DEV_SESSION_COOKIE)?.value) ?? devFallbackSession();
+}
+
+/**
+ * Sesiunea reala, plus motivul cand lipseste.
+ *
+ * Motivul urca pana la ecranul de login: „contul nu e legat de nicio persoana”
+ * si „hook-ul nu e activat in proiect” arata identic pentru utilizator, dar
+ * primul se rezolva in Administrare si al doilea in setarile Supabase.
+ */
+export async function getSessionOrReason(): Promise<
+  { readonly session: Session } | { readonly session: null; readonly reason: ClaimsRejection | null }
+> {
+  if (supabaseConfig() !== null) {
+    const supabase = await supabaseServer();
+    const { data } = await supabase.auth.getUser();
+
+    if (data.user !== null) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const claims = decodeAccessTokenClaims(sessionData.session?.access_token ?? '');
+      const result = sessionFromClaims(claims);
+      if (result.ok) {
+        return { session: result.session };
+      }
+      return { session: null, reason: result.reason };
+    }
+  }
+
+  const fallback = await devSession();
+  return fallback === null ? { session: null, reason: null } : { session: fallback };
+}
+
+export async function getSession(): Promise<Session | null> {
+  return (await getSessionOrReason()).session;
 }
 
 /** Sesiunea sau eroare. Se foloseste unde absenta ei e un bug, nu un caz. */
@@ -61,6 +99,28 @@ export async function requireSession(): Promise<Session> {
   const session = await getSession();
   if (session === null) {
     throw new Error('Sesiune inexistentă.');
+  }
+  return session;
+}
+
+/**
+ * Poarta de spatiu de lucru, chemata din layout-ul fiecarui route group.
+ *
+ * E a doua verificare a aceluiasi lucru pe care il verifica si middleware-ul, si
+ * asta e intentionat (§3.7). Middleware-ul se bazeaza pe un `matcher` — o
+ * expresie regulata pe care o poate strica oricine adauga maine o ruta. Layout-ul
+ * nu poate fi ocolit: ruta lui trece prin el prin constructie.
+ *
+ * Raspunsul la persona gresita e REDIRECT, nu 403: un 403 pe `/contracte` ii
+ * confirma unui om de teren ca ruta exista si ce e pe ea.
+ */
+export async function requireWorkspace(...allowed: readonly Persona[]): Promise<Session> {
+  const session = await getSession();
+  if (session === null) {
+    redirect(LOGIN_PATH);
+  }
+  if (!allowed.includes(session.persona)) {
+    redirect(homeFor(session.persona));
   }
   return session;
 }

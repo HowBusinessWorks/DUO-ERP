@@ -92,6 +92,13 @@
       "when": 1786792469166,
       "tag": "0012_price_isolation",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786792470166,
+      "tag": "0013_auth_hook",
+      "breakpoints": true
     }
   ]
 }

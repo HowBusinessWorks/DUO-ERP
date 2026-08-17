@@ -155,8 +155,9 @@ utilizatorului, 15 august 2026). Motivul: dacă schema de organizație e greșit
 |---|---|---|---|
 | **02a** | Organizație, perioade, serii, audit (migrările `0004`–`0007`) | 5–11 | 🟩 gata |
 | **02b** | RLS + izolarea prețului (`0011`–`0012`) | 1–4 | 🟩 gata |
-| **02c** | Supabase Auth, JWT hook, `packages/auth`, rutare pe personas | 12–16 | ⬜ |
-| **02d** | Ecran de administrare, seed determinist, `docs/security.md` | 17–19 | ⬜ |
+| **02c** | Supabase Auth, JWT hook, `packages/auth`, rutare pe personas | 12–15 | 🟨 cod livrat, de rulat pe conturi reale |
+| **02c′** | MFA TOTP, rate limit pe login, revocare de sesiune | 16, 18 | ⬜ |
+| **02d** | Ecran de administrare, seed determinist, `docs/security.md` | 17, 19 | ⬜ |
 
 ### 2026-08-15 — [status: în lucru] — 02a, baza de date
 
@@ -296,6 +297,95 @@ imposibil să apară un tip în bază fără ca cineva să-l fi vrut acolo.
 2. 02c — Supabase Auth, JWT hook (care umple `company_ids`, `office_roles`, `subcontractor_id`),
    `packages/auth`, rutarea pe personas. Politicile îl așteaptă deja.
 3. 02d — ecranul de administrare, seed determinist cu câte un utilizator per persona.
+
+### 2026-08-17 — [status: în lucru] — 02c, scheletul de autentificare
+
+Pasul 02c a fost tăiat în două (decizia utilizatorului, 17 august 2026): **scheletul** acum —
+hook de token, `packages/auth`, login, rutare pe personas — iar **MFA TOTP, rate limit pe login
+și revocarea sesiunii la retragerea accesului la prețuri** într-o sesiune separată. Motivul e
+mărimea: pasul întreg n-ar fi încăput într-o sesiune fără să se rupă la mijloc.
+
+**Ce s-a executat:**
+
+- **`0013_auth_hook`** — `app.custom_access_token_hook(event jsonb)`, `security definer`, care
+  citește `persons` + `person_office_roles` + `person_company_access` și pune în JWT exact
+  claim-urile pe care le citesc funcțiile din `0011`. Plus `app.clear_must_change_password()`.
+  Blocurile care ating `supabase_auth_admin` sunt condiționate — rolul există doar pe Supabase,
+  ca publicația Realtime din `0008`.
+- **`packages/auth`** — `sessionFromClaims()` (JWT → `Session`), `permissions.ts` cu matricea
+  rol × use-case (12 drepturi, 4 grupuri) și guard-urile `requirePersona` / `requireOfficeRole` /
+  `requireCapability`. **18 teste noi**, primele din pachet.
+- **`apps/web`** — `@supabase/ssr`, middleware de sesiune, ecranele `/login`, `/resetare`,
+  `/parola-noua`, ruta `/auth/confirm` pentru linkurile din email, chip de utilizator cu ieșire
+  din cont în bara de sus și în shell-ul de teren.
+- **`pnpm db:seed:users`** — patru conturi prin Admin API (birou, teren, subcontractant, client),
+  legate de persoane cu id fix. Idempotent; a doua rulare doar resetează parolele.
+
+**Verificări din pas care trec / nu trec:**
+- [x] hook-ul emite claim-urile corecte — confirmat pe Supabase real, într-un bloc anulat la
+  final: `persona`, `person_id`, `office_roles: [pm, admin]`, `company_ids` cu ambele firme,
+  `damina_status: ok`. Un `user_id` necunoscut primește `damina_status: unlinked` și **niciun**
+  claim de identitate.
+- [x] `supabase_auth_admin` poate executa hook-ul, `authenticated` nu — verificat cu
+  `has_function_privilege`.
+- [x] `pnpm typecheck` 12/12 · `pnpm lint` verde · `pnpm build` verde (15 rute, middleware 108 kB)
+  · **95 de teste unitare** (76 → 95)
+- [ ] #12–#15 (login pe cele patru personas, redirect, parolă temporară) — **blocate pe două
+  lucruri care nu se pot face din cod:** activarea hook-ului în dashboard-ul Supabase și
+  `SUPABASE_SERVICE_ROLE_KEY` în `.env.local`.
+
+**Observații / decizii luate / abateri de la plan:**
+
+- **Sesiunea de dezvoltare nu mai e drumul implicit.** Regula nouă (`devSessionAllowed()`):
+  e activă doar dacă Supabase **nu** e configurat și nu suntem în producție, sau dacă
+  `ALLOW_DEV_SESSION=1` e pus explicit. Motivul e practic: cu ea activă lângă Auth configurat,
+  n-am putea testa niciodată login-ul — sesiunea implicită ne-ar duce direct în aplicație.
+  Middleware-ul citește **același** predicat, ca să nu existe două păreri despre cine e logat.
+- **Promisiunea din pasul 03 s-a ținut:** `apps/web/src/lib/session.ts` e singurul fișier de
+  deasupra care s-a schimbat. Shell-ul, registry-ul și cele 15 tab-uri n-au fost atinse.
+- **`Session` a căpătat trei câmpuri** — `subcontractorId`, `clientId`, `mustChangePassword` —
+  și `actorFor` trimite acum și `subcontractor_id` / `client_id` către RLS. Un `null` se comportă
+  ca o absență (funcția cade pe `app.persons`), dar setul de claim-uri văzut de politici e acum
+  identic cu cel din token.
+- **Middleware-ul nu poate importa `@damina/auth`** — pachetul re-exportă din `@damina/db`, deci
+  ar fi tras `pg` și `drizzle` în bundle-ul de Edge. De aceea harta rute ↔ persone stă în
+  `apps/web/src/lib/personas.ts`, fără dependințe de framework, folosită și de middleware, și de
+  layout-uri. Verificarea e dublă dinadins (§3.7): middleware-ul se bazează pe un `matcher` care
+  se poate strica; layout-ul nu poate fi ocolit.
+- **Biroul primește tot ce nu e revendicat de altă persona**, nu o listă albă de prefixe. O listă
+  albă ar fi trebuit actualizată la fiecare modul nou din pașii 05–10, și ar fi fost uitată exact
+  când contează. Spațiile înguste (`/field`, `/portal/*`) sunt cele enumerate.
+- **`canSeeFinancials` și `canEditNomenclature` citesc acum din matrice**, nu din liste proprii.
+  Erau două locuri care puteau spune lucruri diferite despre același drept.
+- **Erorile de login sunt patru, nu una.** „Contul nu e legat de nicio persoană”, „persoana e
+  dezactivată”, „hook-ul nu e activat în proiect” și „sesiune coruptă” se rezolvă de oameni
+  diferiți, în locuri diferite. Un singur „nu poți intra” i-ar fi trimis pe toți la administrator,
+  care în două din patru cazuri n-are ce face.
+- **Email sau parolă greșite dau același mesaj**, dinadins: două mesaje distincte spun unui
+  atacator care adrese sunt conturi reale. La fel, resetarea de parolă răspunde identic și când
+  adresa nu există.
+- **Ordinea la schimbarea parolei e obligatorie**: parolă nouă la GoTrue → flag stins în bază →
+  `refreshSession()`. Fără ultimul pas, claim-ul din token ar rămâne `must_change_password: true`
+  și middleware-ul ar trimite omul înapoi la același ecran, la nesfârșit.
+- **`use server` nu poate exporta obiecte.** `EMPTY_FORM_STATE` a trebuit mutat în
+  `form-state.ts` — build-ul a picat prima oară exact pe asta. Tot ce se exportă dintr-un fișier
+  de server actions capătă un endpoint, iar o constantă n-are ce fi chemată prin rețea.
+- **`packages/services/tsconfig.json` include acum și `scripts/**`.** Cele două seed-uri nu erau
+  typecheck-uite deloc.
+- **`packages/auth` are pentru prima oară `vitest`.** Pachetul avea doar `typecheck`.
+- **Realtime-ul (#8 din pasul 03) rămâne nevalidat.** Tabelele sunt acordate rolurilor `app_*`,
+  nu lui `authenticated`, deci un canal Realtime deschis cu sesiunea utilizatorului n-ar trece de
+  RLS. Se rezolvă separat, nu prin simpla existență a sesiunii.
+
+**Ce rămâne pentru sesiunea următoare:**
+1. **Utilizatorul:** activează hook-ul în Supabase (Authentication → Hooks → *Customize Access
+   Token (JWT) Claims* → `app.custom_access_token_hook`) și pune `SUPABASE_SERVICE_ROLE_KEY` în
+   `.env.local`.
+2. `pnpm db:seed && pnpm db:seed:users` → verificările #12–#15 pe cele patru personas.
+3. Push → CI (testele de bază de date sunt neatinse, ar trebui să rămână 194).
+4. 02c′ — MFA TOTP pentru `admin` și `financiar`, rate limit pe login, revocarea sesiunii prin
+   Admin API la retragerea accesului la prețuri (#16, #18).
+5. 02d — ecranul de administrare, care se randează din `PERMISSION_MATRIX`.
 
 ---
 

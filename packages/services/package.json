@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir src --passWithNoTests",
     "test:db": "vitest run --config vitest.db.config.ts --dir tests",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "db:seed:users": "tsx scripts/seed-users.ts"
   },
   "dependencies": {
     "@damina/contracts": "workspace:*",
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@damina/tsconfig": "workspace:*",
+    "@supabase/supabase-js": "^2.49.8",
     "@testcontainers/postgresql": "^11.0.3",
     "@types/node": "^22.15.30",
     "@types/pg": "^8.15.4",

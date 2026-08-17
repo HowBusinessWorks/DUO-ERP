@@ -2,6 +2,8 @@ import { Badge } from '@damina/ui';
 import { CloudOff, Home, Menu, Camera, ClipboardCheck } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { UserMenu } from '../../components/shell/user-menu';
+import { requireWorkspace } from '../../lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +18,9 @@ export const dynamic = 'force-dynamic';
  * Ce ramane pentru pasul 10: sincronizarea offline propriu-zisa. Bannerul de
  * mai jos exista de acum, ca sa nu se schimbe layoutul cand soseste.
  */
-export default function FieldLayout({ children }: { children: ReactNode }) {
+export default async function FieldLayout({ children }: { children: ReactNode }) {
+  const session = await requireWorkspace('field');
+
   return (
     <div data-shell="field" className="flex min-h-dvh flex-col bg-canvas">
       {/* Banner de sincronizare. Gol acum; in pasul 10 arata cate mutatii
@@ -34,6 +38,10 @@ export default function FieldLayout({ children }: { children: ReactNode }) {
           <Menu className="size-5" aria-hidden="true" />
         </button>
         <span className="text-lg font-semibold">Teren</span>
+        <span className="ml-auto flex items-center gap-2">
+          <span className="max-w-32 truncate text-sm text-ink-muted">{session.fullName}</span>
+          <UserMenu session={session} compact />
+        </span>
       </header>
 
       <main className="flex-1 p-4">{children}</main>

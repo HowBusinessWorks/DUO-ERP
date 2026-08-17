@@ -53,6 +53,27 @@ Regula administratorului fără firme nu deschide nimic: un admin poate oricum s
 `person_company_access`, deci să-și dea singur acces. Fără ea, prima instalare n-ar avea cum
 să fie configurată.
 
+### De unde vin claim-urile
+
+Le scrie `app.custom_access_token_hook(event jsonb)` (migrarea `0013`), chemată de GoTrue la
+fiecare emitere de token. Ea citește `app.persons` + `person_office_roles` +
+`person_company_access` și pune în JWT: `persona`, `person_id`, `full_name`, `office_roles`,
+`company_ids`, `subcontractor_id`, `client_id`, `must_change_password`, `damina_status`.
+
+Aceleași claim-uri ajung înapoi în `request.jwt.claims` prin `withActor()`, deci politicile
+citesc exact ce a emis baza. Un nume de claim schimbat într-un loc și nu în celălalt e prins de
+testul „duce claim-urile mai departe către RLS” din `packages/auth`.
+
+**Hook-ul trebuie activat în proiect**, o singură dată, din Authentication → Hooks →
+*Customize Access Token (JWT) Claims* → `app.custom_access_token_hook`. Fără activare,
+autentificarea funcționează dar token-ul n-are `persona`, iar aplicația refuză sesiunea cu
+mesajul „hook-ul nu e activat” — deliberat diferit de „contul nu e configurat”, pentru că se
+rezolvă în alt loc și de altcineva.
+
+`app.clear_must_change_password()` e singura ușă prin care cineva își poate modifica propriul
+rând din `app.persons`, și schimbă exact o coloană. Nu ia parametri: dacă ar lua, prima cerere
+falsificată ar stinge flagul altcuiva.
+
 `app_service` (worker, integrări) trece peste RLS printr-o politică explicită per tabelă. Nu
 e o portiță: rolul nu e accesibil dintr-o sesiune de utilizator, iar tot ce scrie trece prin
 același trigger de audit.

@@ -5,6 +5,7 @@ import { LiveSync } from '../../components/shell/live-sync';
 import { Sidebar } from '../../components/shell/sidebar';
 import { Topbar } from '../../components/shell/topbar';
 import { getAppContext } from '../../lib/context';
+import { requireWorkspace } from '../../lib/session';
 import { NAVIGATION } from '../../registry/navigation';
 import { entityRegistry } from '../../registry/entities';
 
@@ -23,6 +24,9 @@ import { entityRegistry } from '../../registry/entities';
 export const dynamic = 'force-dynamic';
 
 export default async function OfficeLayout({ children }: { children: ReactNode }) {
+  // Poarta de persona, inaintea oricarei interogari: un om de teren ajuns aici
+  // nu trebuie sa declanseze nici macar numaratoarea de cozi a biroului.
+  await requireWorkspace('office');
   const ctx = await getAppContext();
 
   // Badge-urile: cate lucruri asteapta de la MINE, in firmele pe care le privesc.

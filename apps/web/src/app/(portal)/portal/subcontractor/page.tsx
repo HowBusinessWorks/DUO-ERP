@@ -1,6 +1,13 @@
 import { EmptyState } from '@damina/ui';
+import { requireWorkspace } from '../../../../lib/session';
 
-export default function SubcontractorPortalPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function SubcontractorPortalPage() {
+  // Layout-ul lasa sa treaca ambele persone de portal; separarea dintre ele se
+  // face aici, unde se stie despre care din cele doua e vorba.
+  await requireWorkspace('subcontractor');
+
   return (
     <EmptyState
       title="Portal subcontractant"

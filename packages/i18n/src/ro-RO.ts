@@ -499,6 +499,48 @@ export const roRO = {
     boundaryTitle: 'Ecranul n-a putut fi afișat',
     boundaryBody: 'Eroarea a fost înregistrată. Reîncarcă pagina; dacă persistă, anunță IT-ul.',
   },
+
+  // ── Autentificare ─────────────────────────────────────────────────────────
+  auth: {
+    signInTitle: 'Intră în cont',
+    signInBody: 'Folosește adresa de email primită de la administrator.',
+    email: 'Email',
+    password: 'Parolă',
+    signIn: 'Intră',
+    signingIn: 'Se verifică…',
+    forgot: 'Mi-am uitat parola',
+
+    resetTitle: 'Resetare de parolă',
+    resetBody: 'Îți trimitem un link pe email. Are valabilitate o oră.',
+    resetSend: 'Trimite linkul',
+    resetSent:
+      'Dacă adresa există în sistem, linkul a plecat. Verifică și în Spam. Poți închide fila.',
+    backToSignIn: 'Înapoi la autentificare',
+
+    changeTitle: 'Alege-ți o parolă',
+    changeBodyForced:
+      'Parola pe care ai primit-o e temporară. Până n-o schimbi, nu poți intra în aplicație.',
+    changeBody: 'Parola nouă înlocuiește imediat parola curentă, pe toate dispozitivele.',
+    newPassword: 'Parola nouă',
+    confirmPassword: 'Repetă parola',
+    passwordRule: 'Minimum 12 caractere. Evită parolele folosite pe alte site-uri.',
+    changeSubmit: 'Schimbă parola',
+    changed: 'Parola a fost schimbată.',
+
+    // Motivele refuzului. Fiecare spune omului CE are de făcut mai departe.
+    invalidCredentials: 'Email sau parolă greșite.',
+    unlinked:
+      'Contul există, dar nu e legat de nicio persoană din nomenclator. Cere-i unui administrator să-l lege.',
+    inactive: 'Contul tău e dezactivat. Cere-i unui administrator să-l reactiveze.',
+    noClaims:
+      'Autentificarea funcționează, dar proiectul Supabase nu are hook-ul de token activat — aplicația nu poate afla cine ești. E o setare de infrastructură; anunță IT-ul.',
+    malformed: 'Sesiunea ta e coruptă. Ieși din cont și încearcă din nou.',
+    passwordTooShort: 'Parola trebuie să aibă cel puțin 12 caractere.',
+    passwordMismatch: 'Cele două parole nu coincid.',
+    passwordRejected: 'Parola a fost refuzată. Alege una mai puternică, nefolosită în altă parte.',
+    rateLimited: 'Prea multe încercări. Așteaptă un minut și încearcă din nou.',
+    generic: 'Autentificarea n-a reușit. Încearcă din nou.',
+  },
 } as const;
 
 export type Dictionary = typeof roRO;
