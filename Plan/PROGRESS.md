@@ -14,9 +14,9 @@
 | Pas | Status | Ultima actualizare |
 |---|---|---|
 | 01 — Fundația | 🟩 gata (15/15, CI verde) | 2026-08-15 |
-| 02 — Identitate, acces, RLS | 🟨 în lucru (02a + 02b din 4) | 2026-08-16 |
-| 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat) | 2026-08-15 |
-| 04 — Contracte, obiective | 🟨 în lucru (04b livrat, de rulat pe date reale) | 2026-08-16 |
+| 02 — Identitate, acces, RLS | 🟨 în lucru (02a + 02b + 02c gata; rămân 02c′ și 02d) | 2026-08-17 |
+| 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat: #8, #10, #13, #14) | 2026-08-15 |
+| 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | ⬜ neînceput | — |
 | 06 — Registrul de cost, închidere | ⬜ neînceput | — |
 | 07 — File management (R2) | ⬜ neînceput | — |
@@ -27,6 +27,24 @@
 Legendă: ⬜ neînceput · 🟨 în lucru · 🟩 gata (toate verificările din pas trec) · 🟥 blocat
 
 **Actualizează tabelul de mai sus de fiecare dată** când schimbi statusul unui pas.
+
+---
+
+## Stare care NU trăiește în repo
+
+Lucruri adevărate despre mediul în care rulează proiectul, dar pe care nu le poate afla nimeni
+citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici. **Verifică-le
+înainte să tragi concluzia că ceva e stricat.**
+
+| Fapt | Detaliu |
+|---|---|
+| **Hook-ul de token e activat** în proiectul Supabase `cspjtesltraiaveypuya` | Authentication → Hooks → *Customize Access Token (JWT) Claims* → `app.custom_access_token_hook`. **Nu e versionat.** Un proiect Supabase nou pornește fără el, iar login-ul pică atunci cu „hook neactivat” — mesaj deliberat distinct de „contul nu e configurat”. |
+| `.env.local` (rădăcină, gitignored) are `SUPABASE_SERVICE_ROLE_KEY` și `SEED_USER_PASSWORD` | Fără prima, `pnpm db:seed:users` nu pornește. A doua ține parola conturilor de test stabilă între rulări. Ambele lipsesc pe o mașină nouă. |
+| Cheia de service a trecut printr-o fereastră de chat pe 17 august 2026 | **De rotit** din Project Settings → API. |
+| Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
+| Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
+| Prag de teste: **214** | 96 unitare (`shared` 39 · `domain` 29 · `auth` 19 · `storage` 6 · `i18n` 3) + 91 `packages/db` + 27 `packages/services`. Cifrele sunt din run-ul CI `32004465200`, pe `19ee1d4`. Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Docker nu există pe mașina de dezvoltare | Testele de bază de date rulează **doar în CI**. Verificările pe date reale se fac pe Supabase dev, în blocuri anulate la final. |
 
 ---
 
@@ -157,7 +175,29 @@ utilizatorului, 15 august 2026). Motivul: dacă schema de organizație e greșit
 | **02b** | RLS + izolarea prețului (`0011`–`0012`) | 1–4 | 🟩 gata |
 | **02c** | Supabase Auth, JWT hook, `packages/auth`, rutare pe personas | 12–15 | 🟩 gata |
 | **02c′** | MFA TOTP, rate limit pe login, revocare de sesiune | 16, 18 | ⬜ |
-| **02d** | Ecran de administrare, seed determinist, `docs/security.md` | 17, 19 | ⬜ |
+| **02d** | Ecran de administrare | 17, 19 | ⬜ |
+
+> **02d e mai mic decât scria inițial.** Sub-etapa avea trei livrabile — ecran, seed determinist,
+> `docs/security.md` — iar **ultimele două s-au livrat deja în 02c**: `pnpm db:seed:users` creează
+> câte un utilizator per persona, iar `docs/security.md` a căpătat secțiunea despre hook și
+> claim-uri. **Rămâne doar ecranul.** Nu rescrie seed-ul.
+>
+> Trei lucruri de stabilit la începutul sesiunii de 02d, înainte de prima linie de cod:
+>
+> 1. **Unde stă apelul de Admin API.** Regula 6 din §4 al pasului spune „`SUPABASE_SERVICE_ROLE_KEY`
+>    doar în worker și în rute `/api` dedicate”, iar provizionarea de cont din ecran ar chema-o
+>    dintr-un server action. Tehnic e tot cod de server, dar litera regulii spune altceva: ori rută
+>    `/api/admin/provision` dedicată, ori se relaxează regula **în scris**, cu motivul. Decizia se
+>    ia acum, nu la jumătatea implementării.
+> 2. **#19 e pe jumătate demonstrat.** 02b a confirmat în bază că `financiar` nu citește
+>    `audit.entries` iar `admin` da, și `permissions.test.ts` o susține în cod. 02d închide
+>    jumătatea de ecran, nu toată verificarea.
+> 3. **Ecranul se randează din `PERMISSION_MATRIX`** (`packages/auth/src/permissions.ts`), inclusiv
+>    lista de drepturi REFUZATE — `capabilitiesOf()` întoarce ambele liste tocmai pentru asta.
+>    Cerința §3.10 e explicită: ecranul spune ce NU vede rolul, nu doar ce vede.
+>
+> Adaugă și **lista de persoane în formularul de contract** (câmpul PM, gol din 04b). E puțin peste
+> serviciul care se construiește oricum, și e ultimul lucru care ține 04b legat de pasul 02.
 
 ### 2026-08-15 — [status: în lucru] — 02a, baza de date
 
@@ -377,15 +417,13 @@ mărimea: pasul întreg n-ar fi încăput într-o sesiune fără să se rupă la
   nu lui `authenticated`, deci un canal Realtime deschis cu sesiunea utilizatorului n-ar trece de
   RLS. Se rezolvă separat, nu prin simpla existență a sesiunii.
 
-**Ce rămâne pentru sesiunea următoare:**
+**Ce rămâne pentru sesiunea următoare:** *(toate cele trei puncte s-au făcut în aceeași zi — vezi
+intrarea de mai jos)*
 1. **Utilizatorul:** activează hook-ul în Supabase (Authentication → Hooks → *Customize Access
    Token (JWT) Claims* → `app.custom_access_token_hook`) și pune `SUPABASE_SERVICE_ROLE_KEY` în
    `.env.local`.
 2. `pnpm db:seed && pnpm db:seed:users` → verificările #12–#15 pe cele patru personas.
 3. Push → CI.
-4. 02c′ — MFA TOTP pentru `admin` și `financiar`, rate limit pe login, revocarea sesiunii prin
-   Admin API la retragerea accesului la prețuri (#16, #18).
-5. 02d — ecranul de administrare, care se randează din `PERMISSION_MATRIX`.
 
 ### 2026-08-17 — [status: gata] — 02c, parcursul pe conturi reale
 
@@ -454,6 +492,22 @@ Matricea completă, cu cele patru conturi × șase rute:
 ---
 
 ## Pasul 03 — Shell UI, nomenclatoare
+
+> **Patru verificări rămân deschise: #8, #10, #13, #14.** Ce trebuie știut despre ele înainte de a
+> le lua în lucru:
+>
+> - **#8 (badge-ul crește fără refresh) NU s-a deblocat cu 02c**, deși așa scria când a fost
+>   amânată. Nu-i lipsește o sesiune Supabase — îi lipsește o decizie. Tabelele sunt acordate
+>   rolurilor `app_*`, iar Realtime se autentifică drept `authenticated`, care n-are niciun grant
+>   la noi. Deci ori se acordă `select` pe `work_queue_items` și `notifications` și lui
+>   `authenticated`, cu politici proprii scrise pentru el, ori badge-ul rămâne pe fallback-ul de
+>   60 s din `live-sync.tsx` și verificarea se rescrie. **Nu o trata ca pe „mai rulează o dată”.**
+> - **#10** (produs creat/editat apare imediat + audit) — de rulat pe baza reală. Atenție:
+>   trigger-ul din `0007` compune numele cu schema, deci în `audit.entries` se caută
+>   `app.products`, nu `products`. Aici a fost un test roșu în pasul 04.
+> - **#13** (Playwright, 1200 px / 390 px) și **#14** (Lighthouse) — Playwright nu e în repo.
+>   Când intră, închide și clicul pe hartă din 04b #14, singura verificare a pasului 04 rămasă
+>   neconfirmată în browser.
 
 ### 2026-08-15 — [status: în lucru] — shell fractal, design system, nomenclatoare
 
