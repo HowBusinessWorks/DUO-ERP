@@ -114,18 +114,39 @@ describe('sessionFromClaims', () => {
 
   it('duce claim-urile mai departe catre RLS, cu aceleasi nume', () => {
     // Contractul dintre 0011 (care citeste `request.jwt.claims`) si hook-ul din
-    // 0013 (care le scrie). Daca un nume se schimba intr-un loc, testul cade.
+    // 0013/0014 (care le scrie). Daca un nume se schimba intr-un loc, testul cade.
     const result = sessionFromClaims(officeClaims());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    // Cheile optionale LIPSESC, nu sunt `null` — ca in token. GoTrue refuza sa
+    // semneze `client_id: null`, iar cele doua drumuri catre RLS trebuie sa
+    // arate la fel.
     expect(actorFor(result.session, 'motiv').claims).toEqual({
       persona: 'office',
       person_id: PERSON,
       office_roles: ['pm'],
       company_ids: [COMPANY],
-      subcontractor_id: null,
-      client_id: null,
+    });
+  });
+
+  it('trimite firma proprie catre RLS doar cand exista', () => {
+    const portal = sessionFromClaims(
+      officeClaims({
+        persona: 'client',
+        office_roles: [],
+        client_id: '01950000-0000-7000-8000-000002000001',
+      }),
+    );
+    expect(portal.ok).toBe(true);
+    if (!portal.ok) return;
+
+    expect(actorFor(portal.session).claims).toEqual({
+      persona: 'client',
+      person_id: PERSON,
+      office_roles: [],
+      company_ids: [COMPANY],
+      client_id: '01950000-0000-7000-8000-000002000001',
     });
   });
 });

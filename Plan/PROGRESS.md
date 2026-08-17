@@ -155,7 +155,7 @@ utilizatorului, 15 august 2026). Motivul: dacă schema de organizație e greșit
 |---|---|---|---|
 | **02a** | Organizație, perioade, serii, audit (migrările `0004`–`0007`) | 5–11 | 🟩 gata |
 | **02b** | RLS + izolarea prețului (`0011`–`0012`) | 1–4 | 🟩 gata |
-| **02c** | Supabase Auth, JWT hook, `packages/auth`, rutare pe personas | 12–15 | 🟨 cod livrat, de rulat pe conturi reale |
+| **02c** | Supabase Auth, JWT hook, `packages/auth`, rutare pe personas | 12–15 | 🟩 gata |
 | **02c′** | MFA TOTP, rate limit pe login, revocare de sesiune | 16, 18 | ⬜ |
 | **02d** | Ecran de administrare, seed determinist, `docs/security.md` | 17, 19 | ⬜ |
 
@@ -382,10 +382,74 @@ mărimea: pasul întreg n-ar fi încăput într-o sesiune fără să se rupă la
    Token (JWT) Claims* → `app.custom_access_token_hook`) și pune `SUPABASE_SERVICE_ROLE_KEY` în
    `.env.local`.
 2. `pnpm db:seed && pnpm db:seed:users` → verificările #12–#15 pe cele patru personas.
-3. Push → CI (testele de bază de date sunt neatinse, ar trebui să rămână 194).
+3. Push → CI.
 4. 02c′ — MFA TOTP pentru `admin` și `financiar`, rate limit pe login, revocarea sesiunii prin
    Admin API la retragerea accesului la prețuri (#16, #18).
 5. 02d — ecranul de administrare, care se randează din `PERMISSION_MATRIX`.
+
+### 2026-08-17 — [status: gata] — 02c, parcursul pe conturi reale
+
+Hook-ul a fost activat de utilizator în dashboard (Authentication → Hooks → *Customize Access
+Token (JWT) Claims* → `app.custom_access_token_hook`), iar `SUPABASE_SERVICE_ROLE_KEY` a intrat
+în `.env.local`. Cele patru conturi au fost create cu `pnpm db:seed:users`.
+
+**Verificări din pas care trec / nu trec:**
+- [x] #12 login `office` → aterizează în `/panou`, vede „Andrei Ionescu · pm, admin” în bară și
+  selectorul cu ambele firme
+- [x] #13 login `field` → `/field`; `/panou` și `/contracte` dau **redirect**, nu 403. Zero cifre
+  în lei pe ecranul de teren.
+- [x] #14 `subcontractor` și `client` — fiecare doar în portalul lui, cu redirect din toate
+  celelalte spații
+- [x] #15 cu `must_change_password` toate rutele duc la `/parola-noua`, iar ecranul spune că
+  parola primită e temporară. Un `update` direct pe `app.persons` din rolul `app_field` e refuzat
+  cu **`42501`**; `app.clear_must_change_password()` stinge flagul și numai pe el.
+- [x] fără sesiune, orice rută privată → `/login?next=…`; `/login`, `/resetare` și `/api/health`
+  rămân publice
+
+Matricea completă, cu cele patru conturi × șase rute:
+
+| persona | `/` | `/panou` | `/contracte` | `/field` | `/portal/subcontractor` | `/portal/client` |
+|---|---|---|---|---|---|---|
+| office | → /panou | **200** | **200** | → /panou | → /panou | → /panou |
+| field | → /field | → /field | → /field | **200** | → /field | → /field |
+| subcontractor | → portal/sub | → portal/sub | → portal/sub | → portal/sub | **200** | → portal/sub |
+| client | → portal/client | → portal/client | → portal/client | → portal/client | → portal/client | **200** |
+
+**Trei buguri găsite la parcurs, toate reparate:**
+
+1. **GoTrue refuză `client_id: null`.** Hook-ul emitea cheile opționale mereu, iar GoTrue
+   validează claim-urile înainte să semneze: `client_id` e nume rezervat în specificație și cere
+   `string`. Rezultatul — **trei din patru persone primeau 500 la login**, iar contul de client
+   mergea, pentru că el e singurul cu valoare acolo. Genul de bug care trece de orice test scris
+   pe cazul fericit. Reparat în **`0014_auth_hook_null_claims`**: cheile opționale se emit doar
+   când au valoare. Semantica nu se schimbă — `app.current_client_id()` trata deja cheia lipsă la
+   fel ca `null`. `actorFor` face acum la fel, ca cele două drumuri către RLS să arate identic;
+   **un test nou** blochează regresia.
+2. **`apps/web` nu citea deloc `.env.local`.** Next încarcă `.env*` doar din directorul
+   aplicației, iar noi ținem un singur fișier, în rădăcină. Deci `NEXT_PUBLIC_SUPABASE_URL`
+   lipsea, `supabaseConfig()` întorcea `null`, iar aplicația cădea pe sesiunea de dezvoltare —
+   `/panou` răspundea **200 fără nicio sesiune**. Nu se văzuse pentru că lipsa configurației
+   aprinde exact mecanismul care face totul să pară că merge. Reparat în `next.config.ts`, care
+   încarcă acum fișierul din rădăcină înainte de build (`NEXT_PUBLIC_*` se inlocuiesc la
+   compilare, deci trebuie să fie în mediu dinainte).
+3. **Scanerul de secrete verifica doar jumătate.** Caută valoarea unei variabile numai dacă o
+   găsește în `process.env`; rulat local nu o avea, deci verifica doar *numele* și raporta
+   „curat” cu convingere. A devenit important odată cu reparația 2, care pune cheia de service în
+   mediul build-ului. Scanerul își încarcă acum singur `.env.local`. Verificat în ambele sensuri:
+   curat pe bundle-ul real, și **respinge build-ul** când cheia e plantată intenționat în
+   `.next/static`.
+
+**Observații:**
+
+- Verificările s-au putut face fără browser, construind cookie-ul `sb-<ref>-auth-token` exact cum
+  îl scrie `@supabase/ssr` (prefix `base64-`, tăiat în bucăți peste 3180 de caractere) din
+  răspunsul lui `/auth/v1/token`. Aceeași metodă ca la parcursul lui 04b, extinsă la sesiuni
+  reale.
+- Portul 3000 era ocupat de un server pornit anterior, care rula codul vechi; parcursul s-a făcut
+  pe 3100. Merită știut, pentru că un `/login` care dă 404 arată exact ca o rută lipsă.
+- `SEED_USER_PASSWORD` e fixată în `.env.local`, deci rulările următoare ale seed-ului nu mai
+  schimbă parola conturilor de test.
+- **Cheia de service a trecut prin chat** la configurare — de rotit din Project Settings → API.
 
 ---
 

@@ -99,6 +99,13 @@
       "when": 1786792470166,
       "tag": "0013_auth_hook",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786792471166,
+      "tag": "0014_auth_hook_null_claims",
+      "breakpoints": true
     }
   ]
 }

@@ -9,12 +9,22 @@
  * Cauta doua lucruri:
  *   1. valorile reale din mediu, daca sunt setate (cazul care conteaza in CI);
  *   2. numele variabilelor, care ar indica un `process.env.X` inlocuit la build.
+ *
+ * Mediul se incarca si din `.env.local`, nu doar din shell. Fara asta, rulat
+ * local scanerul cauta doar NUMELE variabilelor — adica exact jumatatea care nu
+ * prinde nimic — si raporteaza „curat” cu convingere. Conteaza de cand
+ * `apps/web/next.config.ts` incarca el insusi fisierul: valorile chiar sunt in
+ * mediul build-ului acum.
  */
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { config as loadDotenv } from 'dotenv';
 
 const ROOT = resolve(import.meta.dirname, '../..');
+
+loadDotenv({ path: join(ROOT, '.env.local'), quiet: true });
+loadDotenv({ path: join(ROOT, '.env'), quiet: true });
 const BUNDLE_DIR = join(ROOT, 'apps/web/.next/static');
 
 /** Variabile care nu au voie sa apara in client, nici ca nume, nici ca valoare. */

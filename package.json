@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@damina/eslint-config": "workspace:*",
+    "dotenv": "^17.4.2",
     "eslint": "^9.28.0",
     "prettier": "^3.5.3",
     "turbo": "^2.5.4",
