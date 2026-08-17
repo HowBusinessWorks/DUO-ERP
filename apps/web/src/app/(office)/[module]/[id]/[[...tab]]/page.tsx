@@ -54,17 +54,30 @@ export default async function EntityDetailPage({
   // Filtrarea pe drept se face INAINTE de randare: tab-urile fara drept nu
   // ajung in DOM, deci nu pot fi nici vazute, nici deschise cu URL (§30.5).
   const visibleTabs = entity.detail.tabs.filter(
-    (definition) => definition.visible?.(ctx.session) ?? true,
+    (definition) => definition.visible?.(ctx.session, record) ?? true,
   );
 
   const activeSlug = tab?.[0] ?? '';
   const activeTab = visibleTabs.find((definition) => definition.slug === activeSlug);
 
   if (activeTab === undefined) {
-    // Ruta exista, dar tab-ul e ascuns pentru rolul asta — sau nu exista deloc.
-    const hidden = entity.detail.tabs.some((definition) => definition.slug === activeSlug);
-    if (hidden) {
-      return <Denied />;
+    const declared = entity.detail.tabs.find((definition) => definition.slug === activeSlug);
+    if (declared !== undefined) {
+      /*
+       * Tab-ul exista in definitie, dar nu pe randul asta. Doua cauze, si de la
+       * pasul 05 incoace amandoua sunt reale: rolul nu are dreptul, SAU tab-ul
+       * nu se aplica tipului (o inspectie n-are Deviz).
+       *
+       * Nu se poate afla care din ele fara sa intrebam de doua ori, deci textul
+       * spune ce e adevarat in ambele cazuri. Un „nu ai acces" pus pe un tab care
+       * pur si simplu nu exista pentru tipul asta l-ar trimite pe om sa ceara un
+       * drept care nu i-ar folosi la nimic.
+       */
+      return (
+        <Denied
+          reason={`Secțiunea „${declared.label}” nu se aplică înregistrării ăsteia, sau rolul tău nu o deschide.`}
+        />
+      );
     }
     notFound();
   }

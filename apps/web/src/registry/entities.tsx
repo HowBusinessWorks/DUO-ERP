@@ -26,6 +26,7 @@ import { AuditTrail } from '../components/detail/audit-trail';
 import { administrare } from './administrare';
 import { contracte } from './contracts';
 import { obiective } from './objectives';
+import { activitate, bani, etape } from './work-units';
 import { DefinitionList, Empty } from '../components/detail/definition-list';
 import { PhasePlaceholder } from '../components/detail/phase-placeholder';
 import { defineEntity, type EntityContext, type EntityDefinition } from './types';
@@ -1277,6 +1278,12 @@ export const entityRegistry: Readonly<Record<string, EntityDefinition>> = {
   // de declaratii, zero fisiere de pagina. Singurul lucru scris in afara
   // registry-ului e `/api/admin/provision`, si numai pentru cheia de service.
   administrare,
+  // Pasul 05 a adaugat trei intrari, tot fara sa atinga shell-ul: activitatea
+  // (o entitate cu TREI seturi de tab-uri, unul pe tip), etapa — care e aceeasi
+  // pagina fractala un nivel mai jos — si ecranul de re-alocari din Bani.
+  activitate,
+  etape,
+  bani,
   produse,
   furnizori,
   clienti,

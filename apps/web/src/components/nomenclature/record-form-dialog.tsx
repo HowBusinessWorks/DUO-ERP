@@ -10,6 +10,7 @@ import {
   rateCardInputSchema,
   subcontractorInputSchema,
   supplierInputSchema,
+  workUnitFormSchema,
 } from '@damina/contracts';
 import { t } from '@damina/i18n';
 import {
@@ -51,6 +52,7 @@ const SCHEMAS: Readonly<Record<string, z.ZodType>> = {
   contracte: contractInputSchema,
   obiective: objectiveInputSchema,
   administrare: personInputSchema,
+  activitate: workUnitFormSchema,
 };
 
 export interface RecordFormDialogProps {

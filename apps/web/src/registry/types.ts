@@ -130,11 +130,21 @@ export interface EntityTab<Entity> {
   readonly slug: string;
   readonly label: string;
   /**
-   * Cine vede tab-ul. Cand intoarce `false`, tab-ul NU se randeaza si ruta lui
-   * raspunde cu „nu ai acces” — §30.5: lipseste, nu e gri. Nu exista `disabled`
-   * in interfata asta, si nici nu trebuie sa apara.
+   * Cine vede tab-ul, si pe CE rand. Cand intoarce `false`, tab-ul NU se
+   * randeaza si ruta lui raspunde cu „nu ai acces” — §30.5: lipseste, nu e gri.
+   * Nu exista `disabled` in interfata asta, si nici nu trebuie sa apara.
+   *
+   * Al doilea parametru e randul, si a fost adaugat la pasul 05: unitatea de
+   * lucru are TREI seturi de tab-uri, unul pe fiecare tip (inspectie:
+   * `Fisa · Constatari · Costuri…`, lucrare: `Prezentare · Deviz · Etape…`).
+   * Fara el, singurele variante erau un tab „nu se aplica tipului asta" — adica
+   * exact tab-ul gri pe care fisierul il interzice — sau o a doua pagina de
+   * detaliu, pe care o interzice si mai apasat.
+   *
+   * Implementarile care se uita doar la sesiune ramin valabile: un parametru in
+   * plus nu strica o functie care nu-l citeste.
    */
-  visible?(session: Session): boolean;
+  visible?(session: Session, entity: Entity): boolean;
   count?(entity: Entity): number | undefined;
   /**
    * `sub` sunt segmentele de dupa slugul tab-ului.

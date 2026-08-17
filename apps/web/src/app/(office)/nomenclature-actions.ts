@@ -10,6 +10,7 @@ import {
   rateCardInputSchema,
   subcontractorInputSchema,
   supplierInputSchema,
+  workUnitFormSchema,
 } from '@damina/contracts';
 import { can, canEditNomenclature, canSeeFinancials } from '@damina/auth';
 import {
@@ -20,6 +21,7 @@ import {
   createObjective,
   createProduct,
   createQualification,
+  createWorkUnitFromForm,
   createRateCard,
   createSubcontractor,
   createSupplier,
@@ -116,6 +118,20 @@ const WRITERS: Readonly<Record<string, Writer>> = {
     update: updatePerson as NonNullable<Writer['update']>,
     canWrite: (session) => can(session, 'admin.users'),
     updateReason: 'modificare persoana',
+  },
+  /*
+   * Activitatea: inspectii, interventii, lucrari.
+   *
+   * `create` merge prin `createWorkUnitFromForm`, care compune formularul plat in
+   * use-case-ul complet — o singura tranzactie cu cod din serie si finantare. Nu
+   * exista `update`: codul se aloca o data, iar finantarea se MUTA, cu motiv
+   * scris, din ecranul ei. Un `update` de aici ar fi a doua usa spre aceleasi
+   * coloane, fara motiv si fara mecanica de luna inchisa.
+   */
+  activitate: {
+    schema: workUnitFormSchema,
+    create: createWorkUnitFromForm as Writer['create'],
+    canWrite: canSeeFinancials,
   },
   // Obiectivele NU au `company_id`: sunt nomenclator comun celor 5 firme.
   obiective: {

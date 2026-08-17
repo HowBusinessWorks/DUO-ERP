@@ -11,8 +11,8 @@ export { clearMustChangePassword } from './auth';
 export { checkHealth } from './health';
 export type { HealthReport, ComponentStatus } from './health';
 
-export { ensureOpenPeriods, findPeriodId } from './periods';
-export type { EnsureOpenPeriodsResult } from './periods';
+export { ensureOpenPeriods, findPeriodId, listPeriodOptions } from './periods';
+export type { EnsureOpenPeriodsResult, PeriodOption } from './periods';
 
 export { getPeriodContext, listCompanies } from './context';
 export type { CompanyOption, PeriodContext, PeriodState, PeriodStatus } from './context';
@@ -162,17 +162,21 @@ export {
   closeWorkUnit,
   createStage,
   createWorkUnit,
+  createWorkUnitFromForm,
   getClosingChecklist,
+  getStage,
   getStageOverview,
   getWorkUnit,
   listAllocations,
   listAssignments,
   listReallocationDocuments,
   listStages,
+  listStagesForCompanies,
   listWorkUnits,
   moveFunding,
   previewFundingMove,
   promoteToLucrare,
+  promotionCheckFor,
   reorderStages,
 } from './work-units';
 export type {
@@ -185,7 +189,9 @@ export type {
   FundingMoveTarget,
   ListWorkUnitsOptions,
   MoveFundingResult,
+  PromotionCheck,
   ReallocationDocumentRow,
   StageRow,
+  StageWithWorkUnitRow,
   WorkUnitRow,
 } from './work-units';

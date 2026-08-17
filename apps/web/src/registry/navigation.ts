@@ -126,7 +126,7 @@ export const NAVIGATION: readonly NavItem[] = [
     label: 'Activitate',
     icon: 'hammer',
     group: 'operational',
-    phase: 1,
+    phase: 0,
     usesPeriod: true,
     children: [
       { slug: '', label: 'Toată activitatea' },
@@ -175,10 +175,14 @@ export const NAVIGATION: readonly NavItem[] = [
     label: 'Bani',
     icon: 'banknote',
     group: 'operational',
-    phase: 2,
+    // Faza 0 din pasul 05: exista un singur ecran construit — re-alocarile lunii.
+    // Restul sub-sectiunilor NU s-au sters: sunt vederi care spun din ce faza vin.
+    // Un link care duce altundeva decat spune e mai rau decat unul care asteapta.
+    phase: 0,
     queueKinds: ['sl_de_aprobat', 'factura_nematchata'],
     usesPeriod: true,
     children: [
+      { slug: '', label: 'Re-alocările lunii' },
       { slug: 'facturare', label: 'Facturare emisă' },
       { slug: 'facturi-furnizor', label: 'Facturi furnizor / SPV' },
       { slug: 'situatii', label: 'Situații de lucrări' },

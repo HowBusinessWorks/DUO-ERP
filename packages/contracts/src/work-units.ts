@@ -156,6 +156,63 @@ export const createWorkUnitInputSchema = z.object({
   series: requiredText(20, 'Alege seria de numerotare.'),
 });
 
+/**
+ * Formularul de creare din ecran — PLAT, cu o singura alocare.
+ *
+ * `createWorkUnitInputSchema` are liste imbricate (alocari, asignari), iar un
+ * formular declarat ca date nu le poate exprima. Alegerea nu e o scurtatura: asa
+ * se si lucreaza. O unitate se deschide cu finantarea de unde se plateste ACUM;
+ * „Delta pe trei luni" se construieste pe urma, din tab-ul de finantare, unde se
+ * vede si cat s-a alocat deja pe fiecare luna.
+ *
+ * Cele patru campuri de finantare merg impreuna: ori toate, ori niciunul. O
+ * inspectie poate porni nefinantata; o interventie, nu — dar regula aia e a
+ * serviciului, nu a formularului, pentru ca depinde de tip.
+ */
+export const workUnitFormSchema = z
+  .object({
+    companyId: uuidSchema,
+    type: z.enum(WORK_UNIT_TYPES),
+    name: requiredText(200, 'Scrie o denumire.'),
+    objectiveId: uuidSchema,
+    responsiblePersonId: optionalUuid,
+    executorType: z.enum(EXECUTOR_TYPES),
+    executorSubcontractorId: optionalUuid,
+    startsOn: optionalDate,
+    endsOn: optionalDate,
+    estimatedValue: optionalMoney,
+    costBudget: optionalMoney,
+    series: requiredText(20, 'Alege seria de numerotare.'),
+    fundingContractId: optionalUuid,
+    fundingComponentId: optionalUuid,
+    fundingPeriodId: optionalUuid,
+    fundingAmount: optionalMoney,
+  })
+  .refine((v) => v.endsOn === null || v.startsOn === null || v.endsOn >= v.startsOn, {
+    message: 'Data de sfârșit trebuie să fie după cea de început.',
+    path: ['endsOn'],
+  })
+  .refine((v) => (v.executorType === 'subcontractant') === (v.executorSubcontractorId !== null), {
+    message: 'Alege subcontractantul care execută, sau treci pe echipă proprie.',
+    path: ['executorSubcontractorId'],
+  })
+  .refine(
+    (v) => {
+      const parts = [
+        v.fundingContractId,
+        v.fundingComponentId,
+        v.fundingPeriodId,
+        v.fundingAmount,
+      ];
+      const filled = parts.filter((part) => part !== null).length;
+      return filled === 0 || filled === parts.length;
+    },
+    {
+      message: 'Finanțarea cere contract, componentă, lună și sumă — toate patru, sau niciuna.',
+      path: ['fundingAmount'],
+    },
+  );
+
 export const workStageInputSchema = z
   .object({
     workUnitId: uuidSchema,
@@ -215,6 +272,7 @@ export type FundingAllocationInput = z.input<typeof fundingAllocationInputSchema
 export type WorkUnitAssignmentInput = z.input<typeof workUnitAssignmentInputSchema>;
 export type CreateWorkUnitInput = z.input<typeof createWorkUnitInputSchema>;
 export type WorkStageInput = z.input<typeof workStageInputSchema>;
+export type WorkUnitFormInput = z.input<typeof workUnitFormSchema>;
 export type MoveFundingInputDto = z.input<typeof moveFundingInputSchema>;
 export type PromoteWorkUnitInput = z.input<typeof promoteWorkUnitInputSchema>;
 export type CloseWorkUnitInput = z.input<typeof closeWorkUnitInputSchema>;

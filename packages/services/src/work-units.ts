@@ -6,6 +6,7 @@ import type {
   PromoteWorkUnitInput,
   ReorderStagesInput,
   WorkStageInput,
+  WorkUnitFormInput,
 } from '@damina/contracts';
 import {
   closeWorkUnitInputSchema,
@@ -15,6 +16,7 @@ import {
   promoteWorkUnitInputSchema,
   reorderStagesInputSchema,
   workStageInputSchema,
+  workUnitFormSchema,
 } from '@damina/contracts';
 import { schema, withActor, type Actor, type ActorTx } from '@damina/db';
 import {
@@ -26,6 +28,8 @@ import {
   type FundingMovePlan,
   type PeriodStatus,
   type PhysicalProgress,
+  type PromotableWorkUnit,
+  type PromotionCheck,
   type StageScheduleCheck,
 } from '@damina/domain';
 import { AppError, Money, uuidv7 } from '@damina/shared';
@@ -320,6 +324,106 @@ export async function listStages(actor: Actor, workUnitId: string): Promise<Stag
   );
 }
 
+export type StageWithWorkUnitRow = StageRow & {
+  readonly workUnitCode: string;
+  readonly workUnitName: string;
+  readonly workUnitStatus: string;
+  readonly companyId: string;
+  readonly objectiveName: string;
+};
+
+/**
+ * Etapele tuturor lucrarilor active de pe firmele selectate.
+ *
+ * Serveste doua ecrane cu o singura interogare: **Gantt-ul general** (§3.4 —
+ * toate lucrarile pe o axa de timp, cu etapele lor) si lista de etape. Doua
+ * interogari ar fi insemnat doua paginari si doua feluri de a numara — iar cele
+ * doua ecrane arata aceleasi randuri, deci trebuie sa arate acelasi numar.
+ */
+export async function listStagesForCompanies(
+  actor: Actor,
+  options: {
+    readonly companyIds: readonly string[];
+    /** Lucrarile inchise si anulate se scot implicit: graficul e despre ce urmeaza. */
+    readonly includeClosed?: boolean;
+    readonly limit?: number;
+  },
+): Promise<StageWithWorkUnitRow[]> {
+  if (options.companyIds.length === 0) {
+    return [];
+  }
+
+  return withActor(actor, async (tx) => {
+    const conditions = [
+      inArray(schema.workUnits.companyId, [...options.companyIds]),
+      eq(schema.workUnits.type, 'lucrare'),
+    ];
+    if (options.includeClosed !== true) {
+      conditions.push(sql`app.work_units.status not in ('inchisa', 'anulata')`);
+    }
+
+    const rows = await tx
+      .select({
+        stage: schema.workStages,
+        workUnitCode: schema.workUnits.code,
+        workUnitName: schema.workUnits.name,
+        workUnitStatus: schema.workUnits.status,
+        companyId: schema.workUnits.companyId,
+        objectiveName: schema.objectives.name,
+      })
+      .from(schema.workStages)
+      .innerJoin(schema.workUnits, eq(schema.workUnits.id, schema.workStages.workUnitId))
+      .innerJoin(schema.objectives, eq(schema.objectives.id, schema.workUnits.objectiveId))
+      .where(and(...conditions))
+      .orderBy(
+        asc(schema.workUnits.code),
+        asc(schema.workStages.position),
+      )
+      .limit(options.limit ?? DEFAULT_LIMIT * 5);
+
+    return rows.map((row) => ({
+      ...row.stage,
+      workUnitCode: row.workUnitCode,
+      workUnitName: row.workUnitName,
+      workUnitStatus: row.workUnitStatus,
+      companyId: row.companyId,
+      objectiveName: row.objectiveName,
+    }));
+  });
+}
+
+/** O etapa, cu lucrarea careia apartine. Pentru pagina proprie a etapei (#11). */
+export async function getStage(actor: Actor, id: string): Promise<StageWithWorkUnitRow | null> {
+  return withActor(actor, async (tx) => {
+    const [row] = await tx
+      .select({
+        stage: schema.workStages,
+        workUnitCode: schema.workUnits.code,
+        workUnitName: schema.workUnits.name,
+        workUnitStatus: schema.workUnits.status,
+        companyId: schema.workUnits.companyId,
+        objectiveName: schema.objectives.name,
+      })
+      .from(schema.workStages)
+      .innerJoin(schema.workUnits, eq(schema.workUnits.id, schema.workStages.workUnitId))
+      .innerJoin(schema.objectives, eq(schema.objectives.id, schema.workUnits.objectiveId))
+      .where(eq(schema.workStages.id, id))
+      .limit(1);
+
+    if (row === undefined) {
+      return null;
+    }
+    return {
+      ...row.stage,
+      workUnitCode: row.workUnitCode,
+      workUnitName: row.workUnitName,
+      workUnitStatus: row.workUnitStatus,
+      companyId: row.companyId,
+      objectiveName: row.objectiveName,
+    };
+  });
+}
+
 export type AssignmentRow = typeof schema.workUnitAssignments.$inferSelect & {
   readonly personName: string;
 };
@@ -487,6 +591,57 @@ export async function createWorkUnit(
   }
 }
 
+/**
+ * Crearea din ECRAN, cu formularul plat.
+ *
+ * Un adaptor, nu un al doilea use-case: compune `CreateWorkUnitInput` si cheama
+ * `createWorkUnit`. Toate regulile — codul din serie, tranzactia unica, luna
+ * inchisa, autorizatia SSM — sunt tot acolo. Daca ar fi doua drumuri de creare,
+ * al doilea ar fi cel care uita o regula.
+ */
+export async function createWorkUnitFromForm(
+  actor: Actor,
+  input: WorkUnitFormInput,
+): Promise<{ readonly id: string; readonly code: string }> {
+  const values = workUnitFormSchema.parse(input);
+
+  const funded =
+    values.fundingContractId !== null &&
+    values.fundingComponentId !== null &&
+    values.fundingPeriodId !== null;
+
+  return createWorkUnit(actor, {
+    workUnit: {
+      companyId: values.companyId,
+      type: values.type,
+      name: values.name,
+      objectiveId: values.objectiveId,
+      contractObjectiveId: '',
+      responsiblePersonId: values.responsiblePersonId ?? '',
+      executorType: values.executorType,
+      executorSubcontractorId: values.executorSubcontractorId ?? '',
+      startsOn: values.startsOn ?? '',
+      endsOn: values.endsOn ?? '',
+      estimatedValue: values.estimatedValue ?? '',
+      costBudget: values.costBudget ?? '',
+    },
+    allocations: funded
+      ? [
+          {
+            contractId: values.fundingContractId as string,
+            componentId: values.fundingComponentId as string,
+            periodId: values.fundingPeriodId as string,
+            allocatedAmount: values.fundingAmount ?? '',
+            allocatedPct: '',
+            reason: 'finanțare stabilită la deschiderea unității',
+          },
+        ]
+      : [],
+    assignments: [],
+    series: values.series,
+  });
+}
+
 // ── Promovare ────────────────────────────────────────────────────────────────
 
 /**
@@ -530,6 +685,22 @@ export async function promoteToLucrare(
     return translateDbError(error);
   }
 }
+
+/**
+ * Verificarea de promovare, pentru ECRAN.
+ *
+ * `apps/web` nu are voie sa importe `domain` — regula de boundaries, verificata in
+ * CI. Iar ecranul are nevoie de acelasi raspuns pe care il da serviciul, altfel ar
+ * arata butonul „Promoveaza" pe o unitate care apoi refuza.
+ *
+ * Deci nu e o duplicare: e usa prin care ecranul ajunge la ACEEASI functie pura.
+ */
+export function promotionCheckFor(workUnit: PromotableWorkUnit): PromotionCheck {
+  return canPromote(workUnit);
+}
+
+// Tipurile trec granita, functiile nu: ecranul are nevoie de forma raspunsului.
+export type { PromotableWorkUnit, PromotionCheck } from '@damina/domain';
 
 function promotionBlockerMessage(blockers: readonly string[]): string {
   if (blockers.includes('already_lucrare')) {

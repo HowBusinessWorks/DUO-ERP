@@ -8,6 +8,7 @@ import {
 import {
   countCeilingsWithoutValue,
   findPeriodId,
+  listAllocations,
   getContract,
   getContractOverview,
   getInspectionCoverage,
@@ -18,6 +19,7 @@ import {
   listContractObjectives,
   listContracts,
   listContractYears,
+  listWorkUnits,
   listInspectionProfiles,
   listObjectives,
   type ComponentBand,
@@ -644,7 +646,15 @@ export const contracte = defineEntity<ContractRow>({
                 />
               );
             }
-            return <FundedWorkUnits contractId={row.id} componentName={component.name} ctx={ctx} />;
+            return (
+              <FundedWorkUnits
+                contractId={row.id}
+                companyId={row.companyId}
+                componentId={component.id}
+                componentName={component.name}
+                ctx={ctx}
+              />
+            );
           }
 
           const [years, monthlyCeilings, periodId] = await Promise.all([
@@ -1417,15 +1427,59 @@ function Pair({ label, value }: { label: string; value: string | null }) {
  * lista e goala si totalul e zero — dar drumul de la cifra la desfacerea ei
  * exista deja, si nu se schimba cand pasul 05 il umple.
  */
-function FundedWorkUnits({
+/**
+ * Desfacerea benzii unei componente: ce se plateste din ea (verificarea #14).
+ *
+ * Regula pe care ecranul trebuie s-o faca verificabila: **totalul de aici da exact
+ * cifra de pe banda**. De aceea nu se aduna valorile estimate ale unitatilor, ci
+ * ALOCARILE lor active pe luna selectata — banda arata venitul alocat pe
+ * componenta in luna aia, iar o unitate finantata din trei luni contribuie la
+ * fiecare dintre ele cu partea ei, nu cu tot.
+ */
+async function FundedWorkUnits({
   contractId,
+  companyId,
+  componentId,
   componentName,
   ctx,
 }: {
   contractId: string;
+  companyId: string;
+  componentId: string;
   componentName: string;
   ctx: EntityContext;
 }) {
+  const monthLabel = `${String(ctx.app.month).padStart(2, '0')}/${String(ctx.app.year)}`;
+  // Luna se cauta la firma CONTRACTULUI, nu la prima bifata in shell: cele doua
+  // pot sa nu fie aceeasi, iar atunci cifra ar fi a altei luni.
+  const periodId = await findPeriodId(ctx.actor, companyId, ctx.app.year, ctx.app.month);
+
+  const rows = await listWorkUnits(ctx.actor, {
+    companyIds: [companyId],
+    componentId,
+    ...(periodId === null ? {} : { periodId }),
+  });
+
+  const allocationGroups = await Promise.all(
+    rows.map((row) => listAllocations(ctx.actor, row.id)),
+  );
+
+  // Doar alocarile active de pe ACEASTA componenta si ACEASTA luna.
+  const contributions = rows.map((row, index) => {
+    const own = (allocationGroups[index] ?? []).filter(
+      (allocation) =>
+        allocation.status === 'active' &&
+        allocation.componentId === componentId &&
+        (periodId === null || allocation.periodId === periodId),
+    );
+    return {
+      row,
+      amount: MoneyValue.sum(own.map((allocation) => MoneyValue.fromDb(allocation.allocatedAmount))),
+    };
+  });
+
+  const total = MoneyValue.sum(contributions.map((contribution) => contribution.amount));
+
   return (
     <div className="space-y-4">
       <Link
@@ -1436,13 +1490,38 @@ function FundedWorkUnits({
         Înapoi la componente
       </Link>
 
-      <EmptyState
-        title={`Nicio unitate de lucru finanțată din ${componentName}`}
-        body={`În luna ${String(ctx.app.month).padStart(2, '0')}/${String(ctx.app.year)} nu există unități de lucru: ele se construiesc în pasul 05. Când vor exista, totalul de aici trebuie să dea exact cifra de pe bandă — dacă nu dă, e bug.`}
-      />
+      {contributions.length === 0 ? (
+        <EmptyState
+          title={`Nicio unitate finanțată din ${componentName}`}
+          body={`În luna ${monthLabel} nu se plătește nimic din componenta asta. Când va exista, totalul de aici trebuie să dea exact cifra de pe bandă — dacă nu dă, e bug.`}
+        />
+      ) : (
+        <>
+          <h3 className="text-sm font-semibold text-ink">
+            Ce se plătește din {componentName} în {monthLabel}
+          </h3>
+          <ul className="divide-y divide-line rounded-md border border-line bg-surface">
+            {contributions.map(({ row, amount }) => (
+              <li key={row.id} className="flex items-center justify-between gap-3 p-3">
+                <Link href={`/activitate/${row.id}`} className="min-w-0">
+                  <span data-numeric className="font-medium tabular-nums text-brand-700">
+                    {row.code}
+                  </span>
+                  <span className="ml-2 truncate text-sm text-ink">{row.name}</span>
+                  <span className="block text-xs text-ink-muted">
+                    {row.objectiveCode} · {row.objectiveName}
+                  </span>
+                </Link>
+                <Money value={amount} className="shrink-0 font-semibold" />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <p className="text-sm text-ink-subtle">
-        Total: <Money value={MoneyValue.ZERO} /> · analitica: <strong>folosit</strong>
+        Total: <Money value={total} className="font-semibold text-ink" /> · analitica:{' '}
+        <strong>folosit</strong>
       </p>
     </div>
   );

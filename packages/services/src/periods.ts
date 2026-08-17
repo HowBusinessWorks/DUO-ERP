@@ -1,6 +1,6 @@
 import { type Actor, schema, withActor } from '@damina/db';
 import { AppError } from '@damina/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 
 /**
  * Deschide lunile care lipsesc, de la `fromYear` pana la luna curenta inclusiv.
@@ -52,6 +52,48 @@ export async function ensureOpenPeriods(
       .returning({ id: schema.periods.id });
 
     return { created: inserted.length, existing: wanted.length - inserted.length };
+  });
+}
+
+export interface PeriodOption {
+  readonly id: string;
+  readonly companyId: string;
+  readonly year: number;
+  readonly month: number;
+  readonly status: 'open' | 'closing' | 'closed';
+}
+
+/**
+ * Lunile firmelor selectate, pentru selectoarele de formular.
+ *
+ * Implicit **doar cele deschise**: un `select` care ar oferi o luna inchisa ar
+ * promite ceva ce baza refuza, iar omul ar afla abia din eroare.
+ */
+export async function listPeriodOptions(
+  actor: Actor,
+  options: { readonly companyIds: readonly string[]; readonly includeClosed?: boolean },
+): Promise<PeriodOption[]> {
+  if (options.companyIds.length === 0) {
+    return [];
+  }
+
+  return withActor(actor, async (tx) => {
+    const conditions = [inArray(schema.periods.companyId, [...options.companyIds])];
+    if (options.includeClosed !== true) {
+      conditions.push(eq(schema.periods.status, 'open'));
+    }
+
+    return tx
+      .select({
+        id: schema.periods.id,
+        companyId: schema.periods.companyId,
+        year: schema.periods.year,
+        month: schema.periods.month,
+        status: schema.periods.status,
+      })
+      .from(schema.periods)
+      .where(and(...conditions))
+      .orderBy(desc(schema.periods.year), desc(schema.periods.month));
   });
 }
 
