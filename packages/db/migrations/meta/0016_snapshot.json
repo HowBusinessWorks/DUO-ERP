@@ -1,6 +1,6 @@
 {
-  "id": "9293cf36-d0fc-4834-8913-b6855747339d",
-  "prevId": "f6a78498-6524-4d32-86b6-46451c8fdffb",
+  "id": "7a31be4d-d07d-4ee5-a082-6ef0e2337096",
+  "prevId": "4ba4c508-ee0c-4f25-87d5-2de48c36e6ac",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -480,6 +480,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "sessions_revoked_at": {
+          "name": "sessions_revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "is_active": {
           "name": "is_active",
@@ -3065,6 +3071,1230 @@
         }
       },
       "isRLSEnabled": false
+    },
+    "app.funding_allocations": {
+      "name": "funding_allocations",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "work_unit_id": {
+          "name": "work_unit_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contract_id": {
+          "name": "contract_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "component_id": {
+          "name": "component_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period_id": {
+          "name": "period_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "allocated_amount": {
+          "name": "allocated_amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "allocated_pct": {
+          "name": "allocated_pct",
+          "type": "numeric(6, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "allocation_status",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "superseded_by": {
+          "name": "superseded_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "funding_allocations_active_unique": {
+          "name": "funding_allocations_active_unique",
+          "columns": [
+            {
+              "expression": "work_unit_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "contract_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "component_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "period_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "status = 'active'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "funding_allocations_work_unit_idx": {
+          "name": "funding_allocations_work_unit_idx",
+          "columns": [
+            {
+              "expression": "work_unit_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "funding_allocations_component_period_idx": {
+          "name": "funding_allocations_component_period_idx",
+          "columns": [
+            {
+              "expression": "component_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "period_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "funding_allocations_period_idx": {
+          "name": "funding_allocations_period_idx",
+          "columns": [
+            {
+              "expression": "period_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "funding_allocations_work_unit_id_work_units_id_fk": {
+          "name": "funding_allocations_work_unit_id_work_units_id_fk",
+          "tableFrom": "funding_allocations",
+          "tableTo": "work_units",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "work_unit_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "funding_allocations_contract_id_contracts_id_fk": {
+          "name": "funding_allocations_contract_id_contracts_id_fk",
+          "tableFrom": "funding_allocations",
+          "tableTo": "contracts",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "contract_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "funding_allocations_component_id_contract_components_id_fk": {
+          "name": "funding_allocations_component_id_contract_components_id_fk",
+          "tableFrom": "funding_allocations",
+          "tableTo": "contract_components",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "component_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "funding_allocations_period_id_periods_id_fk": {
+          "name": "funding_allocations_period_id_periods_id_fk",
+          "tableFrom": "funding_allocations",
+          "tableTo": "periods",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "period_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "funding_allocations_superseded_by_funding_allocations_id_fk": {
+          "name": "funding_allocations_superseded_by_funding_allocations_id_fk",
+          "tableFrom": "funding_allocations",
+          "tableTo": "funding_allocations",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "superseded_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "funding_allocations_created_by_persons_id_fk": {
+          "name": "funding_allocations_created_by_persons_id_fk",
+          "tableFrom": "funding_allocations",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "funding_allocations_amount_or_pct": {
+          "name": "funding_allocations_amount_or_pct",
+          "value": "\"app\".\"funding_allocations\".\"allocated_amount\" is not null or \"app\".\"funding_allocations\".\"allocated_pct\" is not null"
+        },
+        "funding_allocations_amount_non_negative": {
+          "name": "funding_allocations_amount_non_negative",
+          "value": "\"app\".\"funding_allocations\".\"allocated_amount\" is null or \"app\".\"funding_allocations\".\"allocated_amount\" >= 0"
+        },
+        "funding_allocations_pct_range": {
+          "name": "funding_allocations_pct_range",
+          "value": "\"app\".\"funding_allocations\".\"allocated_pct\" is null or (\"app\".\"funding_allocations\".\"allocated_pct\" > 0 and \"app\".\"funding_allocations\".\"allocated_pct\" <= 1)"
+        },
+        "funding_allocations_reason_not_blank": {
+          "name": "funding_allocations_reason_not_blank",
+          "value": "length(btrim(\"app\".\"funding_allocations\".\"reason\")) > 0"
+        },
+        "funding_allocations_not_superseded_by_self": {
+          "name": "funding_allocations_not_superseded_by_self",
+          "value": "\"app\".\"funding_allocations\".\"superseded_by\" is distinct from \"app\".\"funding_allocations\".\"id\""
+        },
+        "funding_allocations_superseded_has_status": {
+          "name": "funding_allocations_superseded_has_status",
+          "value": "\"app\".\"funding_allocations\".\"superseded_by\" is null or \"app\".\"funding_allocations\".\"status\" = 'superseded'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.reallocation_documents": {
+      "name": "reallocation_documents",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "number": {
+          "name": "number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period_id": {
+          "name": "period_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "work_unit_id": {
+          "name": "work_unit_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_contract_id": {
+          "name": "from_contract_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_component_id": {
+          "name": "from_component_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_period_id": {
+          "name": "from_period_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_contract_id": {
+          "name": "to_contract_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_component_id": {
+          "name": "to_component_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_period_id": {
+          "name": "to_period_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "reallocation_documents_period_idx": {
+          "name": "reallocation_documents_period_idx",
+          "columns": [
+            {
+              "expression": "period_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "reallocation_documents_work_unit_idx": {
+          "name": "reallocation_documents_work_unit_idx",
+          "columns": [
+            {
+              "expression": "work_unit_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "reallocation_documents_company_id_companies_id_fk": {
+          "name": "reallocation_documents_company_id_companies_id_fk",
+          "tableFrom": "reallocation_documents",
+          "tableTo": "companies",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "reallocation_documents_period_id_periods_id_fk": {
+          "name": "reallocation_documents_period_id_periods_id_fk",
+          "tableFrom": "reallocation_documents",
+          "tableTo": "periods",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "period_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "reallocation_documents_work_unit_id_work_units_id_fk": {
+          "name": "reallocation_documents_work_unit_id_work_units_id_fk",
+          "tableFrom": "reallocation_documents",
+          "tableTo": "work_units",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "work_unit_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "reallocation_documents_from_contract_id_contracts_id_fk": {
+          "name": "reallocation_documents_from_contract_id_contracts_id_fk",
+          "tableFrom": "reallocation_documents",
+          "tableTo": "contracts",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "from_contract_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "reallocation_documents_from_component_id_contract_components_id_fk": {
+          "name": "reallocation_documents_from_component_id_contract_components_id_fk",
+          "tableFrom": "reallocation_documents",
+          "tableTo": "contract_components",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "from_component_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "reallocation_documents_from_period_id_periods_id_fk": {
+          "name": "reallocation_documents_from_period_id_periods_id_fk",
+          "tableFrom": "reallocation_documents",
+          "tableTo": "periods",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "from_period_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "reallocation_documents_to_contract_id_contracts_id_fk": {
+          "name": "reallocation_documents_to_contract_id_contracts_id_fk",
+          "tableFrom": "reallocation_documents",
+          "tableTo": "contracts",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "to_contract_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "reallocation_documents_to_component_id_contract_components_id_fk": {
+          "name": "reallocation_documents_to_component_id_contract_components_id_fk",
+          "tableFrom": "reallocation_documents",
+          "tableTo": "contract_components",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "to_component_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "reallocation_documents_to_period_id_periods_id_fk": {
+          "name": "reallocation_documents_to_period_id_periods_id_fk",
+          "tableFrom": "reallocation_documents",
+          "tableTo": "periods",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "to_period_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "reallocation_documents_created_by_persons_id_fk": {
+          "name": "reallocation_documents_created_by_persons_id_fk",
+          "tableFrom": "reallocation_documents",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "reallocation_documents_company_number_unique": {
+          "name": "reallocation_documents_company_number_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "company_id",
+            "number"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "reallocation_documents_number_not_blank": {
+          "name": "reallocation_documents_number_not_blank",
+          "value": "length(btrim(\"app\".\"reallocation_documents\".\"number\")) > 0"
+        },
+        "reallocation_documents_reason_not_blank": {
+          "name": "reallocation_documents_reason_not_blank",
+          "value": "length(btrim(\"app\".\"reallocation_documents\".\"reason\")) > 0"
+        },
+        "reallocation_documents_amount_positive": {
+          "name": "reallocation_documents_amount_positive",
+          "value": "\"app\".\"reallocation_documents\".\"amount\" > 0"
+        },
+        "reallocation_documents_moves_somewhere": {
+          "name": "reallocation_documents_moves_somewhere",
+          "value": "\"app\".\"reallocation_documents\".\"from_component_id\" <> \"app\".\"reallocation_documents\".\"to_component_id\" or \"app\".\"reallocation_documents\".\"from_period_id\" <> \"app\".\"reallocation_documents\".\"to_period_id\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.work_stages": {
+      "name": "work_stages",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "work_unit_id": {
+          "name": "work_unit_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "planned_start": {
+          "name": "planned_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "planned_end": {
+          "name": "planned_end",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "material_budget": {
+          "name": "material_budget",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "labor_budget": {
+          "name": "labor_budget",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pct_of_work": {
+          "name": "pct_of_work",
+          "type": "numeric(6, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actual_start": {
+          "name": "actual_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actual_end": {
+          "name": "actual_end",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "work_stages_work_unit_id_work_units_id_fk": {
+          "name": "work_stages_work_unit_id_work_units_id_fk",
+          "tableFrom": "work_stages",
+          "tableTo": "work_units",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "work_unit_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "work_stages_work_unit_position_unique": {
+          "name": "work_stages_work_unit_position_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "work_unit_id",
+            "position"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "work_stages_position_positive": {
+          "name": "work_stages_position_positive",
+          "value": "\"app\".\"work_stages\".\"position\" > 0"
+        },
+        "work_stages_name_not_blank": {
+          "name": "work_stages_name_not_blank",
+          "value": "length(btrim(\"app\".\"work_stages\".\"name\")) > 0"
+        },
+        "work_stages_planned_range": {
+          "name": "work_stages_planned_range",
+          "value": "\"app\".\"work_stages\".\"planned_end\" is null or \"app\".\"work_stages\".\"planned_start\" is null or \"app\".\"work_stages\".\"planned_end\" >= \"app\".\"work_stages\".\"planned_start\""
+        },
+        "work_stages_actual_range": {
+          "name": "work_stages_actual_range",
+          "value": "\"app\".\"work_stages\".\"actual_end\" is null or \"app\".\"work_stages\".\"actual_start\" is null or \"app\".\"work_stages\".\"actual_end\" >= \"app\".\"work_stages\".\"actual_start\""
+        },
+        "work_stages_material_budget_non_negative": {
+          "name": "work_stages_material_budget_non_negative",
+          "value": "\"app\".\"work_stages\".\"material_budget\" is null or \"app\".\"work_stages\".\"material_budget\" >= 0"
+        },
+        "work_stages_labor_budget_non_negative": {
+          "name": "work_stages_labor_budget_non_negative",
+          "value": "\"app\".\"work_stages\".\"labor_budget\" is null or \"app\".\"work_stages\".\"labor_budget\" >= 0"
+        },
+        "work_stages_pct_range": {
+          "name": "work_stages_pct_range",
+          "value": "\"app\".\"work_stages\".\"pct_of_work\" is null or (\"app\".\"work_stages\".\"pct_of_work\" >= 0 and \"app\".\"work_stages\".\"pct_of_work\" <= 1)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.work_unit_assignments": {
+      "name": "work_unit_assignments",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "work_unit_id": {
+          "name": "work_unit_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "person_id": {
+          "name": "person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_from": {
+          "name": "valid_from",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "valid_to": {
+          "name": "valid_to",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "work_unit_assignments_work_unit_idx": {
+          "name": "work_unit_assignments_work_unit_idx",
+          "columns": [
+            {
+              "expression": "work_unit_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "work_unit_assignments_person_idx": {
+          "name": "work_unit_assignments_person_idx",
+          "columns": [
+            {
+              "expression": "person_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "work_unit_assignments_work_unit_id_work_units_id_fk": {
+          "name": "work_unit_assignments_work_unit_id_work_units_id_fk",
+          "tableFrom": "work_unit_assignments",
+          "tableTo": "work_units",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "work_unit_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "work_unit_assignments_person_id_persons_id_fk": {
+          "name": "work_unit_assignments_person_id_persons_id_fk",
+          "tableFrom": "work_unit_assignments",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "work_unit_assignments_role_known": {
+          "name": "work_unit_assignments_role_known",
+          "value": "\"app\".\"work_unit_assignments\".\"role\" in ('sef_santier', 'inspector', 'echipa')"
+        },
+        "work_unit_assignments_period_valid": {
+          "name": "work_unit_assignments_period_valid",
+          "value": "\"app\".\"work_unit_assignments\".\"valid_to\" is null or \"app\".\"work_unit_assignments\".\"valid_from\" is null or \"app\".\"work_unit_assignments\".\"valid_to\" >= \"app\".\"work_unit_assignments\".\"valid_from\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "app.work_units": {
+      "name": "work_units",
+      "schema": "app",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "work_unit_type",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "objective_id": {
+          "name": "objective_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contract_objective_id": {
+          "name": "contract_objective_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "work_unit_status",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "responsible_person_id": {
+          "name": "responsible_person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "executor_type": {
+          "name": "executor_type",
+          "type": "executor_type",
+          "typeSchema": "app",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'echipa_proprie'"
+        },
+        "executor_subcontractor_id": {
+          "name": "executor_subcontractor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "starts_on": {
+          "name": "starts_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "estimated_value": {
+          "name": "estimated_value",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cost_budget": {
+          "name": "cost_budget",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_request_id": {
+          "name": "source_request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "promoted_from_id": {
+          "name": "promoted_from_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "root_node_id": {
+          "name": "root_node_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closed_by": {
+          "name": "closed_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "work_units_company_status_idx": {
+          "name": "work_units_company_status_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "work_units_company_type_idx": {
+          "name": "work_units_company_type_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "work_units_objective_idx": {
+          "name": "work_units_objective_idx",
+          "columns": [
+            {
+              "expression": "objective_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "work_units_contract_objective_idx": {
+          "name": "work_units_contract_objective_idx",
+          "columns": [
+            {
+              "expression": "contract_objective_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "work_units_responsible_idx": {
+          "name": "work_units_responsible_idx",
+          "columns": [
+            {
+              "expression": "responsible_person_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "work_units_company_id_companies_id_fk": {
+          "name": "work_units_company_id_companies_id_fk",
+          "tableFrom": "work_units",
+          "tableTo": "companies",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "work_units_objective_id_objectives_id_fk": {
+          "name": "work_units_objective_id_objectives_id_fk",
+          "tableFrom": "work_units",
+          "tableTo": "objectives",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "objective_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "work_units_contract_objective_id_contract_objectives_id_fk": {
+          "name": "work_units_contract_objective_id_contract_objectives_id_fk",
+          "tableFrom": "work_units",
+          "tableTo": "contract_objectives",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "contract_objective_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "work_units_responsible_person_id_persons_id_fk": {
+          "name": "work_units_responsible_person_id_persons_id_fk",
+          "tableFrom": "work_units",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "responsible_person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "work_units_executor_subcontractor_id_subcontractors_id_fk": {
+          "name": "work_units_executor_subcontractor_id_subcontractors_id_fk",
+          "tableFrom": "work_units",
+          "tableTo": "subcontractors",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "executor_subcontractor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "work_units_promoted_from_id_work_units_id_fk": {
+          "name": "work_units_promoted_from_id_work_units_id_fk",
+          "tableFrom": "work_units",
+          "tableTo": "work_units",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "promoted_from_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "work_units_closed_by_persons_id_fk": {
+          "name": "work_units_closed_by_persons_id_fk",
+          "tableFrom": "work_units",
+          "tableTo": "persons",
+          "schemaTo": "app",
+          "columnsFrom": [
+            "closed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "work_units_company_code_unique": {
+          "name": "work_units_company_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "company_id",
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "work_units_code_not_blank": {
+          "name": "work_units_code_not_blank",
+          "value": "length(btrim(\"app\".\"work_units\".\"code\")) > 0"
+        },
+        "work_units_name_not_blank": {
+          "name": "work_units_name_not_blank",
+          "value": "length(btrim(\"app\".\"work_units\".\"name\")) > 0"
+        },
+        "work_units_period_valid": {
+          "name": "work_units_period_valid",
+          "value": "\"app\".\"work_units\".\"ends_on\" is null or \"app\".\"work_units\".\"starts_on\" is null or \"app\".\"work_units\".\"ends_on\" >= \"app\".\"work_units\".\"starts_on\""
+        },
+        "work_units_executor_consistent": {
+          "name": "work_units_executor_consistent",
+          "value": "(\"app\".\"work_units\".\"executor_type\" = 'subcontractant') = (\"app\".\"work_units\".\"executor_subcontractor_id\" is not null)"
+        },
+        "work_units_estimated_value_non_negative": {
+          "name": "work_units_estimated_value_non_negative",
+          "value": "\"app\".\"work_units\".\"estimated_value\" is null or \"app\".\"work_units\".\"estimated_value\" >= 0"
+        },
+        "work_units_cost_budget_non_negative": {
+          "name": "work_units_cost_budget_non_negative",
+          "value": "\"app\".\"work_units\".\"cost_budget\" is null or \"app\".\"work_units\".\"cost_budget\" >= 0"
+        },
+        "work_units_closed_complete": {
+          "name": "work_units_closed_complete",
+          "value": "num_nonnulls(\"app\".\"work_units\".\"closed_at\", \"app\".\"work_units\".\"closed_by\") <> 1"
+        },
+        "work_units_not_promoted_from_self": {
+          "name": "work_units_not_promoted_from_self",
+          "value": "\"app\".\"work_units\".\"promoted_from_id\" is distinct from \"app\".\"work_units\".\"id\""
+        }
+      },
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -3258,7 +4488,10 @@
         "lista_inventar",
         "decizie_inventariere",
         "nota_diferente",
-        "nota_realocare"
+        "nota_realocare",
+        "lucrare",
+        "interventie",
+        "inspectie"
       ]
     },
     "app.office_role": {

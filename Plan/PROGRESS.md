@@ -13,12 +13,31 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Scris la finalul lui 02c′ (17 august 2026). Citește-l primul; restul fișierului e istoric.*
+*Scris la finalul lui 05a (17 august 2026). Citește-l primul; restul fișierului e istoric.*
 
 ### Unde s-a ajuns
 
 Pașii **01, 02 și 04 sunt gata**. Pasul **03 e complet ca implementare**, dar are 4 verificări
-nerulate. Următorul pas de conținut neînceput e **05 — Unitate de Lucru, finanțare**.
+nerulate. Pasul **05 e tăiat în trei** (decizia utilizatorului, 17 august 2026), iar **05a — schema
+și domain-ul pur — e gata**. Următorul lucru de făcut e **05b: use-case-urile din
+`packages/services/work-units`**.
+
+### Tăierea pasului 05, și ce e în fiecare bucată
+
+| Sub-etapă | Conținut | Verificări din §6 | Stare |
+|---|---|---|---|
+| **05a** | Migrarea `0016_work_units` (5 tabele, 8 triggere, RLS, grant-uri pe coloană) + `packages/domain/funding` | 1, 2, 3, 9, 10, 12, 13, 16, 17, 18 | 🟩 gata |
+| **05b** | `packages/services/work-units`: `createWorkUnit`, `promoteToLucrare`, `moveFunding`, `allocateFunding`/`reallocate`, etape, `closeWorkUnit`, seed | 4, 5, 6, 7, 8 | ⬜ |
+| **05c** | Ecranele, cu agentul de design | 11, 14, 15, 19 | ⬜ |
+
+Motivul tăierii: pasul întreg are 19 verificări, 5 tabele, 6 use-case-uri și 7 ecrane — nu încape
+într-o sesiune fără să se rupă la mijloc.
+
+**Ce te așteaptă deja făcut la 05b:** planul mutării de finanțare e **funcție pură**, gata și
+testată (`planFundingMove`). Serviciul nu mai judecă nimic — execută ramura pe care i-o dă domain-ul.
+Tot acolo sunt `splitAcrossPeriods` (Delta pe 2–3 luni, fără ban pierdut), `validateAllocationSum`,
+`canPromote` (cu listele „ce se păstrează / ce se adaugă" pentru ecranul de confirmare),
+`stageScheduleIsCoherent` și `physicalProgress`.
 
 ### Primul lucru de făcut, înainte de orice cod
 
@@ -37,7 +56,13 @@ nerulate. Următorul pas de conținut neînceput e **05 — Unitate de Lucru, fi
 | 2 | **Playwright** | Neinstalat. Blochează #13 din pasul 03 și clicul pe hartă din 04b (#14). Vezi mai jos ce am aflat despre testarea fără el. |
 | 3 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Decizie deschisă: ori `grant select` pe `work_queue_items`/`notifications` către `authenticated` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
 | 4 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — atenție, `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
-| 5 | **`pnpm db:generate` e blocat** din 02c | `drizzle-kit` refuză cu „snapshots are pointing to a parent snapshot … collision”. Migrările `0013`–`0015` sunt scrise de mână. Ca să reînvie, cineva trebuie să refacă lanțul `id`/`prevId` din `migrations/meta/`. Până atunci: **scrii migrarea de mână**, adaugi intrarea în `_journal.json` și un `NNNN_snapshot.json` care conține chiar schema nouă (nu o copie oarbă). |
+
+**Datoria #5 de dinainte — `pnpm db:generate` blocat — e PLĂTITĂ la 05a.** Cauza era exact cea
+bănuită: `0013`–`0015` aveau `id`/`prevId` copiate din `0012`, deci trei snapshot-uri arătau spre
+același părinte. Reparat cu un lanț nou de `id`-uri; diff-ul e de 8 linii. `db:generate` merge din
+nou, iar migrarea `0016` a fost generată cu el, nu scrisă de mână. **Nu mai scrie migrări de mână** —
+scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu poate exprima
+(triggere, politici, grant-uri pe coloană, constrângeri `exclude`).
 
 ### Lucruri pe care le-am aflat greu și te scutesc de o zi
 
@@ -95,7 +120,7 @@ nerulate. Următorul pas de conținut neînceput e **05 — Unitate de Lucru, fi
 | 02 — Identitate, acces, RLS | 🟩 **gata** (19/19 verificări; 02a–02d + 02c′) | 2026-08-17 |
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat: #8, #10, #13, #14) | 2026-08-15 |
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
-| 05 — Unitate de Lucru, finanțare | ⬜ neînceput | — |
+| 05 — Unitate de Lucru, finanțare | 🟨 în lucru (**05a gata**; 05b, 05c neînceput) | 2026-08-17 |
 | 06 — Registrul de cost, închidere | ⬜ neînceput | — |
 | 07 — File management (R2) | ⬜ neînceput | — |
 | 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
@@ -119,11 +144,11 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | **Hook-ul de token e activat** în proiectul Supabase `cspjtesltraiaveypuya` | Authentication → Hooks → *Customize Access Token (JWT) Claims* → `app.custom_access_token_hook`. **Nu e versionat.** Un proiect Supabase nou pornește fără el, iar login-ul pică atunci cu „hook neactivat” — mesaj deliberat distinct de „contul nu e configurat”. |
 | `.env.local` (rădăcină, gitignored) are `SUPABASE_SERVICE_ROLE_KEY` și `SEED_USER_PASSWORD` | Fără prima, `pnpm db:seed:users` nu pornește. A doua ține parola conturilor de test stabilă între rulări. Ambele lipsesc pe o mașină nouă. |
 | Cheia de service a trecut printr-o fereastră de chat pe 17 august 2026 | **De rotit** din Project Settings → API. |
-| `pnpm db:generate` **nu mai rulează** din 02c | `drizzle-kit` refuză: „0012, 0013, 0014 snapshots are pointing to a parent snapshot … which is a collision”. Migrările `0013`–`0015` sunt scrise de mână, iar snapshot-urile lor sunt copii. Din 02c′, `0015_snapshot.json` conține totuși coloana nouă, deci nu minte despre schemă. Ca să reînvie `db:generate`, cineva trebuie să refacă lanțul de `id`/`prevId` din `meta/`. |
+| `pnpm db:generate` **merge din nou**, din 05a | Era blocat din 02c de trei snapshot-uri (`0013`–`0015`) cu `id`/`prevId` copiate din `0012`. Lanțul a fost refăcut la 05a; `0016` e generată cu drizzle. |
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași**, ceea ce e chiar comportamentul cerut de #16. |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **242** | 110 unitare (`shared` 39 · `domain` 29 · **`auth` 33** · `storage` 6 · `i18n` 3) + 91 `packages/db` + 41 `packages/services`. Confirmate în CI `32014280507`, pe `570da2b`. Testele de bază de date rulează **doar în CI** — mașina de dezvoltare n-are Docker. Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **329** *(de confirmat la primul CI de după 05a)* | 163 unitare (`shared` 39 · **`domain` 82** · `auth` 33 · `storage` 6 · `i18n` 3) + **125** `packages/db` + 41 `packages/services`. Cele 163 unitare sunt confirmate local. Cele 34 de teste noi din `packages/db/tests/work-units.test.ts` **n-au rulat local** — mașina n-are Docker — deci `125` e cifra așteptată, nu una confirmată. Pragul de dinainte era 242, pe `570da2b`. Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | Docker nu există pe mașina de dezvoltare | Testele de bază de date rulează **doar în CI**. Verificările pe date reale se fac pe Supabase dev, în blocuri anulate la final. |
 
 ---
@@ -1177,7 +1202,132 @@ brută, iar serviciile o primesc pe aceea. Parsarea are un singur loc — servic
 
 ## Pasul 05 — Unitate de Lucru, finanțare
 
-*(nicio sesiune n-a lucrat încă aici)*
+Pasul e tăiat în trei sub-etape (decizia utilizatorului, 17 august 2026), fiecare cu commit și CI
+verde propriu: **05a** schema + domain pur · **05b** use-case-uri + seed · **05c** ecranele, cu
+agentul de design. Motivul e mărimea: 19 verificări, 5 tabele, 6 use-case-uri și 7 ecrane nu încap
+într-o sesiune.
+
+### 2026-08-17 — [status: gata] — 05a, schema și domain-ul pur
+
+**Migrare nouă: `0016_work_units`** (nu `0013` ca în textul pasului — numerotarea drizzle e la 15).
+Cele 5 tabele din Anexa C.5 plus tot ce drizzle nu poate exprima:
+
+- **8 triggere.** Etapele doar pe lucrări, și reversul (o lucrare cu etape nu se mai poate întoarce
+  la intervenție) · coerența alocării (firma unității = firma contractului = firma lunii, componenta
+  aparține contractului) · suma procentelor active ≤ 1 · imutabilitatea alocării · imutabilitatea
+  documentului de re-alocare · coerența documentului + luna-țintă deschisă · autorizația SSM la
+  asignare.
+- **RLS pe toate cele 5 tabele**, cu `force`, prin `app.rls_enable`. Două funcții noi de scop:
+  `app.work_unit_in_scope()` și `app.work_unit_assigned_to_me()`.
+- **Grant-uri pe coloană** pentru teren și subcontractant: toate coloanele **în afară de**
+  `estimated_value`, `cost_budget` (pe unitate) și `material_budget`, `labor_budget` (pe etapă).
+- **`app.assert_no_money_leak(text[])`** — poarta din `0012`, scoasă într-o funcție reutilizabilă.
+  Rămâne în bază pentru pașii 06–10.
+
+**Pachet nou: `packages/domain/funding`** — `planFundingMove`, `describeFundingMove`,
+`splitAcrossPeriods`, `allocatedTotal`, `validateAllocationSum`, `canPromote`,
+`stageScheduleIsCoherent`, `physicalProgress`. **Domain-ul a urcat de la 29 la 82 de teste.**
+
+**Verificări din pas care trec / nu trec:**
+
+Rulate **pe Supabase dev (Postgres 17.6) real**, într-un bloc anulat la final — plus `pnpm db:migrate`
+efectiv aplicat:
+
+- [x] **#1** Delta pe 3 luni → **3 rânduri**, suma exact `34800.00`
+- [x] **#2** 60% + 50% pe aceeași UL și lună → respins, mesajul spune `110.00%`
+- [x] **#3** rescrierea sumei unei alocări → `CONFLICT: … nu se rescrie, se supersedeaza
+  (s-a incercat: allocated_amount)`; supersedarea trece și lasă rândul vechi marcat; **supersedarea
+  fără motiv scris e respinsă de audit**
+- [x] **#9** etapă pe inspecție → `VALIDATION_FAILED: etapele exista doar pe lucrari, iar unitatea …
+  este inspectie`
+- [x] **#10** etapă cu `planned_end < planned_start` → `work_stages_planned_range`
+- [x] **#12** SSM expirat la `starts_on` → `AUTHORIZATION_EXPIRED: persoana … nu are la 03.08.2026
+  autorizatiile: ssm (expirata la 31.12.2025)` — **spune ce autorizație și când a expirat**
+- [x] **#16** alocare într-o lună închisă → `PERIOD_CLOSED: luna 08/2026 este inchisa`
+- [x] **#17** (jumătatea de bază de date) zero coloane de bani ale pasului vizibile lui
+  `app_field`/`app_subcontractor`/`app_client`, dar codul unității rămâne vizibil terenului
+- [x] **#18** toate cazurile din §13 și §13.1, fără Postgres — **46 de teste noi de domain**
+- [x] (bonus) a doua alocare **activă** pe aceeași componentă × lună → respinsă de indexul unic
+  parțial; RLS aprins + `force` + politici pe toate cele 5 tabele
+- [x] `pnpm typecheck` 12/12 · `pnpm lint` verde · `pnpm test` verde · `pnpm build` verde ·
+  `pnpm scan:secrets` curat
+- [ ] **#13** (coduri consecutive la creare în paralel) — testul e scris, dar **cere Docker**; se
+  validează la primul CI
+- [ ] Cele **34 de teste noi** din `packages/db/tests/work-units.test.ts` — scrise, **nerulate
+  local**. Ar trebui să urce suita de bază de date de la 91 la **125**.
+
+**Observații / decizii luate / abateri de la plan:**
+
+- **`pnpm db:generate` a fost reparat înainte de orice cod** (datoria #5 din predarea lui 02c′).
+  Cauza: `0013`–`0015` aveau `id`/`prevId` copiate din `0012`, deci trei snapshot-uri arătau spre
+  același părinte. Un lanț nou de `id`-uri, 8 linii de diff, și migrarea `0016` a putut fi
+  **generată**, nu scrisă de mână. Merita făcut aici: o migrare de 5 tabele scrisă manual e exact
+  locul unde apare o coloană care nu se potrivește cu schema TypeScript.
+- **Codurile de UL trec prin `numbered_document_type`** (decizia utilizatorului): trei valori noi —
+  `lucrare`, `interventie`, `inspectie`. Refolosesc alocatorul gapless din 02a. **Consecință de
+  formă:** ies `L-000233`, nu `L-233`, pentru că alocatorul face `lpad(…, 6, '0')`. Convenția e
+  schimbabilă cât timp tabelele sunt goale; după primul cod emis, nu. Inventarul de enum-uri din
+  `schema.test.ts` **n-a trebuit atins** — el listează tipuri, nu valori.
+- **`work_units` a căpătat o coloană `name`**, care nu e în Anexa C.5. Vederea unificată (§3.4) cere
+  explicit coloana „denumire"; fără ea lista ar arăta numai coduri.
+- **`guard_closed_period` NU se atașează pe `work_units`**, doar pe `funding_allocations` și
+  `reallocation_documents`. O unitate de lucru n-are lună proprie, iar starea ei se schimbă și după
+  ce luna în care a început s-a închis — o lucrare din august se finalizează în septembrie, și e
+  cazul normal. Verificarea #16 trece deci **prin alocare**: `createWorkUnit` e o singură tranzacție
+  care scrie și finanțarea, iar finanțarea e cea care are lună.
+- **Regula 3 („alocările nu se fac UPDATE") e impusă cu un trigger, nu prin convenție.** Litera
+  verificării #3 spune „niciun `UPDATE` pe rândul vechi", dar supersedarea *este* un update al
+  statusului. Citirea onestă: se pot schimba **doar** `status` și `superseded_by`; suma, componenta,
+  luna și motivul sunt istorie. Comparația se face pe `to_jsonb(row)` fără cele două chei mutabile,
+  nu coloană cu coloană — așa o coloană adăugată la pașii 06–10 intră automat sub regulă.
+- **`app.assert_authorizations_valid` a fost rescrisă** (semnătura neschimbată, deci apelanții din
+  0004 rămân valabili). Mesajul spune acum, pentru fiecare tip: lipsește / a expirat la data X /
+  e emisă abia la X. Fără asta, verificarea #12 („mesaj care spune ce autorizație **și când a
+  expirat**") n-ar fi fost adevărată.
+- **Asignarea nu folosește `app.guard_person_authorizations` din 0004**, deși funcția a fost scrisă
+  exact pentru asta. Ambalajul generic citește data din rândul care se scrie, iar aici data care
+  contează stă pe **părinte**: întrebarea e „avea omul SSM valabil când începe lucrarea", nu „acum".
+  Trigger propriu, cu `coalesce(valid_from, work_units.starts_on, current_date)`.
+- **Se cere `ssm` și numai `ssm`.** Autorizațiile de specialitate (înălțime, ISCIR, electrician)
+  depind de ce se execută, nu de faptul că cineva e asignat — se cer pe operație, în pasul 09, unde
+  există fișa care spune ce se face.
+- **Regexul de bani din `0012` are o gaură reală:** prinde `price|pret|cost|amount|margin|salary`,
+  deci `cost_budget` și `allocated_amount`, dar **nu** `estimated_value`, `material_budget`,
+  `labor_budget`. Numele de coloană nu e un mecanism de securitate, e o euristică. De aceea
+  `app.assert_no_money_leak()` primește o listă explicită de coloane suplimentare, iar `0016` o
+  cheamă cu cele trei. **Pașii următori care adaugă bani trebuie să facă la fel.**
+- **Grant-ul răspunde înaintea trigger-ului**, și e ordinea bună. `delete` pe alocări și
+  `update`/`delete` pe documentele de re-alocare nu sunt acordate nimănui, deci refuzul vine cu
+  `42501`, nu cu mesajul de business. Triggerele de imutabilitate acoperă **cealaltă** cale: funcțiile
+  `security definer`, care rulează ca proprietarul și trec pe lângă orice grant. Testele verifică
+  `42501` acolo unde privilegiul răspunde primul — nu mesajul, care nu se mai vede.
+- **Subcontractantul vede unitățile pe care le execută el**, prin `executor_subcontractor_id`, pe
+  aceleași coloane fără bani ca terenul. **Clientul nu primește nimic** pe UL: pasul nu cere niciun
+  ecran de client, iar un grant nefolosit e un grant uitat.
+- **Terenul are doar `select`** pe cele trei tabele vizibile. Crearea de pe teren (offline) e pasul
+  10; până atunci un `insert` din `app_field` primește `42501`, verificat.
+- **`work_unit_assignments` are o constrângere `exclude`** pe (unitate, persoană, rol, interval): un
+  om nu poate avea de două ori același rol pe intervale suprapuse. Rolul intră în cheie dinadins —
+  același om poate fi simultan inspector și echipă, și e cazul real la o firmă mică.
+- **`describeFundingMove` există ca să nu fie două păreri.** Ecranul trebuie să anunțe mecanica
+  *înainte* de confirmare (§3.4); dacă ar calcula-o singur, ar putea promite o ramură și tranzacția
+  ar executa cealaltă. Un test compară cele două pe toate cele trei stări de lună.
+- **`closing` se tratează ca `closed`** la mutarea finanțării. O lună în curs de închidere are deja
+  raportul în verificare, iar o rescriere în timpul verificării e cel mai prost moment posibil.
+- **`physicalProgress` spune dacă procentul e ponderat sau presupus.** „50% executat" dintr-o
+  numărare de etape și „50%" din ponderi scrise de PM nu sunt aceeași afirmație, deși arată identic.
+- **Capcană de plpgsql, prinsă pe date reale:** în `raise exception`, `%%%` se citește „`%` literal,
+  apoi placeholder" — deci mesajul ar fi ieșit `%110.00`, nu `110.00%`. Semnul de procent se lipește
+  la **argument**, nu la șablon.
+- **Etapele au voie să se suprapună în timp**, și `stageScheduleIsCoherent` nu verifică asta
+  dinadins: pe un șantier zugrăvitul începe într-o cameră în timp ce instalațiile se termină în alta.
+
+**Ce rămâne pentru sesiunea următoare:**
+1. Push → CI. Se validează #13 și cele 34 de teste de bază de date; pragul ar trebui să ajungă la
+   **329**.
+2. **05b** — `packages/services/work-units`, peste domain-ul care e deja gata. Nu rescrie
+   `planFundingMove`: serviciul execută ramura, nu o alege.
+3. **05c** — ecranele, cu agentul de design.
 
 ---
 

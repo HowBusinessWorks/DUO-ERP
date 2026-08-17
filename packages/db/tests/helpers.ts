@@ -95,6 +95,8 @@ export const SQLSTATE = {
   RAISED: 'P0001',
   /** violare de CHECK */
   CHECK_VIOLATION: '23514',
+  /** violare de UNIQUE (constrangere sau index unic partial) */
+  UNIQUE_VIOLATION: '23505',
   /** violare de constrangere EXCLUDE */
   EXCLUSION_VIOLATION: '23P01',
   /** privilegiu insuficient */

@@ -208,6 +208,20 @@ export const numberedDocumentTypeEnum = app.enum('numbered_document_type', [
   'decizie_inventariere',
   'nota_diferente',
   'nota_realocare',
+  /*
+   * Codurile unitatilor de lucru (pasul 05). Trec prin acelasi alocator gapless
+   * ca documentele fiscale, cu serie per firma × tip: `L-000233`, `#-001841`,
+   * `I-009022`.
+   *
+   * Nu sunt documente fiscale, si totusi stau aici dinadins. Alternativa era o
+   * secventa proprie pe `work_units`, adica a doua mecanica de numerotare de
+   * intretinut — iar cea existenta e deja testata pentru exact proprietatea care
+   * conteaza si aici: zero goluri, zero duplicate la creari in paralel
+   * (verificarea #13 a pasului).
+   */
+  'lucrare',
+  'interventie',
+  'inspectie',
 ]);
 
 export const auditOpEnum = app.enum('audit_op', ['insert', 'update', 'delete']);
