@@ -104,6 +104,24 @@ Un `admin` care și-a schimbat telefonul se deblochează din Administrare › fi
 login* → „Resetează verificarea în doi pași”, de către **alt** administrator — pe sine nu se poate.
 Fără ușa asta, un mecanism obligatoriu ar fi o capcană.
 
+### `MFA_ENFORCED=0` — poarta oprită, pe medii de test
+
+Pe un deploy de test se intră de zeci de ori pe zi. Un cod de 6 cifre la fiecare intrare nu face
+testarea mai sigură, o face să nu se mai facă. De aceea `MFA_ENFORCED=0` oprește **poarta**:
+`mfaSatisfied()` întoarce `true`, deci nici middleware-ul, nici `requireMfa()` nu mai opresc pe
+nimeni.
+
+**Ce NU face:** nu atinge drepturile. `requiresMfa()` răspunde în continuare `true` pentru un
+`admin`, iar ecranul de administrare spune în continuare adevărul despre el. Matricea nu se
+schimbă cu un bit.
+
+**De ce nu se blochează pe `NODE_ENV === 'production'`**, care ar fi fost reflexul: pe Vercel
+`NODE_ENV` e `production` pe *toate* deploy-urile, inclusiv preview. Verificarea ar fi fost ori
+inutilă, ori ar fi blocat exact mediul pentru care comutatorul există. Garanția e deci **vizibilă**,
+nu ascunsă: cât timp comutatorul e pornit, shell-ul de birou afișează o bandă roșie pe fiecare
+ecran, la fiecare om. Un mediu în care al doilea factor e oprit nu poate fi confundat cu unul în
+care nu e — și asta se verifică dintr-o privire, nu citind variabile de mediu.
+
 ## Revocarea sesiunii
 
 Drepturile călătoresc în JWT, iar JWT-ul trăiește o oră. La **retragerea accesului la prețuri**,

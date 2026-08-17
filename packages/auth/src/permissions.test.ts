@@ -9,6 +9,7 @@ import {
   PERMISSION_MATRIX,
   grantsCapability,
   MFA_REQUIRED_ROLES,
+  mfaBypassed,
   mfaSatisfied,
   requireCapability,
   requireMfa,
@@ -142,6 +143,34 @@ describe('al doilea factor', () => {
 
     expect(() => requireMfa(session('office', ['admin'], 'aal1'))).toThrow(AppError);
     expect(() => requireMfa(session('office', ['admin'], 'aal2'))).not.toThrow();
+  });
+
+  it('MFA_ENFORCED=0 opreste POARTA, nu drepturile', () => {
+    const before = process.env.MFA_ENFORCED;
+    try {
+      process.env.MFA_ENFORCED = '0';
+
+      expect(mfaBypassed()).toBe(true);
+      // Poarta se deschide...
+      expect(mfaSatisfied(session('office', ['admin'], 'aal1'))).toBe(true);
+      expect(() => requireMfa(session('office', ['admin'], 'aal1'))).not.toThrow();
+      // ...dar rolul CONTINUA sa ceara al doilea factor, si ecranul de
+      // administrare trebuie sa spuna in continuare adevarul despre el.
+      expect(requiresMfa(session('office', ['admin'], 'aal1'))).toBe(true);
+      // Si niciun drept nu se schimba.
+      expect(can(session('office', ['admin'], 'aal1'), 'admin.users')).toBe(true);
+    } finally {
+      if (before === undefined) {
+        delete process.env.MFA_ENFORCED;
+      } else {
+        process.env.MFA_ENFORCED = before;
+      }
+    }
+  });
+
+  it('fara variabila, poarta e la locul ei', () => {
+    expect(mfaBypassed()).toBe(false);
+    expect(mfaSatisfied(session('office', ['admin'], 'aal1'))).toBe(false);
   });
 
   it('nu scade drepturile din matrice cand lipseste al doilea factor', () => {

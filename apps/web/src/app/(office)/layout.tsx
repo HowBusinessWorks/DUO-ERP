@@ -1,3 +1,4 @@
+import { mfaBypassed } from '@damina/auth';
 import { countWorkQueue } from '@damina/services';
 import { ToastProvider } from '@damina/ui';
 import type { ReactNode } from 'react';
@@ -61,6 +62,29 @@ export default async function OfficeLayout({ children }: { children: ReactNode }
 
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar ctx={ctx} usesPeriod={true} />
+
+          {/*
+           * Banda de mediu nesigur.
+           *
+           * Cand `MFA_ENFORCED=0` opreste poarta de al doilea factor, faptul se
+           * VEDE — pe fiecare ecran, la fiecare om. Garantia nu sta intr-o
+           * variabila de mediu pe care o citeste cineva daca se gandeste s-o
+           * caute; sta aici, unde nu se poate uita.
+           *
+           * Nu e `Banner`: aia e banda de CONTEXT, care se citeste si se ignora.
+           * Asta trebuie sa deranjeze cat timp e pornita.
+           */}
+          {mfaBypassed() ? (
+            <p
+              role="status"
+              className="border-b border-danger-300 bg-danger-100 px-4 py-1.5 text-center text-sm font-medium text-danger-900"
+            >
+              Verificarea în doi pași e <strong>oprită</strong> în acest mediu
+              (<code className="font-mono text-xs">MFA_ENFORCED=0</code>). Rolurile de admin și
+              financiar intră fără al doilea factor — nu folosi mediul ăsta cu date reale.
+            </p>
+          ) : null}
+
           <div id="continut" className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto">
             {children}
           </div>

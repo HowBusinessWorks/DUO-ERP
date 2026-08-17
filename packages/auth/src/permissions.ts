@@ -251,8 +251,33 @@ export function rolesRequireMfa(persona: Persona, officeRoles: readonly OfficeRo
   return persona === 'office' && officeRoles.some((role) => MFA_REQUIRED_ROLES.includes(role));
 }
 
+/**
+ * Poarta de al doilea factor e OPRITA in mediul asta?
+ *
+ * `MFA_ENFORCED=0` opreste poarta — nu drepturile. Un `admin` ramane admin, doar
+ * nu mai e trimis la `/doi-pasi`. Exista pentru un motiv practic: pe un deploy de
+ * test se intra de zeci de ori pe zi, si un cod de 6 cifre la fiecare intrare face
+ * testarea sa nu se mai faca.
+ *
+ * **De ce nu se blocheaza pe `NODE_ENV === 'production'`**, cum ar fi fost reflexul:
+ * pe Vercel `NODE_ENV` e `production` pe TOATE deploy-urile, inclusiv preview. O
+ * astfel de verificare ar fi fost ori inutila, ori ar fi blocat exact mediul de
+ * test pentru care comutatorul exista. Deci garantia nu e ascunsa in cod, e
+ * VIZIBILA pe ecran: cand comutatorul e pornit, shell-ul arata o banda permanenta.
+ * Un mediu in care al doilea factor e oprit nu poate fi confundat cu unul in care
+ * nu e — si asta se verifica dintr-o privire, nu citind variabile de mediu.
+ *
+ * Predicatul e citit si din middleware (Edge), deci nu atinge nimic din Node.
+ */
+export function mfaBypassed(): boolean {
+  return process.env.MFA_ENFORCED === '0';
+}
+
 /** A facut ce i se cere? Cine nu e obligat, trece intotdeauna. */
 export function mfaSatisfied(session: Session): boolean {
+  if (mfaBypassed()) {
+    return true;
+  }
   return !requiresMfa(session) || session.aal === 'aal2';
 }
 

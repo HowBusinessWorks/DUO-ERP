@@ -46,6 +46,7 @@ export {
   CAPABILITIES,
   grantsCapability,
   MFA_REQUIRED_ROLES,
+  mfaBypassed,
   mfaSatisfied,
   PERMISSION_MATRIX,
   requireCapability,
