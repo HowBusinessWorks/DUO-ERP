@@ -57,6 +57,25 @@ export type {
 } from './contracts';
 
 export {
+  companyAccessInputSchema,
+  officeRolesInputSchema,
+  OFFICE_ROLE_LABELS,
+  PERSONA_LABELS,
+  personCategorySchema,
+  personInputSchema,
+  PERSON_CATEGORIES,
+  PERSON_CATEGORY_LABELS,
+  provisionAccountInputSchema,
+} from './admin';
+export type {
+  CompanyAccessInput,
+  OfficeRolesInput,
+  PersonCategory,
+  PersonInput,
+  ProvisionAccountInput,
+} from './admin';
+
+export {
   checklistInputSchema,
   contractObjectiveInputSchema,
   inspectionProfileInputSchema,

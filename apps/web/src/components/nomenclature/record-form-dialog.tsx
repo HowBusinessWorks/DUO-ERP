@@ -4,6 +4,7 @@ import {
   clientInputSchema,
   contractInputSchema,
   objectiveInputSchema,
+  personInputSchema,
   productInputSchema,
   qualificationInputSchema,
   rateCardInputSchema,
@@ -49,6 +50,7 @@ const SCHEMAS: Readonly<Record<string, z.ZodType>> = {
   tarife: rateCardInputSchema,
   contracte: contractInputSchema,
   obiective: objectiveInputSchema,
+  administrare: personInputSchema,
 };
 
 export interface RecordFormDialogProps {

@@ -23,6 +23,7 @@ import { Money as MoneyValue } from '@damina/shared';
 import { Badge, CellMeta, CellTitle, EmptyState, Money } from '@damina/ui';
 import { Clock } from 'lucide-react';
 import { AuditTrail } from '../components/detail/audit-trail';
+import { administrare } from './administrare';
 import { contracte } from './contracts';
 import { obiective } from './objectives';
 import { DefinitionList, Empty } from '../components/detail/definition-list';
@@ -1066,6 +1067,7 @@ const tarife = defineEntity<RateCardRow>({
   // Modulul intreg poarta salarii. Cine nu are drept financiar nu-l vede in
   // meniu si nu ajunge la el pe URL.
   canRead: canSeeFinancials,
+  readDeniedReason: 'Tarifele conțin salarii și cost orar. Rolul tău nu deschide ecranul acesta.',
   canWrite: canSeeFinancials,
 
   list: {
@@ -1271,6 +1273,10 @@ export const entityRegistry: Readonly<Record<string, EntityDefinition>> = {
   // fisiere de pagina. Asta era testul pe care si-l pusese pasul 03.
   contracte,
   obiective,
+  // Administrarea s-a adaugat in 02d pe acelasi drum: o intrare aici, un fisier
+  // de declaratii, zero fisiere de pagina. Singurul lucru scris in afara
+  // registry-ului e `/api/admin/provision`, si numai pentru cheia de service.
+  administrare,
   produse,
   furnizori,
   clienti,

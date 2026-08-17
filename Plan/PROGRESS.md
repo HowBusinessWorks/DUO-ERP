@@ -14,7 +14,7 @@
 | Pas | Status | Ultima actualizare |
 |---|---|---|
 | 01 — Fundația | 🟩 gata (15/15, CI verde) | 2026-08-15 |
-| 02 — Identitate, acces, RLS | 🟨 în lucru (02a + 02b + 02c gata; rămân 02c′ și 02d) | 2026-08-17 |
+| 02 — Identitate, acces, RLS | 🟨 în lucru (02a + 02b + 02c + 02d gata; rămâne 02c′) | 2026-08-17 |
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat: #8, #10, #13, #14) | 2026-08-15 |
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | ⬜ neînceput | — |
@@ -43,7 +43,7 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Cheia de service a trecut printr-o fereastră de chat pe 17 august 2026 | **De rotit** din Project Settings → API. |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **214** | 96 unitare (`shared` 39 · `domain` 29 · `auth` 19 · `storage` 6 · `i18n` 3) + 91 `packages/db` + 27 `packages/services`. Cifrele sunt din run-ul CI `32004465200`, pe `19ee1d4`. Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **214**, iar după 02d **224** | 96 unitare (`shared` 39 · `domain` 29 · `auth` 19 · `storage` 6 · `i18n` 3) + 91 `packages/db` + 27 `packages/services`. Cifrele de bază sunt din run-ul CI `32004465200`, pe `19ee1d4`. 02d adaugă 10 teste în `packages/services/tests/admin.test.ts`, **nerulate local** (mașina n-are Docker). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | Docker nu există pe mașina de dezvoltare | Testele de bază de date rulează **doar în CI**. Verificările pe date reale se fac pe Supabase dev, în blocuri anulate la final. |
 
 ---
@@ -175,7 +175,7 @@ utilizatorului, 15 august 2026). Motivul: dacă schema de organizație e greșit
 | **02b** | RLS + izolarea prețului (`0011`–`0012`) | 1–4 | 🟩 gata |
 | **02c** | Supabase Auth, JWT hook, `packages/auth`, rutare pe personas | 12–15 | 🟩 gata |
 | **02c′** | MFA TOTP, rate limit pe login, revocare de sesiune | 16, 18 | ⬜ |
-| **02d** | Ecran de administrare | 17, 19 | ⬜ |
+| **02d** | Ecran de administrare | 17, 19 | 🟩 gata |
 
 > **02d e mai mic decât scria inițial.** Sub-etapa avea trei livrabile — ecran, seed determinist,
 > `docs/security.md` — iar **ultimele două s-au livrat deja în 02c**: `pnpm db:seed:users` creează
@@ -488,6 +488,116 @@ Matricea completă, cu cele patru conturi × șase rute:
 - `SEED_USER_PASSWORD` e fixată în `.env.local`, deci rulările următoare ale seed-ului nu mai
   schimbă parola conturilor de test.
 - **Cheia de service a trecut prin chat** la configurare — de rotit din Project Settings → API.
+
+### 2026-08-17 — [status: gata] — 02d, ecranul de administrare
+
+**Decizia luată înainte de prima linie de cod:** apelul de Admin API stă într-o **rută
+`/api/admin/provision`**, nu într-un server action. Regula 6 din §4 nu e despre unde se execută
+codul — un server action e tot cod de server — ci despre unde se poate **căuta**: cu cheia de
+service într-un singur fișier, un `grep` peste `apps/web` dă un răspuns complet la „cine o
+atinge”. Cu ea într-un server action, următorul care are nevoie de Admin API o importă în al
+doilea, apoi în al treilea.
+
+**Ce s-a executat:**
+
+- **`packages/contracts/src/admin.ts`** — `personInputSchema` (cu cele două `refine` care repetă în
+  română `check`-urile `persons_subcontractor_consistent` / `_client_consistent`),
+  `officeRolesInputSchema`, `companyAccessInputSchema`, `provisionAccountInputSchema`, plus
+  etichetele de persona / categorie / rol.
+- **`packages/services/src/admin.ts`** — `listPersons` / `getPerson` / `createPerson` /
+  `updatePerson`, `setOfficeRoles` și `setCompanyAccess` (ambele ca **set complet**, nu diferență),
+  `linkAuthUser` și `listPersonOptions`. Rolurile și firmele se agregă în interogare, cu coloana
+  exterioară scrisă **calificat** (`app.persons.id`) — capcana de subinterogare corelată din 04a.
+- **`packages/services/src/audit.ts`** — `listRecentAuditEntries`, jurnalul global.
+- **`apps/web/src/app/api/admin/provision/route.ts`** — singurul fișier din `apps/web` care atinge
+  `SUPABASE_SERVICE_ROLE_KEY`. Parola se generează acolo, se întoarce o singură dată și nu se scrie
+  nicăieri.
+- **`apps/web/src/registry/administrare.tsx`** — o intrare în registry, **zero fișiere de pagină**:
+  lista de utilizatori, vederile *Matricea de drepturi* · *Audit trail* · trei plasate „din faza 1”,
+  și cele cinci tab-uri ale persoanei (Prezentare · Roluri · Acces pe firme · Cont · Istoric).
+- **`components/admin/`** — `permission-matrix.tsx` (randată din `PERMISSION_MATRIX`, cu coloanele
+  rolului evidențiate și cu drepturile **refuzate** afișate explicit, §3.10), `checkbox-set.tsx`,
+  `provision-account.tsx`, `audit-feed.tsx`.
+- **Câmpul PM din formularul de contract** e populat (`listPersonOptions`) — ultimul lucru care
+  ținea 04b legat de pasul 02.
+- **`NAVIGATION`: administrarea trece pe faza 0.** Cele trei sub-secțiuni care nu există încă
+  (firme, praguri, integrări) **nu s-au șters**: sunt vederi care randează „din faza 1”. Fără ele,
+  intrările de meniu ar fi căzut tăcut pe tabelul de utilizatori — un link care duce altundeva
+  decât spune e mai rău decât unul care spune că nu e gata.
+
+**Verificări din pas care trec / nu trec:**
+- [x] **#17** parcurs complet pe conturi reale: fără sesiune → **401**; ca teren → **403** cu mesaj;
+  ca admin prima oară → **200 + parola**; a doua oară → **409** „are deja cont”. **Refresh-ul
+  paginii nu mai conține parola** (căutată literal în HTML-ul randat), iar lista arată badge-ul
+  „Parolă temporară”. Persoana de test și contul ei GoTrue au fost șterse la final.
+- [x] **#19** cu rolurile lui Andrei puse temporar pe `financiar`: `/administrare`, `?view=audit`,
+  fișa persoanei și tab-ul Istoric răspund toate cu refuz, cu motivul modulului; `/administrare`
+  **lipsește din sidebar**. Rolurile s-au restaurat prin `setOfficeRoles`, adică prin drumul pe care
+  îl folosește chiar ecranul.
+- [x] `pnpm typecheck` 12/12 · `pnpm lint` verde · `pnpm build` verde (**16 rute** — a apărut doar
+  `/api/admin/provision`; entitatea n-a adăugat niciuna) · **96 de teste unitare**, neschimbate ·
+  `pnpm scan:secrets` curat pe bundle-ul real, cu cheia de service prezentă în mediul build-ului.
+- [x] Gărzile din servicii, verificate pe Supabase real: un om de **teren** nu poate primi roluri de
+  birou, un **client** nu poate primi acces pe firme din grup.
+- [ ] Cele **10 teste noi** din `packages/services/tests/admin.test.ts` — scrise, **nerulate local**
+  (mașina n-are Docker). Se validează la primul CI; testele de servicii ar trebui să urce 27 → 37.
+
+**Trei buguri găsite la parcurs, toate reparate:**
+
+1. **`occurred_at` din jurnal venea ca ȘIR, nu ca `Date`.** Interogările pe `audit.entries` trec
+   prin `tx.execute` — SQL scris de mână, pentru că schema `audit` nu e sub drizzle — iar pe drumul
+   ăla valoarea nu mai trece prin parserul de coloană. Tipul declarat în `execute<...>()` spunea
+   `Date` și nimeni nu-l contrazicea: TypeScript are încredere în ce scrii acolo. Consecința:
+   `Intl.format` pe un șir dă `RangeError: Invalid time value`, iar `.toISOString()` nu există pe
+   el. **Bugul e în cod livrat la pasul 02a** și lovea și `AuditTrail`, tab-ul de Istoric al
+   oricărei entități — nu se văzuse pentru că se randase doar pe rânduri fără intrări de jurnal.
+   Conversia se face acum o dată, în serviciu.
+2. **O închidere pasată unei componente de client.** `save={(values) => actiune({ personId, ... })}`
+   scris într-o componentă de server pică la randare cu „Functions cannot be passed directly to
+   Client Components”: o închidere nu se serializează, un server action da, pentru că e o referință.
+   `CheckboxSet` primește acum **referința** acțiunii plus `personId` și `payloadKey`, și compune
+   corpul cererii de partea clientului.
+3. **Textul de refuz al unui modul mințea.** Cât timp exista un singur modul cu `canRead`
+   (tarifele), motivul stătea scris în pagina de listă. Al doilea modul l-a făcut fals: unui
+   `financiar` i se spunea că „tarifele conțin salarii și cost orar” când încerca să deschidă
+   administrarea. Motivul e acum al entității (`readDeniedReason`), iar ambele pagini generice îl
+   citesc de acolo.
+
+**Observații / decizii luate:**
+
+- **Persoana și contul sunt lucruri diferite, și ecranul o arată.** Formularul nu atinge parola și
+  nu cunoaște `auth_user_id`; tab-ul „Cont de login” e singurul care vorbește despre GoTrue. Un om
+  intră în nomenclator înainte să existe motiv să se logheze.
+- **Rolurile și firmele se salvează ca SET, nu ca diferență.** Un API de tip „adaugă rolul X” ar fi
+  cerut ecranului să calculeze singur ce trebuie șters — un al doilea loc care poate greși, și o
+  cursă când doi administratori au ecranul deschis simultan.
+- **Butonul de salvare e inactiv cât timp nimic nu s-a schimbat**, și spune de ce. Fără asta, un
+  ecran cu șapte căsuțe invită la „salvez ca să fiu sigur”, iar fiecare apăsare lasă un rând de
+  audit care nu spune nimic.
+- **Motivul scris e fix la roluri și acces, nu cerut de la om.** Operația e „am pus ce vezi”, iar
+  cine/când/ce-era-înainte sunt deja în jurnal. Un câmp de motiv la fiecare bifă ar fi produs o mie
+  de rânduri cu „actualizare”.
+- **Un cont GoTrue orfan se leagă, dar NU i se schimbă parola.** Altfel ecranul ăsta ar fi devenit o
+  unealtă de preluat conturi existente. Răspunsul spune explicit că parola a rămas cea veche și
+  trimite la „Am uitat parola”.
+- **Dialogul cu parola are `isDirty` permanent**, deci Escape și butonul de închidere cer
+  confirmare. Nu e un artificiu: pe ecran chiar sunt date care se pierd la închidere.
+- **Ecranul de drepturi arată și ce NU deschide un rol**, plus personele care pot avea dreptul —
+  `financials.read` are `personas: ['office']`, deci nu ajunge niciodată la teren, indiferent ce rol
+  i-ai da. Fără coloana aia, tabelul ar fi promis ceva ce baza refuză.
+- **`/administrare` lipsește din sidebar** pentru cine n-are dreptul: filtrarea din layout se face
+  pe `canRead` din registry, deci a funcționat pentru modulul nou fără nicio linie în plus.
+- Parcursul s-a făcut din nou fără browser, cu cookie-ul `sb-<ref>-auth-token` construit din
+  răspunsul lui `/auth/v1/token`, ca la 02c. **Porturile 3000 ȘI 3100 erau ocupate** de servere
+  vechi; parcursul a rulat pe 3211 și 3212.
+
+**Ce rămâne pentru sesiunea următoare:**
+1. Push → CI. Testele de servicii ar trebui să urce 27 → **37**, totalul 214 → **224**. E singura
+   verificare a lui 02d nerulată local.
+2. **02c′** — MFA TOTP pentru `admin` și `financiar`, rate limit pe login, revocarea sesiunii prin
+   Admin API la retragerea accesului la prețuri (#16, #18). Cu 02d gata, pasul 02 se închide acolo.
+3. Playwright — încă neinstalat; blochează #13 din pasul 03 și clicul pe hartă din 04b.
+4. Decizia despre **#8** (Realtime vs. `authenticated`), rămasă deschisă din pasul 03.
 
 ---
 

@@ -4,15 +4,18 @@ import {
   clientInputSchema,
   contractInputSchema,
   objectiveInputSchema,
+  personInputSchema,
   productInputSchema,
   qualificationInputSchema,
   rateCardInputSchema,
   subcontractorInputSchema,
   supplierInputSchema,
 } from '@damina/contracts';
-import { canEditNomenclature, canSeeFinancials } from '@damina/auth';
+import { can, canEditNomenclature, canSeeFinancials } from '@damina/auth';
 import {
   createClient,
+  createPerson,
+  updatePerson,
   createContract,
   createObjective,
   createProduct,
@@ -103,6 +106,16 @@ const WRITERS: Readonly<Record<string, Writer>> = {
     update: updateContract as NonNullable<Writer['update']>,
     canWrite: canSeeFinancials,
     updateReason: 'modificare contract',
+  },
+  // Persoanele nu sunt nomenclator: ele decid cine intra in aplicatie. Dreptul e
+  // `admin.users`, nu cel de nomenclator — un devizist poate adauga un produs,
+  // dar nu si un om caruia sa i se dea apoi cont.
+  administrare: {
+    schema: personInputSchema,
+    create: createPerson as Writer['create'],
+    update: updatePerson as NonNullable<Writer['update']>,
+    canWrite: (session) => can(session, 'admin.users'),
+    updateReason: 'modificare persoana',
   },
   // Obiectivele NU au `company_id`: sunt nomenclator comun celor 5 firme.
   obiective: {

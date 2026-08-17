@@ -273,12 +273,18 @@ export const NAVIGATION: readonly NavItem[] = [
     label: 'Administrare',
     icon: 'settings',
     group: 'configuration',
-    phase: 1,
+    // Trecut pe 0 in 02d. Cele trei sub-sectiuni care inca nu exista (firme,
+    // praguri, integrari) NU s-au sters: sunt vederi ale listei care randeaza
+    // „din faza 1”. Fara ele, intrarile de meniu ar fi cazut tacut pe tabelul de
+    // utilizatori — un link care duce altundeva decat spune e mai rau decat unul
+    // care spune ca inca nu e gata.
+    phase: 0,
     children: [
-      { slug: 'firme', label: 'Firme și serii de documente' },
-      { slug: 'persoane', label: 'Utilizatori și roluri' },
-      { slug: 'praguri', label: 'Praguri și reguli' },
+      { slug: '', label: 'Utilizatori și roluri' },
+      { slug: 'drepturi', label: 'Matricea de drepturi' },
       { slug: 'audit', label: 'Audit trail' },
+      { slug: 'firme', label: 'Firme și serii de documente' },
+      { slug: 'praguri', label: 'Praguri și reguli' },
       { slug: 'integrari', label: 'Integrări' },
     ],
   },

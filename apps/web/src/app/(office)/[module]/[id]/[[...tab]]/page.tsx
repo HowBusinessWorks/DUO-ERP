@@ -42,7 +42,7 @@ export default async function EntityDetailPage({
   const ctx = await getAppContext();
 
   if (entity.canRead !== undefined && !entity.canRead(ctx.session)) {
-    return <Denied />;
+    return <Denied reason={entity.readDeniedReason} />;
   }
 
   const entityCtx: EntityContext = { session: ctx.session, actor: ctx.actor, app: ctx };
@@ -105,12 +105,15 @@ export default async function EntityDetailPage({
   );
 }
 
-function Denied() {
+function Denied({ reason }: { reason?: string }) {
   return (
     <div className="p-5">
       <EmptyState
         title="Nu ai acces la această secțiune"
-        body="Secțiunea conține informații financiare. Rolul tău nu o deschide — cere-i unui administrator dreptul dacă îți trebuie."
+        body={
+          reason ??
+          'Rolul tău nu o deschide — cere-i unui administrator dreptul dacă îți trebuie.'
+        }
       />
     </div>
   );

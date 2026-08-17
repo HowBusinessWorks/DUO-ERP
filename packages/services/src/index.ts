@@ -136,8 +136,20 @@ export type {
   ObjectiveRow,
 } from './objectives';
 
-export { listAuditEntries } from './audit';
-export type { AuditEntry } from './audit';
+export {
+  createPerson,
+  getPerson,
+  linkAuthUser,
+  listPersonOptions,
+  listPersons,
+  setCompanyAccess,
+  setOfficeRoles,
+  updatePerson,
+} from './admin';
+export type { ListPersonsOptions, PersonOption, PersonRow } from './admin';
+
+export { listAuditEntries, listRecentAuditEntries } from './audit';
+export type { AuditEntry, AuditFeedEntry } from './audit';
 
 export { countNomenclature, searchEverything } from './search';
 export type { SearchGroup, SearchHit } from './search';

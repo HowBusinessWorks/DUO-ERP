@@ -13,6 +13,7 @@ import {
   getInspectionCoverage,
   listCeilings,
   listClients,
+  listPersonOptions,
   listComponents,
   listContractObjectives,
   listContracts,
@@ -1243,13 +1244,19 @@ export const contracte = defineEntity<ContractRow>({
     createTitle: 'Contract nou',
     editTitle: 'Modifică contractul',
     loadLookups: async (ctx: EntityContext) => {
-      const clients = await listClients(ctx.actor, { limit: 500 });
+      const [clients, persons] = await Promise.all([
+        listClients(ctx.actor, { limit: 500 }),
+        // Doar oamenii de birou activi: un sef de santier nu poate fi PM. Vezi
+        // `listPersonOptions` pentru de ce lista nu-i cuprinde pe cei plecati.
+        listPersonOptions(ctx.actor),
+      ]);
       return {
         clients: clients.map((client) => ({ value: client.id, label: client.name })),
         companies: ctx.app.companies.map((company) => ({
           value: company.id,
           label: company.name,
         })),
+        persons: persons.map((person) => ({ value: person.id, label: person.fullName })),
       };
     },
     fields: (lookups) => [
@@ -1347,8 +1354,8 @@ export const contracte = defineEntity<ContractRow>({
         name: 'ownerPersonId',
         label: 'PM proprietar de P&L',
         control: 'select',
-        options: [],
-        hint: 'Lista de persoane vine odată cu ecranul de administrare (pasul 02d).',
+        options: [{ value: '', label: '— fără —' }, ...(lookups.persons ?? [])],
+        hint: 'Cine răspunde de marja contractului. Doar oameni de birou, activi.',
       },
     ],
     blank: {

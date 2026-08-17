@@ -44,8 +44,11 @@ export default async function ModuleListPage({
   if (entity?.canRead !== undefined && !entity.canRead(ctx.session)) {
     return (
       <Forbidden
-        title="Nu ai acces la acest nomenclator"
-        body="Tarifele conțin salarii și cost orar. Rolul tău nu deschide ecranul acesta."
+        title={`Nu ai acces la „${entity.plural}”`}
+        body={
+          entity.readDeniedReason ??
+          'Rolul tău nu deschide ecranul acesta. Cere-i unui administrator dreptul dacă îți trebuie.'
+        }
       />
     );
   }

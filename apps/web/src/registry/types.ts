@@ -259,6 +259,15 @@ export interface EntityDefinition<Row = unknown, Entity = Row> {
    * invete nimeni ca exista un ecran la care nu ajunge.
    */
   canRead?(session: Session): boolean;
+  /**
+   * De ce nu ai voie, in cuvintele modulului.
+   *
+   * Cat timp exista un singur modul cu `canRead` (tarifele), textul de refuz a
+   * stat scris in pagina. Al doilea modul (administrarea) l-a facut sa minta:
+   * unui financiar i se spunea ca „tarifele contin salarii”. Motivul apartine
+   * modulului care il stie.
+   */
+  readonly readDeniedReason?: string;
   /** Cine poate crea/edita. Cand lipseste, entitatea e doar de citit. */
   canWrite?(session: Session): boolean;
   readonly list?: EntityListConfig<Row>;
