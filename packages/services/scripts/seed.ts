@@ -8,6 +8,7 @@ import {
 } from '../src/contracts';
 import { addProfileItem, createInspectionProfile, linkObjective } from '../src/objectives';
 import { ensureOpenPeriods } from '../src/periods';
+import { createStage, createWorkUnit } from '../src/work-units';
 
 /**
  * Seed-ul DETERMINIST al fazei 0 (pasul 04, §7).
@@ -41,12 +42,32 @@ const IDS = {
   clientApaNova: id(2, 1),
   clientPrimarie: id(2, 2),
   pm: id(3, 1),
+  /**
+   * Marius Dobre, seful de santier. Persoana e creata AICI, iar contul lui de
+   * login in `seed-users.ts` — care o gaseste existenta si doar o leaga.
+   *
+   * Emailul se repeta in ambele fisiere dinadins, ca la PM: `seed-users` insereaza
+   * cu `on conflict do nothing`, deci daca persoana ar aparea aici fara email, ar
+   * ramane fara el pentru totdeauna.
+   */
+  fieldLead: id(3, 2),
   contractMaintenance: id(4, 1),
   contractIndividual: id(4, 2),
   checklistStation: id(5, 1),
   checklistBasin: id(5, 2),
   objective: (n: number) => id(7, n),
+  workUnitLucrare: id(8, 1),
+  workUnitInterventie: id(8, 2),
+  workUnitInspectie: id(8, 3),
 };
+
+/** Seriile de numerotare, per firma. Codurile UL trec prin acelasi alocator. */
+const SERIES = {
+  lucrare: 'L',
+  interventie: 'IV',
+  inspectie: 'I',
+  nota_realocare: 'NRA',
+} as const;
 
 /** Profilele isi iau id-ul din baza, deci numele le e cheia — si aici, si in `wipe`. */
 const PROFILE_QUARTERLY = 'Trimestrial — stații';
@@ -72,7 +93,45 @@ const actor = (reason?: string): Actor => ({
   ...(reason === undefined ? {} : { reason }),
 });
 
+/**
+ * `--force` nu mai poate sterge tot, de la pasul 05a incoace, si asta e o
+ * consecinta a unei reguli, nu un bug.
+ *
+ * Alocarile de finantare NU se sterg — trigger-ul `funding_allocations_immutable`
+ * refuza `delete` pentru oricine, pentru ca o alocare stearsa ia cu ea explicatia
+ * unei cifre deja raportate. Iar cum alocarile arata spre componentele
+ * contractului, nici contractul nu se mai poate sterge.
+ *
+ * Deci: cand exista unitati de lucru de seed, singura reconstruire de la zero e
+ * `pnpm db:reset`. Mesajul o spune, in loc sa lase omul cu un `23503` in fata.
+ */
+async function assertWipeable(): Promise<void> {
+  const seeded = await withActor(actor(), async (tx) =>
+    tx
+      .select({ id: schema.workUnits.id })
+      .from(schema.workUnits)
+      .where(
+        inArray(schema.workUnits.id, [
+          IDS.workUnitLucrare,
+          IDS.workUnitInterventie,
+          IDS.workUnitInspectie,
+        ]),
+      )
+      .limit(1),
+  );
+
+  if (seeded.length > 0) {
+    throw new Error(
+      'Exista unitati de lucru de seed, iar alocarile lor de finantare nu se pot sterge ' +
+        '(regula pasului 05: o alocare stearsa ia cu ea explicatia unei cifre raportate). ' +
+        'Ca sa reconstruiesti de la zero, ruleaza `pnpm db:reset`.',
+    );
+  }
+}
+
 async function wipe(): Promise<void> {
+  await assertWipeable();
+
   // Ordinea conteaza doar pentru ce n-are `on delete cascade`.
   await withActor(actor('stergere date de seed'), async (tx) => {
     // Cautate dupa cheia naturala (cod + firma), nu dupa id: rulari mai vechi
@@ -472,7 +531,247 @@ async function main(): Promise<void> {
     });
   }
 
-  console.log('Seed complet: 2 firme, 2 contracte, 20 obiective, plafoane pe 3 luni.');
+  // ── Unitatile de lucru (pasul 05) ──────────────────────────────────────────
+  await seedWorkUnits({
+    objectiveIds,
+    delta: components.delta.id,
+    maintenance: components.maintenance.id,
+    contractId: maintenance.id,
+  });
+
+  console.log(
+    'Seed complet: 2 firme, 2 contracte, 20 obiective, plafoane pe 3 luni, 3 unitati de lucru.',
+  );
+}
+
+interface WorkUnitGround {
+  readonly objectiveIds: readonly string[];
+  readonly contractId: string;
+  readonly delta: string;
+  readonly maintenance: string;
+}
+
+/**
+ * O lucrare finantata din Delta pe TREI luni, o interventie si o inspectie (§7).
+ *
+ * Cifrele nu sunt la intamplare: alocarile pe Delta sunt exact veniturile alocate
+ * pe cele trei luni (7.600 · 15.200 · 3.100), deci suma unitatilor finantate din
+ * componenta da exact cifra de pe banda ei — verificarea #14 a pasului, adevarata
+ * prin constructie, nu prin coincidenta.
+ *
+ * Nu se sterge si nu se rescrie la reluare: `assertWipeable` opreste `--force`
+ * inainte, iar aici se verifica existenta si se iese. Codurile ies din serie o
+ * singura data, deci nu se schimba de la o rulare la alta.
+ */
+async function seedWorkUnits(base: WorkUnitGround): Promise<void> {
+  const already = await withActor(actor(), async (tx) =>
+    tx
+      .select({ id: schema.workUnits.id })
+      .from(schema.workUnits)
+      .where(eq(schema.workUnits.id, IDS.workUnitLucrare))
+      .limit(1),
+  );
+  if (already.length > 0) {
+    console.log('Unitatile de lucru de seed exista deja.');
+    return;
+  }
+
+  // Seful de santier, cu SSM valabil: fara autorizatie, trigger-ul din 05a
+  // refuza asignarea — si asa trebuie sa fie.
+  await withActor(actor('seed'), async (tx) => {
+    await tx
+      .insert(schema.persons)
+      .values({
+        id: IDS.fieldLead,
+        persona: 'field',
+        category: 'sef_santier',
+        fullName: 'Marius Dobre',
+        email: 'marius.sef@damina.test',
+      })
+      .onConflictDoNothing();
+    await tx
+      .insert(schema.personCompanyAccess)
+      .values({ personId: IDS.fieldLead, companyId: IDS.companyA })
+      .onConflictDoNothing();
+    await tx
+      .insert(schema.personAuthorizations)
+      .values({
+        personId: IDS.fieldLead,
+        kind: 'ssm',
+        issuedAt: '2026-01-01',
+        expiresAt: '2027-12-31',
+      })
+      .onConflictDoNothing();
+
+    // Seriile, la ambele firme: o serie lipsa da „NOT_FOUND: seria … nu e
+    // definita" la prima creare din ecran, si nimeni nu ghiceste de ce.
+    await tx
+      .insert(schema.documentSeries)
+      .values(
+        [IDS.companyA, IDS.companyB].flatMap((companyId) =>
+          (
+            [
+              ['lucrare', SERIES.lucrare],
+              ['interventie', SERIES.interventie],
+              ['inspectie', SERIES.inspectie],
+              ['nota_realocare', SERIES.nota_realocare],
+            ] as const
+          ).map(([documentType, series]) => ({
+            companyId,
+            documentType,
+            series,
+            nextNumber: 1,
+          })),
+        ),
+      )
+      .onConflictDoNothing();
+  });
+
+  const periods = await withActor(actor(), async (tx) =>
+    tx.select().from(schema.periods).where(eq(schema.periods.companyId, IDS.companyA)),
+  );
+  const periodOf = (year: number, month: number): string | undefined =>
+    periods.find((row) => row.year === year && row.month === month)?.id;
+
+  const march = periodOf(2026, 3);
+  const april = periodOf(2026, 4);
+  const may = periodOf(2026, 5);
+  if (march === undefined || april === undefined || may === undefined) {
+    console.log('Lunile 03-05/2026 lipsesc; unitatile de lucru se sar.');
+    return;
+  }
+
+  const objective = (index: number): string => base.objectiveIds[index] ?? IDS.objective(1);
+
+  // ── Lucrarea, pe trei luni de Delta ────────────────────────────────────────
+  const lucrare = await createWorkUnit(
+    actor('seed'),
+    {
+      workUnit: {
+        companyId: IDS.companyA,
+        type: 'lucrare',
+        name: 'Reabilitare stație de pompare SP-1',
+        objectiveId: objective(0),
+        contractObjectiveId: '',
+        responsiblePersonId: IDS.pm,
+        executorType: 'echipa_proprie',
+        executorSubcontractorId: '',
+        startsOn: '2026-03-02',
+        endsOn: '',
+        estimatedValue: '25900.00',
+        costBudget: '18500.00',
+      },
+      allocations: [
+        { periodId: march, amount: '7600.00' },
+        { periodId: april, amount: '15200.00' },
+        { periodId: may, amount: '3100.00' },
+      ].map(({ periodId, amount }) => ({
+        contractId: base.contractId,
+        componentId: base.delta,
+        periodId,
+        allocatedAmount: amount,
+        allocatedPct: '',
+        reason: 'lucrare mare, tăiată pe trei luni de Delta',
+      })),
+      assignments: [
+        { personId: IDS.fieldLead, role: 'sef_santier', validFrom: '2026-03-02', validTo: '' },
+      ],
+      series: SERIES.lucrare,
+    },
+    IDS.workUnitLucrare,
+  );
+
+  // Etape: prima incheiata, ca Prezentarea sa aiba ce desena in bara de progres.
+  const stages = [
+    { name: 'Demontare echipament vechi', start: '2026-03-02', end: '2026-03-20', pct: '25' },
+    { name: 'Montaj pompe noi', start: '2026-03-23', end: '2026-04-24', pct: '50' },
+    { name: 'Probe și punere în funcțiune', start: '2026-04-27', end: '2026-05-15', pct: '25' },
+  ];
+  const stageIds: string[] = [];
+  for (const stage of stages) {
+    const created = await createStage(actor('seed'), {
+      workUnitId: lucrare.id,
+      name: stage.name,
+      plannedStart: stage.start,
+      plannedEnd: stage.end,
+      materialBudget: '',
+      laborBudget: '',
+      pctOfWork: stage.pct,
+    });
+    stageIds.push(created.id);
+  }
+  await withActor(actor('seed'), async (tx) => {
+    await tx
+      .update(schema.workStages)
+      .set({ actualStart: '2026-03-02', actualEnd: '2026-03-19' })
+      .where(eq(schema.workStages.id, stageIds[0] ?? ''));
+  });
+
+  // ── Interventia, pe mentenanta ─────────────────────────────────────────────
+  await createWorkUnit(
+    actor('seed'),
+    {
+      workUnit: {
+        companyId: IDS.companyA,
+        type: 'interventie',
+        name: 'Înlocuire vană DN100',
+        objectiveId: objective(2),
+        contractObjectiveId: '',
+        responsiblePersonId: IDS.pm,
+        executorType: 'echipa_proprie',
+        executorSubcontractorId: '',
+        startsOn: '2026-03-10',
+        endsOn: '2026-03-10',
+        estimatedValue: '840.00',
+        costBudget: '600.00',
+      },
+      allocations: [
+        {
+          contractId: base.contractId,
+          componentId: base.maintenance,
+          periodId: march,
+          allocatedAmount: '840.00',
+          allocatedPct: '',
+          reason: 'sub pragul de 2.000 lei, intră pe mentenanță',
+        },
+      ],
+      assignments: [
+        { personId: IDS.fieldLead, role: 'echipa', validFrom: '2026-03-10', validTo: '' },
+      ],
+      series: SERIES.interventie,
+    },
+    IDS.workUnitInterventie,
+  );
+
+  // ── Inspectia, nefinantata ────────────────────────────────────────────────
+  await createWorkUnit(
+    actor('seed'),
+    {
+      workUnit: {
+        companyId: IDS.companyA,
+        type: 'inspectie',
+        name: 'Inspecție trimestrială bazin',
+        objectiveId: objective(1),
+        contractObjectiveId: '',
+        responsiblePersonId: IDS.pm,
+        executorType: 'echipa_proprie',
+        executorSubcontractorId: '',
+        startsOn: '2026-03-05',
+        endsOn: '',
+        estimatedValue: '',
+        costBudget: '',
+      },
+      // O inspectie nu consuma buget: e o verificare pe checklist.
+      allocations: [],
+      assignments: [
+        { personId: IDS.fieldLead, role: 'inspector', validFrom: '2026-03-05', validTo: '' },
+      ],
+      series: SERIES.inspectie,
+    },
+    IDS.workUnitInspectie,
+  );
+
+  console.log('3 unitati de lucru: o lucrare pe 3 luni de Delta, o interventie, o inspectie.');
 }
 
 main()

@@ -95,3 +95,38 @@ export type {
   InspectionProfileItemInput,
   ObjectiveInput,
 } from './objectives';
+
+export {
+  closeWorkUnitInputSchema,
+  createWorkUnitInputSchema,
+  EXECUTOR_TYPE_LABELS,
+  EXECUTOR_TYPES,
+  fundingAllocationInputSchema,
+  moveFundingInputSchema,
+  promoteWorkUnitInputSchema,
+  reorderStagesInputSchema,
+  workStageInputSchema,
+  workUnitAssignmentInputSchema,
+  workUnitInputSchema,
+  WORK_UNIT_ROLE_LABELS,
+  WORK_UNIT_ROLES,
+  WORK_UNIT_STATUS_LABELS,
+  WORK_UNIT_STATUSES,
+  WORK_UNIT_TYPE_LABELS,
+  WORK_UNIT_TYPES,
+} from './work-units';
+export type {
+  CloseWorkUnitInput,
+  CreateWorkUnitInput,
+  ExecutorType,
+  FundingAllocationInput,
+  MoveFundingInputDto,
+  PromoteWorkUnitInput,
+  ReorderStagesInput,
+  WorkStageInput,
+  WorkUnitAssignmentInput,
+  WorkUnitInput,
+  WorkUnitRole,
+  WorkUnitStatusValue,
+  WorkUnitType,
+} from './work-units';

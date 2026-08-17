@@ -154,3 +154,38 @@ export type { AuditEntry, AuditFeedEntry } from './audit';
 
 export { countNomenclature, searchEverything } from './search';
 export type { SearchGroup, SearchHit } from './search';
+
+export { pgMessage, sqlstate, SQLSTATE, translateDbError } from './db-errors';
+
+export {
+  allocateFunding,
+  closeWorkUnit,
+  createStage,
+  createWorkUnit,
+  getClosingChecklist,
+  getStageOverview,
+  getWorkUnit,
+  listAllocations,
+  listAssignments,
+  listReallocationDocuments,
+  listStages,
+  listWorkUnits,
+  moveFunding,
+  previewFundingMove,
+  promoteToLucrare,
+  reorderStages,
+} from './work-units';
+export type {
+  AllocationRow,
+  AssignmentRow,
+  ClosingChecklist,
+  ClosingChecklistItem,
+  ClosingItemState,
+  FundingMovePreview,
+  FundingMoveTarget,
+  ListWorkUnitsOptions,
+  MoveFundingResult,
+  ReallocationDocumentRow,
+  StageRow,
+  WorkUnitRow,
+} from './work-units';
