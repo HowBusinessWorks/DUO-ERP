@@ -18,9 +18,8 @@
 ### Unde s-a ajuns
 
 Pașii **01, 02 și 04 sunt gata**. Pasul **03 e complet ca implementare**, dar are 4 verificări
-nerulate. Pasul **05 e tăiat în trei** (decizia utilizatorului, 17 august 2026), iar **05a (schema + domain) și 05b (use-case-uri) sunt
-gata**. Următorul lucru de făcut e **05c: ecranele**, cu skill-ul de
-design — serviciile de care au nevoie există toate.
+nerulate. Pasul **05 e gata**, tăiat în trei sub-etape (decizia utilizatorului, 17 august 2026), fiecare
+cu CI verde propriu. Următorul pas de conținut neînceput e **06 — Registrul de cost, închiderea**.
 
 ### Tăierea pasului 05, și ce e în fiecare bucată
 
@@ -28,36 +27,23 @@ design — serviciile de care au nevoie există toate.
 |---|---|---|---|
 | **05a** | Migrarea `0016_work_units` (5 tabele, 8 triggere, RLS, grant-uri pe coloană) + `packages/domain/funding` | 1, 2, 3, 9, 10, 12, 13, 16, 17, 18 | 🟩 gata, CI verde |
 | **05b** | `packages/services/work-units` + DTO-uri + seed | 4, 5, 6, 7, 8, 14, 19 | 🟩 gata, CI verde |
-| **05c** | Ecranele, cu agentul de design | 11, 15, 17 | ⬜ |
+| **05c** | Ecranele, cu skill-ul de design | 11, 15 (+ jumătatea de UI a #14) | 🟩 gata, CI verde |
 
 Motivul tăierii: pasul întreg are 19 verificări, 5 tabele, 6 use-case-uri și 7 ecrane — nu încape
 într-o sesiune fără să se rupă la mijloc.
 
-**Ce te așteaptă deja făcut la 05c.** Toate serviciile de care au nevoie ecranele există și sunt
-testate în CI:
+**Ce te așteaptă la pasul 06.** Toată structura de cost e deja pe ecran, cu eticheta corectă și
+cifra „—”:
 
-| Ecran din §3.4 | Ce cheamă |
+| Unde | Ce se umple din registrul de cost |
 |---|---|
-| Vederea unificată | `listWorkUnits` (filtre pe tip, status, obiectiv, responsabil, executant, **contract/componentă/lună prin alocările active**) |
-| Prezentare (lucrare) | `getWorkUnit`, `listAllocations`, `getStageOverview` — bara de progres fizic vine din `physicalProgress`, cu `weighted` care spune dacă procentul e din ponderi sau presupus |
-| Etape + Gantt | `listStages`, `createStage`, `reorderStages`, `getStageOverview` |
-| Închidere | `getClosingChecklist` (rândurile modulelor viitoare vin deja `pending_module`), `closeWorkUnit` |
-| Mutarea finanțării | **`previewFundingMove`** pentru ce se anunță înainte de confirmare, `moveFunding` pentru execuție |
-| Bani › Re-alocările lunii | `listReallocationDocuments` |
-| Promovarea | `promoteToLucrare`; listele „ce se păstrează / ce se adaugă" vin din `canPromote` ca **chei stabile**, iar ecranul le traduce |
+| Vederea unificată, coloana *Consumat* | arată `—`, nu zero. Un zero inventat s-ar citi ca o cifră reală |
+| Prezentarea unei lucrări, **a doua bară** | „Consum financiar", acum 0 cu explicația „registrul de cost intră în pasul 06”. Divergența față de progresul fizic e semnalul de risc |
+| Tab-ul *Costuri*, pe unitate și pe etapă | `PhasePlaceholder` |
+| `moveFunding`, ramura de lună deschisă | `costLineIds` e listă goală. Planul din domain o cere deja; când liniile există, se rescrie analitica „descărcat" pe ele |
+| Checklist-ul de închidere, rândul *Retur la magazie* | `pending_module`, cu textul „se verifică din pasul 06” |
 
-Ce **nu** face niciun serviciu, dinadins: nu decide mecanica mutării. Aceea vine din
-`@damina/domain` (`planFundingMove`), iar ecranul o **anunță** din `previewFundingMove`, care citește
-aceeași sursă. Trei locuri, o singură părere.
-
-### Primul lucru de făcut, înainte de orice cod
-
-1. `git fetch && git status && git log HEAD..origin/<branch> --oneline` — regula din `CLAUDE.md`,
-   care se aplică oricărei modificări de cod, oricât de mică.
-2. Verifică tabelul **„Stare care NU trăiește în repo”** de mai sus. Acolo scrie ce e adevărat
-   despre mediu și nu se poate afla citind codul: hook-ul activat manual în Supabase, conturile de
-   test, porturi ocupate, pragul de teste. **Verifică-l înainte să tragi concluzia că ceva e
-   stricat.**
+Nimic din ele nu cere rearanjarea ecranului: coloanele, barele și rândurile există la locul lor.
 
 ### Datorii deschise, în ordinea în care le-aș lua
 
@@ -131,7 +117,7 @@ scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu
 | 02 — Identitate, acces, RLS | 🟩 **gata** (19/19 verificări; 02a–02d + 02c′) | 2026-08-17 |
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat: #8, #10, #13, #14) | 2026-08-15 |
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
-| 05 — Unitate de Lucru, finanțare | 🟨 în lucru (**05a și 05b gata**; rămâne 05c — ecranele) | 2026-08-17 |
+| 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
 | 06 — Registrul de cost, închidere | ⬜ neînceput | — |
 | 07 — File management (R2) | ⬜ neînceput | — |
 | 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
@@ -159,8 +145,9 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași**, ceea ce e chiar comportamentul cerut de #16. |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **362** | 163 unitare (`shared` 39 · `domain` 82 · `auth` 33 · `storage` 6 · `i18n` 3) + 125 `packages/db` + **74** `packages/services`. Confirmate în CI `32021200540`, pe `4634b6b`. Testele de bază de date **și cele de servicii** rulează doar în CI — mașina n-are Docker. Praguri anterioare: 242 (02c′), 329 (05a). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **362** | 163 unitare (`shared` 39 · `domain` 82 · `auth` 33 · `storage` 6 · `i18n` 3) + 125 `packages/db` + **74** `packages/services`. Confirmate în CI `32024540915`, pe `8f17b7b` (05c n-a adăugat teste automate: ecranele s-au verificat pe aplicația care rulează). Testele de bază de date **și cele de servicii** rulează doar în CI — mașina n-are Docker. Praguri anterioare: 242 (02c′), 329 (05a). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
+| **Martie 2026 e ÎNCHISĂ la firma A pe Supabase dev**, din 05c | Închisă dinadins, ca ecranul de re-alocări să aibă ce arăta: mutarea finanțării intervenției `IV-000001` de acolo a emis `NRA-000001` în august. Dacă un ecran refuză o scriere pe martie, ăsta e motivul — nu un bug. |
 | Docker nu există pe mașina de dezvoltare | Testele de bază de date rulează **doar în CI**. Verificările pe date reale se fac pe Supabase dev, în blocuri anulate la final. |
 
 ---
@@ -1424,12 +1411,97 @@ efectiv aplicat:
 3. **Un test crea alocarea direct în luna închisă**, ceea ce e corect respins (#16). Ordinea reală e
    alta: aloci cât luna e deschisă, luna se închide, mutarea vine după.
 
-**Ce rămâne pentru sesiunea următoare:**
-1. **05c** — ecranele, cu skill-ul de design: vederea unificată, pagina de UL cu tab-uri pe tip,
-   Prezentare (cele două bare de progres), Etape + Gantt, Închidere, ecranul de mutare a finanțării,
-   *Bani › Re-alocările lunii*, Gantt general. Serviciile de care au nevoie există toate.
-2. Verificările **#11** (pagina etapei, prin același registry — recursivitatea), **#15** (ecranul de
-   re-alocări) și **#17** (teren pe UL asignată, fără cifre în lei).
+**Ce rămâne pentru sesiunea următoare:** *(05c s-a făcut în aceeași zi — vezi intrarea de mai jos)*
+1. **05c** — ecranele, cu skill-ul de design.
+2. Verificările **#11**, **#15**, **#17**.
+
+### 2026-08-17 — [status: gata] — 05c, ecranele
+
+Skill-ul de design (`llm-designer`) a fost încărcat înainte de prima linie de UI, cum a cerut
+utilizatorul.
+
+**Ce s-a executat — trei intrări în `entityRegistry`, ZERO fișiere de pagină:**
+
+- **`activitate`** — vederea unificată peste cele trei tipuri, cu filtre (tip, status, obiectiv,
+  responsabil, executant, **contract/componentă/lună prin alocările active**), plus pagina de
+  detaliu cu **trei seturi de tab-uri**, unul pe fiecare tip.
+- **`etape`** — aceeași pagină fractală, **un nivel mai jos**. Etapa are antet, tab-uri proprii,
+  legături și breadcrumb care urcă la lucrare. Asta e verificarea #11, și e testul real al pasului 03.
+- **`bani`** — *Re-alocările lunii*, cu număr, unitate, de la, la, valoare, cine a decis, de ce.
+  Celelalte sub-secțiuni **n-au fost șterse**: sunt vederi care spun din ce fază vin.
+
+**O completare în `registry/types.ts`**, exact felul pe care `docs/entity-registry.md` îl cere în loc
+de o a doua pagină de detaliu: **`visible(session, entity)` primește acum și rândul.** Fără el,
+singurele variante erau un tab „nu se aplică tipului ăsta" — adică tab-ul gri pe care §30.5 îl
+interzice — sau a doua pagină de detaliu, pe care o interzice și mai apăsat.
+
+**Verificări din pas care trec / nu trec** — rulate pe **aplicația care rulează**, cu sesiuni reale
+fabricate din `/auth/v1/token` (22 de verificări, toate verzi):
+
+- [x] **#11** etapa are pagina ei, cu tab-urile ei (Prezentare · Materiale · Manoperă · Costuri ·
+  Istoric), navigabile, cu breadcrumb care urcă la lucrare
+- [x] **#14** (jumătatea de UI) banda unei componente duce la ce se plătește din ea, cu total
+- [x] **#15** `NRA-000001` apare în *Bani › Re-alocările lunii*, cu Mentenanță → Delta, 840 lei,
+  Andrei Ionescu, și motivul scris
+- [x] **#6 end-to-end prin aplicație**: martie 2026 închisă pe dev, iar mutarea finanțării
+  intervenției a emis documentul în luna curentă — deci ramura de lună închisă merge pe drumul real,
+  nu doar în test
+- [x] cele **trei seturi de tab-uri**: lucrarea are Deviz/Etape/Situații și n-are Constatări;
+  inspecția are Constatări și n-are Deviz/Etape
+- [x] **„Unitate de Lucru" nu apare nicăieri pe ecran** — căutat literal în HTML-ul randat
+- [x] coloana *Consumat* arată „—", nu zero
+- [x] eticheta **„Delta ×3 luni"** apare pe lucrarea din seed
+- [x] terenul e redirectat din ecranele de birou (rutarea din 02c, neatinsă)
+- [x] `pnpm typecheck` 12/12 · `lint` · `test` · `build` · `scan:secrets` — **CI verde**
+  (run `32024540915`, commit `8f17b7b`)
+- [ ] **#17** (jumătatea de UI) — **cere ecranul de teren, care e pasul 10.** Jumătatea de bază de
+  date e demonstrată la 05a: RLS pe asignare + grant-uri pe coloană, cu `42501` pe coloanele de bani.
+  §3.4 al pasului nu cere niciun ecran de teren.
+
+**Observații / decizii luate:**
+
+- **Rutele au rămas 16.** Trei module noi, zero fișiere de pagină: build-ul arată tot `/[module]` și
+  `/[module]/[id]/[[...tab]]`. Promisiunea pasului 03 se ține și la al treilea pas care o testează.
+- **Cele două bare, una lângă alta.** A doua e zero și **spune de ce** („registrul de cost intră în
+  pasul 06"). Un zero fără explicație s-ar citi ca „n-am cheltuit nimic", care e altceva decât „nu se
+  poate calcula încă". Coloana *Consumat* din listă merge mai departe și arată „—", ca la contracte.
+- **Graficul de etape: datele se scriu ca TEXT**, nu doar ca poziție a barei. O bară spune „cam
+  pe-aici", iar raportul de lună are nevoie de ziua exactă — și informația care se vede doar la hover
+  nu există nici pe telefon, nici pentru cititorul de ecran. Graficul e un `<table>` cu `caption`, iar
+  barele sunt `aria-hidden`: ele ilustrează, nu informează.
+- **Zero animație.** Nimic nu se desenează la scroll și nimic nu pulsează. Regula din skill: dacă
+  utilizatorul nu se mișcă, interfața nu se mișcă.
+- **Ecranul de mutare anunță mecanica înainte de confirmare**, din `previewFundingMove` — aceeași
+  sursă pe care o citește execuția. Sub câmpuri scrie ce **nu** se schimbă niciodată (data
+  documentului, obiectivul, analitica „folosit"), pentru că lista aia e motivul pentru care mutarea e
+  sigură.
+- **Confirmarea promovării arată listele „ce se păstrează / ce se adaugă"** venite din `canPromote`,
+  ca ecranul să nu poată spune altceva decât face serviciul. Aici se traduc doar cheile.
+- **`promotionCheckFor` în servicii:** `apps/web` **nu are voie** să importe `domain` (regula de
+  boundaries, verificată în CI), iar ecranul are nevoie de exact același răspuns pe care îl dă
+  serviciul — altfel ar arăta butonul „Promovează" pe o unitate care apoi refuză.
+- **Creare din ecran, cu formular plat.** `createWorkUnitInputSchema` are liste imbricate, iar un
+  formular declarat ca date nu le poate exprima. `workUnitFormSchema` + `createWorkUnitFromForm` e un
+  **adaptor**, nu al doilea use-case: compune și cheamă `createWorkUnit`. Două drumuri de creare ar fi
+  însemnat că al doilea uită o regulă. Nu are `update`: codul se alocă o dată, iar finanțarea se
+  **mută**, cu motiv scris, din ecranul ei.
+- **`listPeriodOptions` întoarce implicit doar lunile deschise.** Un `select` care ar oferi o lună
+  închisă ar promite ceva ce baza refuză, iar omul ar afla abia din eroare.
+- **Capcană de mediu:** `UseFormReturn` importat direct din `react-hook-form` în `apps/web` se
+  rezolvă la **altă copie** a pachetului decât cea folosită de `@damina/ui`, și tipurile nu se mai
+  potrivesc. Se importă din `@damina/ui`, care îl reexportă tocmai pentru asta.
+- **Andrei nu poate intra în ecranele de birou fără al doilea factor** (rolul `admin` îl cere, din
+  02c′). Verificările s-au făcut lăsându-i temporar doar rolul `pm` — care are `financials.read` și nu
+  cere MFA — prin `setOfficeRoles`, adică prin ușa pe care o folosește chiar ecranul. Rolurile au fost
+  **restaurate la final**.
+
+**Un bug găsit la verificarea pe ecrane** (nu la typecheck): grupul de legături **„Etape"** se randa
+pe toate cele trei tipuri, gol pe inspecții. Un „Etape (0)" pe o inspecție nu e o absență, e o
+afirmație falsă — sugerează că inspecțiile au etape, doar că asta n-are. Acum apare doar pe lucrări.
+
+**Ce rămâne pentru sesiunea următoare:** pasul **06 — Registrul de cost, închiderea**. Vezi tabelul
+din predarea de la începutul fișierului: toate locurile care așteaptă cifrele de cost sunt deja pe
+ecran, cu eticheta corectă.
 
 ---
 
