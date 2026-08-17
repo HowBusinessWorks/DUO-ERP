@@ -1,5 +1,5 @@
 import { uuidv7 } from '@damina/shared';
-import { sql } from 'drizzle-orm';
+import { desc, sql } from 'drizzle-orm';
 import {
   boolean,
   check,
@@ -161,6 +161,15 @@ export const costLines = app.table(
       .where(sql`used_contract_id is distinct from charged_contract_id`),
     // Blocarea lunii inchise si recalcularea rollup-urilor citesc pe luna.
     index('cost_lines_period_idx').on(t.periodId),
+    /*
+     * Indexul paginarii cursor (§3.5). Adaugat DUPA masuratoare, nu din
+     * precautie: fara el, prima pagina a registrului e `seq scan` + `top-N
+     * heapsort` — 5 ms la zece mii de linii, dar liniar, deci ~50 ms la o suta de
+     * mii si o jumatate de secunda la un milion. Ordinea coloanelor si sensul lor
+     * sunt exact cele din `order by`, ca fiecare pagina sa fie o cautare in index,
+     * nu o resortare a tot ce e in urma ei.
+     */
+    index('cost_lines_cursor_idx').on(t.companyId, desc(t.effectDate), desc(t.id)),
 
     /*
      * Analitica „descarcat" e obligatorie de la `receptionat` incolo (regula 2

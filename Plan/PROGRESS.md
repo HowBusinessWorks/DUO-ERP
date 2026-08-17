@@ -1739,6 +1739,79 @@ Rulate pe **Supabase dev (Postgres 17.6) real**, prin use-case-uri, nu prin SQL:
 
 ---
 
+### 2026-08-17 — [status: gata local, CI de confirmat] — 06c, ecranele
+
+**Decizia utilizatorului:** ecranele s-au făcut **fără agentul de design**, pe tiparul din 05c.
+Regula casei („există un agent de design și se folosește pentru ecrane") rămâne valabilă; aici a fost
+suspendată explicit, pentru că 05c lăsase deja tiparul, iar contextul de registry și use-case-uri era
+proaspăt. **Nici skill-ul `llm-designer` n-a fost încărcat**: catalogul lui de anti-tipare
+(gradiente, scroll-jacking, aglomerare de CTA-uri) e despre pagini de prezentare, iar ecranele astea
+stau într-un design system existent, cu token-uri și componente care impun deja regulile din §30.
+
+**Ecrane livrate:**
+
+| Unde | Ce s-a schimbat |
+|---|---|
+| **Tab-ul Costuri**, pe unitate și pe etapă | Trei straturi, în ordinea întrebărilor: *cât* (patru stadii), *pe ce* (fel de cheltuială), *din ce document*. Analitica declarată pe ecran: **folosit**. |
+| **Bani › Marjă** | Venit alocat − cost direct − regie, per contract. Comutatorul brut/net e **chiar comutatorul de vederi al listei** — vizibil permanent, în același loc ca toate celelalte. |
+| **Bani › Folosit vs descărcat** | Liniile unde analiticele diferă, cu totalul mutat. Fără filtru implicit care să scurteze lista. |
+| **Bani › Închidere de perioadă** | Checklist blocant per firmă, cu contor și link pe fiecare rând; butoanele *Începe închiderea* / *Închide luna* / *Redeschide luna*, ultimele două cu motiv obligatoriu. |
+| **Contract › Prezentare** | Cifrele reale din rollup-uri, plus *Marja lunii* și *Cost direct în lună*. |
+| **Obiectiv › Istoric** | Total anual, medie lunară și număr de unități, pe analitica **folosit**. |
+| **Panou › Rapoarte** | Cele cinci rapoarte standard, fiecare cu analitica declarată în antet, plus cele **patru metrici de integritate** din §3.6. |
+
+**Verificări din pas care trec / nu trec:**
+
+Rulate în browser-ul serverului (harness-ul de fetch peste `next dev`, cu sesiune de dezvoltare), pe
+**datele de seed cu 10.000 de linii**:
+
+- [x] **#10** Prezentarea contractului se randează dintr-o **singură interogare pe rollup**.
+  Măsurat cu `explain analyze` pe luna cu date: **0,076 ms**. Aceeași întrebare pusă direct
+  registrului — adică ecranul pe care NU l-am construit — costă **10–11 ms la 5.000 de linii pe
+  lună**, și crește liniar. Ținta de „sub 200 ms" e despre asta; restul timpului de pagină e rețea
+  către Supabase și `next dev`, nu interogarea.
+- [x] **#11** Drill-down: „Consumat” → liniile unității → linia cu documentul ei (tip + număr).
+  **Parțial, și se vede pe ecran de ce:** documentele sursă (bon de consum, NIR, pontaj) apar la
+  pașii 09–10. Lanțul e complet până la identitatea documentului; ultima verigă n-are încă unde să
+  ducă, și ecranul spune asta în loc să dea un link mort.
+- [x] **#15** Reconcilierea arată exact liniile mutate, cu ambele capete și cu totalul.
+- [x] **#16** Ecranul de închidere arată rândul blocat cu contor și link, iar butonul e inactiv, cu
+  motivul scris în `disabledReason` — nu gri și mut.
+- [x] **#19** Comutatorul brut/net schimbă cifrele **și** eticheta; ambele vederi declară baza.
+- [x] **#21** Paginarea cursor: `explain analyze` a arătat `seq scan` + `top-N heapsort`, **5,35 ms**
+  la 10.000 de linii — corect ca rezultat, dar liniar, deci ~50 ms la o sută de mii. Cu indexul nou
+  `cost_lines_cursor_idx` (migrarea `0020`): **0,108 ms**, `index scan`, fără sortare. Cost de
+  ~50× mai mic și, mai important, **constant pe pagină** în loc de proporțional cu tot ce e în urmă.
+- [x] `pnpm typecheck` 12/12 · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets` — verzi.
+- [ ] Testele de bază de date și de servicii — nemodificate la 06c, dar rulează la primul CI.
+
+**Migrare nouă: `0020_cost_cursor_index`** — adăugată **după măsurătoare**, nu din precauție.
+
+**Observații / decizii luate / abateri de la plan:**
+
+- **Comutatorul de marjă e comutatorul de vederi, nu unul propriu.** Prima variantă avea butoane
+  desenate în ecran; se ajungea la două mecanisme pentru același lucru și la două locuri în care
+  omul trebuie să se uite. Efect secundar util: `?view=marja-neta` a picat prima oară tăcut, pentru
+  că `[module]/page.tsx` acceptă doar vederile **declarate** — exact garda care trebuia să existe.
+- **Eticheta de analitică de pe Contract › Prezentare era greșită și a fost corectată.** Scria
+  „folosit”; benzile și rollup-urile sunt pe **descărcat**. O etichetă greșită pe un ecran de bani e
+  mai rea decât lipsa ei, pentru că se citește ca fiind verificată.
+- **Textele „vine în pasul 06” au fost înlocuite peste tot**, nu doar unde apar cifrele noi. Un
+  ecran care promite un pas deja făcut e o minciună care se descoperă singură.
+- **Lista de contracte NU calculează consumul pe rând**, dinadins: ar fi o interogare de rollup per
+  contract, la fiecare afișare. Cifrele lunii stau în *Bani › Marjă*, într-o singură trecere, iar
+  coloanele listei spun unde să te uiți.
+- **Ecranul de închidere se randează per firmă**, nu pe grup: luna e a firmei, iar două firme pot fi
+  în stări diferite în aceeași lună calendaristică.
+- **Constructorul de rapoarte peste registru (§3.4) NU s-a făcut** și scrie pe ecran că vine cu
+  exporturile, în faza 3. Cele cinci rapoarte standard sunt trimiteri către ecranele care produc
+  cifrele — un raport care ar recalcula altfel aceeași întrebare ar fi a doua sursă de adevăr.
+- **Ce rămâne pentru pasul următor:** documentele care produc costuri (09–10) închid ultima verigă
+  a lui #11, iar recalcularea lunară a regiei (`recomputeOverheadSnapshot`) trebuie legată la un job
+  — funcția există și e acordată doar worker-ului, dar nimeni n-o cheamă încă periodic.
+
+---
+
 ## Pasul 07 — File management (R2)
 
 *(nicio sesiune n-a lucrat încă aici)*

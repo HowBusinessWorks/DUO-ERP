@@ -479,9 +479,11 @@ export async function setRevenueCeiling(
 /**
  * O banda de componenta de pe ecranul de Prezentare.
  *
- * `committed` si `consumed` sunt ZERO in pasul 04, si asta e corect: rollup-urile
- * (`component_period_rollup`) vin in pasul 06. Cifrele sunt separate de acum, ca
- * sa nu fie nevoie sa se schimbe forma ecranului cand incep sa aiba continut.
+ * `committed` si `consumed` vin din `app.component_period_rollup` (pasul 06a),
+ * printr-o SINGURA interogare pe toata luna — nu prin agregarea registrului la
+ * fiecare afisare. Diferenta se vede la zece mii de linii, si tot acolo se vede
+ * si de ce rollup-ul se intretine prin trigger: cifra de pe banda trebuie sa dea
+ * exact suma din spatele ei (§8.2), nu „aproape".
  */
 export interface ComponentBand {
   readonly component: ComponentRow;
@@ -542,6 +544,40 @@ export async function getContractOverview(
   );
 
   const byComponent = new Map(ceilings.map((row) => [row.ceiling.componentId, row.ceiling]));
+
+  /*
+   * Rollup-urile lunii, INTR-O SINGURA interogare pentru toate componentele
+   * (verificarea #10 a pasului 06). Ecranul nu atinge `app.cost_lines`: la zece
+   * mii de linii pe luna, agregarea la fiecare afisare se simte, iar la o suta
+   * de mii se vede cu ochiul liber.
+   */
+  const rollups = await withActor(actor, async (tx) =>
+    components.length === 0
+      ? []
+      : tx
+          .select({
+            componentId: schema.componentPeriodRollup.componentId,
+            committed: schema.componentPeriodRollup.committed,
+            consumed: schema.componentPeriodRollup.consumed,
+          })
+          .from(schema.componentPeriodRollup)
+          .innerJoin(
+            schema.periods,
+            eq(schema.componentPeriodRollup.periodId, schema.periods.id),
+          )
+          .where(
+            and(
+              inArray(
+                schema.componentPeriodRollup.componentId,
+                components.map((component) => component.id),
+              ),
+              eq(schema.periods.year, year),
+              eq(schema.periods.month, month),
+            ),
+          ),
+  );
+
+  const rollupOf = new Map(rollups.map((row) => [row.componentId, row]));
   const asOf = todayWithin(period);
   // Luna privita e in trecut: nu mai are zile de umplut, oricare i-ar fi ultima zi.
   const monthEnded = period.compare(Period.fromDate(new Date())) < 0;
@@ -571,9 +607,8 @@ export async function getContractOverview(
       fill: null,
       usage: ceilingUsage({
         ceiling: ceiling?.costCeiling == null ? null : Money.fromDb(ceiling.costCeiling),
-        // Pasul 06 le umple. Pana atunci sunt zero, si se vede ca sunt zero.
-        committed: Money.ZERO,
-        consumed: Money.ZERO,
+        committed: Money.fromDb(rollupOf.get(component.id)?.committed),
+        consumed: Money.fromDb(rollupOf.get(component.id)?.consumed),
       }),
     };
   });

@@ -197,18 +197,23 @@ export type {
 } from './work-units';
 
 export {
+  contractMargin,
   costBreakdown,
   costLineIdsForMove,
   listCostLines,
   listReconciliation,
+  objectiveCostHistory,
   rechargeCostLines,
+  recomputeOverheadSnapshot,
   recordCost,
   stornoCost,
   verifyRollups,
 } from './cost';
 export type {
+  ContractMargin,
   CostBreakdownRow,
   CostLineRow,
+  ObjectiveCostYear,
   RecordCostResult,
   ReconciliationRow,
   RollupDivergence,

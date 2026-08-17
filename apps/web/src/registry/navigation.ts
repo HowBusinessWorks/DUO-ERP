@@ -175,21 +175,23 @@ export const NAVIGATION: readonly NavItem[] = [
     label: 'Bani',
     icon: 'banknote',
     group: 'operational',
-    // Faza 0 din pasul 05: exista un singur ecran construit — re-alocarile lunii.
-    // Restul sub-sectiunilor NU s-au sters: sunt vederi care spun din ce faza vin.
-    // Un link care duce altundeva decat spune e mai rau decat unul care asteapta.
+    // Patru ecrane construite la 06c: re-alocarile lunii, reconcilierea, marja si
+    // inchiderea. Restul sub-sectiunilor NU s-au sters: sunt vederi care spun din
+    // ce faza vin. Un link care duce altundeva decat spune e mai rau decat unul
+    // care asteapta.
     phase: 0,
     queueKinds: ['sl_de_aprobat', 'factura_nematchata'],
     usesPeriod: true,
     children: [
       { slug: '', label: 'Re-alocările lunii' },
+      { slug: 'reconciliere', label: 'Folosit vs descărcat' },
+      { slug: 'marja', label: 'Marjă și plafoane' },
+      { slug: 'inchidere', label: 'Închidere de perioadă' },
       { slug: 'facturare', label: 'Facturare emisă' },
       { slug: 'facturi-furnizor', label: 'Facturi furnizor / SPV' },
       { slug: 'situatii', label: 'Situații de lucrări' },
       { slug: 'garantii', label: 'Garanții și avansuri' },
-      { slug: 'marja', label: 'Marjă și plafoane' },
       { slug: 'cash-flow', label: 'Cash-flow' },
-      { slug: 'inchidere', label: 'Închidere de perioadă' },
       { slug: 'saga', label: 'Conector Saga' },
     ],
   },

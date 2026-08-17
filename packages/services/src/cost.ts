@@ -456,6 +456,192 @@ export async function listReconciliation(
   });
 }
 
+export interface ObjectiveCostYear {
+  readonly year: number;
+  readonly total: Money;
+  /** Media pe lunile IN CARE s-a intamplat ceva, nu pe 12. */
+  readonly monthlyAverage: Money;
+  readonly monthsWithActivity: number;
+  readonly workUnitCount: number;
+}
+
+/**
+ * Istoricul unui obiectiv, pe ani (§3.4).
+ *
+ * Construit pe analitica **„folosit"**, si asta e tot rostul ecranului: banii se
+ * plimba intre contracte, obiectivul ramane acelasi. Un istoric pe „descarcat"
+ * s-ar rescrie de fiecare data cand cineva muta finantarea — adica ar raspunde
+ * la alta intrebare decat cea pusa.
+ *
+ * Media lunara se imparte la lunile CU activitate, nu la 12: o statie atinsa in
+ * doua luni din an n-a costat „media pe 12", iar cifra aia n-ar ajuta pe nimeni
+ * sa compare doua obiective.
+ */
+export async function objectiveCostHistory(
+  actor: Actor,
+  objectiveId: string,
+): Promise<ObjectiveCostYear[]> {
+  return withActor(actor, async (tx) => {
+    const rows = await tx.execute(sql`
+      select
+        extract(year from effect_date)::int                  as year,
+        sum(amount)::text                                    as total,
+        count(distinct date_trunc('month', effect_date))::int as months,
+        count(distinct work_unit_id)::int                     as work_units
+        from app.cost_lines
+       where objective_id = ${objectiveId}
+       group by 1
+       order by 1 desc`);
+
+    return (
+      rows.rows as { year: number; total: string; months: number; work_units: number }[]
+    ).map((row) => {
+      const total = Money.fromDb(row.total);
+      return {
+        year: row.year,
+        total,
+        monthlyAverage: row.months === 0 ? Money.ZERO : total.div(row.months),
+        monthsWithActivity: row.months,
+        workUnitCount: row.work_units,
+      };
+    });
+  });
+}
+
+// ── Marja ────────────────────────────────────────────────────────────────────
+
+export interface ContractMargin {
+  readonly contractId: string;
+  readonly periodId: string;
+  /** Cat s-a promis din componentele contractului in luna asta. */
+  readonly revenue: Money;
+  /** Costul direct: ce s-a consumat, pe analitica „descarcat". */
+  readonly directCost: Money;
+  /** Regia lunii. `Money.ZERO` pe baza bruta — nu lipsa, ci zero explicit. */
+  readonly overhead: Money;
+  readonly margin: Money;
+  /**
+   * Pe ce e construita cifra. **Nu e optional**, si de-aia sta in tipul de retur:
+   * regula de interfata 9 cere ca fiecare ecran cu marja sa declare baza, iar un
+   * camp obligatoriu se declara singur. Doua ecrane care ar afisa doua cifre
+   * diferite fara sa spuna care e care sunt mai rele decat niciun ecran.
+   */
+  readonly basis: 'gross' | 'net';
+  /** Procentul folosit la regie, din fotografia lunii. Null pe baza bruta. */
+  readonly overheadPct: string | null;
+}
+
+/**
+ * Marja unui contract pe o luna, bruta sau neta.
+ *
+ * Neta foloseste `overhead_snapshots` — FOTOGRAFIA lunii, nu procentul curent al
+ * contractului. Diferenta conteaza peste un an: procentul de regie se schimba,
+ * iar marja lui martie 2026 trebuie sa ramana cea calculata cu procentul lui
+ * martie 2026. Cand fotografia lipseste (luna n-a fost inca recalculata de
+ * worker), regia e zero si `overheadPct` e `null` — nu inventam procentul curent,
+ * pentru ca atunci cifra s-ar schimba retroactiv la fiecare modificare de contract.
+ */
+export async function contractMargin(
+  actor: Actor,
+  contractId: string,
+  periodId: string,
+  basis: 'gross' | 'net' = 'gross',
+): Promise<ContractMargin> {
+  return withActor(actor, async (tx) => {
+    const totals = await tx.execute(sql`
+      select
+        coalesce(sum(r.allocated_revenue), 0)::text as revenue,
+        coalesce(sum(r.consumed), 0)::text          as direct_cost
+        from app.component_period_rollup r
+        join app.contract_components cc on cc.id = r.component_id
+       where cc.contract_id = ${contractId} and r.period_id = ${periodId}`);
+
+    const row = (totals.rows[0] ?? {}) as { revenue?: string; direct_cost?: string };
+    const revenue = Money.fromDb(row.revenue);
+    const directCost = Money.fromDb(row.direct_cost);
+
+    if (basis === 'gross') {
+      return {
+        contractId,
+        periodId,
+        revenue,
+        directCost,
+        overhead: Money.ZERO,
+        margin: revenue.sub(directCost),
+        basis,
+        overheadPct: null,
+      };
+    }
+
+    const snapshots = await tx
+      .select()
+      .from(schema.overheadSnapshots)
+      .where(
+        and(
+          eq(schema.overheadSnapshots.contractId, contractId),
+          eq(schema.overheadSnapshots.periodId, periodId),
+        ),
+      )
+      .limit(1);
+
+    const snapshot = snapshots[0];
+    const overhead = Money.fromDb(snapshot?.overheadAmount);
+
+    return {
+      contractId,
+      periodId,
+      revenue,
+      directCost,
+      overhead,
+      margin: revenue.sub(directCost).sub(overhead),
+      basis,
+      overheadPct: snapshot?.overheadPct ?? null,
+    };
+  });
+}
+
+/**
+ * Recalculeaza fotografia de regie a unei luni. Ruleaza ca `app_service`:
+ * `insert`/`update` pe `overhead_snapshots` nu se acorda biroului, tocmai ca
+ * marja unei luni raportate sa nu se poata rescrie dintr-un ecran.
+ */
+export async function recomputeOverheadSnapshot(
+  actor: Actor,
+  contractId: string,
+  periodId: string,
+): Promise<Money> {
+  return withActor(actor, async (tx) => {
+    const contracts = await tx
+      .select({ overheadPct: schema.contracts.overheadPct })
+      .from(schema.contracts)
+      .where(eq(schema.contracts.id, contractId))
+      .limit(1);
+
+    const pct = contracts[0]?.overheadPct ?? '0';
+
+    const totals = await tx.execute(sql`
+      select coalesce(sum(r.consumed), 0)::text as direct_cost
+        from app.component_period_rollup r
+        join app.contract_components cc on cc.id = r.component_id
+       where cc.contract_id = ${contractId} and r.period_id = ${periodId}`);
+
+    const directCost = Money.fromDb((totals.rows[0] as { direct_cost?: string } | undefined)?.direct_cost);
+    const overhead = directCost.mul(Number(pct));
+
+    await tx.execute(sql`
+      insert into app.overhead_snapshots
+        (contract_id, period_id, overhead_pct, direct_cost, overhead_amount)
+      values (${contractId}, ${periodId}, ${pct}, ${directCost.toDbString()}, ${overhead.toDbString()})
+      on conflict (contract_id, period_id) do update set
+        overhead_pct = excluded.overhead_pct,
+        direct_cost = excluded.direct_cost,
+        overhead_amount = excluded.overhead_amount,
+        computed_at = now()`);
+
+    return overhead;
+  });
+}
+
 export interface RollupDivergence {
   readonly componentId: string;
   readonly periodId: string;

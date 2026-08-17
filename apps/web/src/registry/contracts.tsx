@@ -6,6 +6,7 @@ import {
   CONTRACT_TYPES,
 } from '@damina/contracts';
 import {
+  contractMargin,
   countCeilingsWithoutValue,
   findPeriodId,
   listAllocations,
@@ -330,7 +331,7 @@ export const contracte = defineEntity<ContractRow>({
     rowFlagged: (row) => monthsToExpiry(row.endsOn) < row.expiryAlertMonths,
     searchPlaceholder: 'Caută după cod, referință sau client',
     notice:
-      'Consumul și marja se umplu din registrul de cost (pasul 06). Până atunci coloanele lor arată „—”, nu zero — un zero inventat s-ar citi ca o cifră reală.',
+      'Lista nu calculează consumul pe fiecare rând: ar însemna o interogare de rollup per contract, la fiecare afișare. Cifrele lunii sunt în Bani › Marjă și plafoane, într-o singură trecere.',
     views: [
       { key: '', label: 'Toate' },
       { key: 'plafoane', label: 'Plafoane' },
@@ -434,7 +435,7 @@ export const contracte = defineEntity<ContractRow>({
         width: '6rem',
         hideBelow: 'lg',
         cell: () => (
-          <span title="Se calculează din registrul de cost, în pasul 06.">
+          <span title="Cifra lunii se vede în Bani › Marjă și plafoane, sau pe Prezentarea contractului.">
             <Empty />
           </span>
         ),
@@ -446,7 +447,7 @@ export const contracte = defineEntity<ContractRow>({
         width: '6rem',
         hideBelow: 'lg',
         cell: () => (
-          <span title="Se calculează din registrul de cost, în pasul 06.">
+          <span title="Cifra lunii se vede în Bani › Marjă și plafoane, sau pe Prezentarea contractului.">
             <Empty />
           </span>
         ),
@@ -553,6 +554,10 @@ export const contracte = defineEntity<ContractRow>({
             ctx.app.year,
             ctx.app.month,
           );
+          // Marja lunii, din rollup-uri. `null` cand luna nu exista la firma
+          // contractului — si atunci Stat-ul spune asta, nu arata zero.
+          const margin =
+            periodId === null ? null : await contractMargin(ctx.actor, row.id, periodId, 'gross');
           const monthLabel = `${String(ctx.app.month).padStart(2, '0')}/${String(ctx.app.year)}`;
           const blocked = ctx.app.period.locked
             ? 'Luna selectată este închisă. Plafoanele ei nu se mai pot modifica.'
@@ -567,8 +572,12 @@ export const contracte = defineEntity<ContractRow>({
                   locked={ctx.app.period.locked}
                 />
                 <p className="text-sm text-ink-subtle">
-                  Cifrele sunt pe analitica <strong className="text-ink-muted">folosit</strong>,
-                  marja e <strong className="text-ink-muted">brută</strong>.
+                  Cifrele sunt pe analitica <strong className="text-ink-muted">descărcat</strong> —
+                  cine plătește. Marja e <strong className="text-ink-muted">brută</strong>;{' '}
+                  <Link href="/bani?view=marja-neta" className="text-brand-700 hover:underline">
+                    cea netă, cu regie, e în Bani › Marjă
+                  </Link>
+                  .
                 </p>
               </div>
 
@@ -590,13 +599,19 @@ export const contracte = defineEntity<ContractRow>({
                 />
                 <Stat
                   label="Marja lunii"
-                  value="—"
-                  context="Venit − cost real. Se calculează din registrul de cost, pasul 06."
+                  value={margin === null ? '—' : <Money value={margin.margin} />}
+                  context={
+                    margin === null
+                      ? 'Luna nu există la firma contractului.'
+                      : 'Venit alocat − cost direct consumat. Brută: fără regie.'
+                  }
+                  tone={margin !== null && margin.margin.isNegative() ? 'danger' : 'neutral'}
+                  href="/bani?view=marja"
                 />
                 <Stat
-                  label="Marja anului contractual"
-                  value="—"
-                  context="Cumulat de la aniversare. Tot din pasul 06."
+                  label="Cost direct în lună"
+                  value={margin === null ? '—' : <Money value={margin.directCost} />}
+                  context="Consumat, din registrul de cost. Se desface pe componente, mai jos."
                 />
               </div>
 
@@ -1075,8 +1090,9 @@ export const contracte = defineEntity<ContractRow>({
                   {net
                     ? `Venit − cost direct − regie (${formatPercent(row.overheadPct)}). Regia se aplică peste costul direct.`
                     : 'Venit − cost direct. Fără regie.'}{' '}
-                  Cifrele se umplu din registrul de cost, în pasul 06. Structura e deja cea finală,
-                  ca ecranul să nu se schimbe când capătă conținut.
+                  Cumulatele pe an contractual se adună din rollup-urile lunilor lui — ecranul
+                  vine cu exporturile, în faza 3. Marja lunii curente e mai sus, iar cea pe contract
+                  în Bani › Marjă și plafoane.
                 </p>
                 <dl className="mt-3 grid gap-4 sm:grid-cols-4">
                   <Pair label="Venit cumulat" value={null} />

@@ -6,9 +6,11 @@ import {
   listContractsForObjective,
   listInspectionProfiles,
   listObjectives,
+  objectiveCostHistory,
+  type ObjectiveCostYear,
   type ObjectiveRow,
 } from '@damina/services';
-import { Badge, CellMeta, CellTitle, EmptyState, Table } from '@damina/ui';
+import { Badge, CellMeta, CellTitle, EmptyState, Money, Table } from '@damina/ui';
 import { History, MapPin } from 'lucide-react';
 import { DefinitionList, Empty } from '../components/detail/definition-list';
 import { PhasePlaceholder } from '../components/detail/phase-placeholder';
@@ -231,32 +233,84 @@ export const obiective = defineEntity<ObjectiveRow>({
       {
         slug: 'istoric',
         label: 'Istoric',
-        render: (row) => (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-border bg-surface-sunken px-4 py-3">
-              <p className="text-sm text-ink">
-                Istoricul e <strong>transversal peste contracte și peste ani</strong>: tot ce s-a
-                întâmplat la {row.name}, indiferent din ce contract a fost finanțat și la ce firmă.
-              </p>
-              <p className="mt-1.5 text-sm text-ink-muted">
-                Construit pe analitica <strong className="text-ink">folosit</strong> — nu pe
-                „descărcat”. Diferența e exact ce face ecranul ăsta să rămână intact când finanțarea
-                se mută de pe un contract pe altul: banii se plimbă, obiectivul rămâne același.
+        render: async (row, ctx) => {
+          const years = await objectiveCostHistory(ctx.actor, row.id);
+
+          return (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border bg-surface-sunken px-4 py-3">
+                <p className="text-sm text-ink">
+                  Istoricul e <strong>transversal peste contracte și peste ani</strong>: tot ce s-a
+                  întâmplat la {row.name}, indiferent din ce contract a fost finanțat și la ce firmă.
+                </p>
+                <p className="mt-1.5 text-sm text-ink-muted">
+                  Construit pe analitica <strong className="text-ink">folosit</strong> — nu pe
+                  „descărcat”. Diferența e exact ce face ecranul ăsta să rămână intact când
+                  finanțarea se mută de pe un contract pe altul: banii se plimbă, obiectivul rămâne
+                  același.
+                </p>
+              </div>
+
+              {years.length === 0 ? (
+                <EmptyState
+                  icon={<History className="size-5" aria-hidden="true" />}
+                  title="Niciun cost înregistrat la obiectivul ăsta"
+                  body="Costurile apar din documentele care le produc, pe unitățile de lucru legate de obiectiv. Structura ecranului e deja cea finală: total anual și medie lunară, pe ani."
+                />
+              ) : (
+                <Table<ObjectiveCostYear>
+                  caption="Costul obiectivului pe ani, pe analitica „folosit”"
+                  rows={years}
+                  rowKey={(year) => String(year.year)}
+                  columns={[
+                    {
+                      key: 'year',
+                      header: 'An',
+                      width: '6rem',
+                      cell: (year) => <CellTitle>{String(year.year)}</CellTitle>,
+                    },
+                    {
+                      key: 'total',
+                      header: 'Total',
+                      align: 'right',
+                      cell: (year) => <Money value={year.total} />,
+                    },
+                    {
+                      key: 'average',
+                      header: 'Medie lunară',
+                      align: 'right',
+                      cell: (year) => (
+                        <div>
+                          <Money value={year.monthlyAverage} />
+                          <CellMeta>
+                            pe {String(year.monthsWithActivity)}{' '}
+                            {year.monthsWithActivity === 1 ? 'lună' : 'luni'} cu activitate
+                          </CellMeta>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'units',
+                      header: 'Unități de lucru',
+                      align: 'right',
+                      hideBelow: 'md',
+                      cell: (year) => <span>{String(year.workUnitCount)}</span>,
+                    },
+                  ]}
+                  empty={
+                    <EmptyState title="Niciun an" body="Nu există costuri pe obiectivul ăsta." />
+                  }
+                />
+              )}
+
+              <p className="text-xs text-ink-subtle">
+                Analitica: <strong>folosit</strong>. Media lunară se împarte la lunile{' '}
+                <strong>cu activitate</strong>, nu la 12: o stație atinsă în două luni din an n-a
+                costat „media pe douăsprezece”, iar cifra aia n-ar ajuta la nicio comparație.
               </p>
             </div>
-
-            <EmptyState
-              icon={<History className="size-5" aria-hidden="true" />}
-              title="Niciun cost înregistrat la obiectivul ăsta"
-              body="Costurile apar pe măsură ce unitățile de lucru (pasul 05) și registrul de cost (pasul 06) sunt construite. Structura ecranului e deja cea finală: total anual și medie lunară, pe ani."
-            />
-
-            <p className="text-xs text-ink-subtle">
-              Analitica: <strong>folosit</strong>. Total anual și medie lunară se calculează pe anul
-              calendaristic, nu pe cel contractual — obiectivul nu are aniversare, contractul are.
-            </p>
-          </div>
-        ),
+          );
+        },
       },
 
       // ── Contracte: pe ce contracte a fost si este, in timp si simultan ────

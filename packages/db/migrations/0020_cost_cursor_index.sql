@@ -1,0 +1,1 @@
+CREATE INDEX "cost_lines_cursor_idx" ON "app"."cost_lines" USING btree ("company_id","effect_date" desc,"id" desc);

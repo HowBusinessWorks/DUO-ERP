@@ -141,6 +141,13 @@
       "when": 1786970726931,
       "tag": "0019_period_close_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786973693776,
+      "tag": "0020_cost_cursor_index",
+      "breakpoints": true
     }
   ]
 }

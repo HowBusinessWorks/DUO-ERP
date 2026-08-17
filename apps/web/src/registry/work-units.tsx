@@ -31,6 +31,9 @@ import {
 import { Money as MoneyValue } from '@damina/shared';
 import { Badge, CellMeta, CellTitle, EmptyState, Money, Stat } from '@damina/ui';
 import Link from 'next/link';
+import { CostTab } from '../components/cost/cost-tab';
+import { MarginScreen, ReconciliationScreen } from '../components/cost/money-screens';
+import { PeriodCloseScreen } from '../components/cost/period-close-screen';
 import { AuditTrail } from '../components/detail/audit-trail';
 import { PhasePlaceholder } from '../components/detail/phase-placeholder';
 import { ClosingChecklist } from '../components/work-unit/closing-checklist';
@@ -555,8 +558,12 @@ export const activitate = defineEntity<WorkUnitRow>({
         slug: 'costuri',
         label: 'Costuri',
         visible: (session) => canSeeFinancials(session),
-        render: () => (
-          <PhasePlaceholder phase={1} what="Registrul de cost al unității (pasul 06)" />
+        render: (row, ctx) => (
+          <CostTab
+            ctx={ctx}
+            scope={{ workUnitId: row.id }}
+            emptyBody="Costurile intră aici din documentele care le produc — bon de consum, NIR, pontaj, fișă de utilaj. Până la primul document, unitatea n-a costat nimic."
+          />
         ),
       },
 
@@ -879,7 +886,13 @@ export const etape = defineEntity<StageWithWorkUnitRow>({
         slug: 'costuri',
         label: 'Costuri',
         visible: (session) => canSeeFinancials(session),
-        render: () => <PhasePlaceholder phase={1} what="Costurile etapei (pasul 06)" />,
+        render: (stage, ctx) => (
+          <CostTab
+            ctx={ctx}
+            scope={{ stageId: stage.id }}
+            emptyBody="Pe etapa asta nu s-a înregistrat încă niciun cost. Liniile apar aici pe măsură ce documentele lor sunt validate."
+          />
+        ),
       },
       {
         slug: 'istoric',
@@ -945,17 +958,37 @@ export const bani = defineEntity<ReallocationDocumentRow>({
       'Dacă lista e lungă în fiecare lună, decizia inițială de rutare se ia prost — și asta e o problemă de proces, nu de software. De aceea ecranul nu o scurtează.',
     views: [
       { key: '', label: 'Re-alocările lunii' },
+      { key: 'reconciliere', label: 'Folosit vs descărcat' },
+      { key: 'marja', label: 'Marjă brută' },
+      { key: 'marja-neta', label: 'Marjă netă' },
+      { key: 'inchidere', label: 'Închidere de perioadă' },
       { key: 'facturare', label: 'Facturare emisă' },
       { key: 'situatii', label: 'Situații de lucrări' },
-      { key: 'marja', label: 'Marjă și plafoane' },
-      { key: 'inchidere', label: 'Închidere de perioadă' },
     ],
-    renderView: (_rows, view) => {
+    /*
+     * Cele patru vederi construite la 06c sunt ecrane cu cifre, si fiecare isi
+     * declara analitica pe ecran: marja pe „descarcat", reconcilierea pe
+     * amandoua (ea despre diferenta lor e). Restul raman placeholder cinstit.
+     *
+     * Comutatorul brut/net e chiar comutatorul de vederi al listei — vizibil
+     * permanent, in acelasi loc ca toate celelalte. Un comutator propriu, desenat
+     * in ecran, ar fi fost al doilea mecanism pentru acelasi lucru, si al doilea
+     * loc in care omul trebuie sa se uite.
+     */
+    renderView: (_rows, view, ctx) => {
+      if (view === 'marja' || view === 'marja-neta') {
+        return <MarginScreen ctx={ctx} net={view === 'marja-neta'} />;
+      }
+      if (view === 'reconciliere') {
+        return <ReconciliationScreen ctx={ctx} />;
+      }
+      if (view === 'inchidere') {
+        return <PeriodCloseScreen ctx={ctx} />;
+      }
+
       const what: Readonly<Record<string, string>> = {
         facturare: 'Facturarea emisă și e-Factura',
         situatii: 'Situațiile de lucrări',
-        marja: 'Marja și gradul de plafon',
-        inchidere: 'Închiderea de perioadă',
       };
       return <PhasePlaceholder phase={2} what={what[view] ?? 'Ecranul'} />;
     },
