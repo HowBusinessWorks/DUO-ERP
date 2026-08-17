@@ -120,6 +120,20 @@
       "when": 1786959378029,
       "tag": "0016_work_units",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786968733586,
+      "tag": "0017_cost_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786968778702,
+      "tag": "0018_rollups",
+      "breakpoints": true
     }
   ]
 }

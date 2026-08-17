@@ -19,7 +19,9 @@
 
 Pașii **01, 02 și 04 sunt gata**. Pasul **03 e complet ca implementare**, dar are 4 verificări
 nerulate. Pasul **05 e gata**, tăiat în trei sub-etape (decizia utilizatorului, 17 august 2026), fiecare
-cu CI verde propriu. Următorul pas de conținut neînceput e **06 — Registrul de cost, închiderea**.
+cu CI verde propriu. Pasul **06 e început**: **06a** (schema de cost + rollup-uri) e scris și rulat pe
+Supabase dev; urmează **06b** — `recordCost`, storno, extinderea lui `moveFunding`, jobul
+`rollup.verify`, registrul de check-uri de închidere și seed-ul de 10.000 de linii.
 
 ### Tăierea pasului 05, și ce e în fiecare bucată
 
@@ -32,12 +34,15 @@ cu CI verde propriu. Următorul pas de conținut neînceput e **06 — Registrul
 Motivul tăierii: pasul întreg are 19 verificări, 5 tabele, 6 use-case-uri și 7 ecrane — nu încape
 într-o sesiune fără să se rupă la mijloc.
 
-### Pasul 06 — cum aș tăia-o, dacă ești de acord cu utilizatorul
+### Pasul 06 — tăierea, aprobată
 
-**Propunere, NU decizie luată** — utilizatorul n-a aprobat-o încă, pentru că sesiunea a plecat pe
-altceva. Motivul e același ca la 05, doar mai apăsat: pasul are **21 de verificări**, registrul de
-cost cu ~25 de coloane, rollup-uri întreținute prin trigger, un job de control, mașina de închidere
-cu checklist ca date, șase ecrane și ~20 de fișiere `.sql`.
+**Aprobată de utilizator pe 17 august 2026.** Motivul e același ca la 05, doar mai apăsat: pasul are
+**21 de verificări**, registrul de cost cu ~25 de coloane, rollup-uri întreținute prin trigger, un job
+de control, mașina de închidere cu checklist ca date, șase ecrane și ~20 de fișiere `.sql`.
+
+**06a e gata** (vezi intrarea de la pasul 06), cu o singură rezervă: testele de bază de date n-au
+rulat local — mașina n-are Docker. Primul CI e cel care confirmă. Migrările sunt însă aplicate pe
+Supabase dev, iar toate verificările de mai jos au fost rulate acolo pe Postgres 17.6 real.
 
 | Sub-etapă | Conținut | Verificări din §6 |
 |---|---|---|
@@ -145,7 +150,7 @@ scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat: #8, #10, #13, #14) | 2026-08-15 |
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
-| 06 — Registrul de cost, închidere | ⬜ neînceput | — |
+| 06 — Registrul de cost, închidere | 🟨 în lucru (06a gata local, CI de confirmat; 06b, 06c neîncepute) | 2026-08-17 |
 | 07 — File management (R2) | ⬜ neînceput | — |
 | 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
 | 09 — Fișe de lucru | ⬜ neînceput | — |
@@ -1562,7 +1567,96 @@ ecran, cu eticheta corectă.
 
 ## Pasul 06 — Registrul de cost, închidere
 
-*(nicio sesiune n-a lucrat încă aici)*
+Pasul e tăiat în trei sub-etape (decizia utilizatorului, 17 august 2026), pe propunerea din predarea
+sesiunii anterioare: **06a** schema de cost + rollup-uri · **06b** use-case-uri, jobul de control și
+checklist-ul de închidere · **06c** ecranele. Motivul e mărimea: 21 de verificări, un registru cu 28
+de coloane, rollup-uri întreținute prin trigger și șase ecrane nu încap într-o sesiune.
+
+### 2026-08-17 — [status: gata local, CI de confirmat] — 06a, schema de cost și rollup-urile
+
+**Două migrări noi: `0017_cost_ledger` și `0018_rollups`.** Amândouă **generate** cu
+`pnpm db:generate`, cu completările scrise de mână dedesubt — datoria plătită la 05a ține.
+
+`app.cost_lines`, 28 de coloane, plus tot ce drizzle nu exprimă:
+
+- **7 indecși**, fiecare din câte o întrebare reală de la §11, nu inventați. Cel de plafon a fost
+  refăcut de mână cu `include (amount, stage)` — drizzle nu exprimă `INCLUDE`, iar aici răspunsul
+  iese din index fără să atingă tabela. Cel de reconciliere e parțial și conține **exact anomaliile**:
+  `where used_contract_id is distinct from charged_contract_id`.
+- **4 triggere.** `period_id` derivat din `effect_date` · coerența liniei (firmă, etapă doar pe
+  lucrări și obligatorie acolo, etapa să fie a unității de pe linie, componenta să aparțină
+  contractului de pe **aceeași** analitică) · append-only · blocarea lunii închise, prin
+  `attach_period_guard`.
+- **RLS cu `force`**, o singură politică: `office`. Terenul, subcontractantul și clientul nu primesc
+  **nicio** politică și niciun grant — regula 7 din pas, spusă de două ori dinadins.
+- **`app.recharge_cost_line()`** — ușa unică prin care o linie își schimbă analitica „descărcat".
+- **`app.rollup_verify(period)`** — recalculează din registru și întoarce doar diferențele.
+
+**Verificări din pas care trec / nu trec:**
+
+Rulate **pe Supabase dev (Postgres 17.6) real**, într-un bloc anulat la final — plus `pnpm db:migrate`
+efectiv aplicat:
+
+- [x] **#1** linie `consumat` fără `charged_contract_id` → respinsă de `check`; aceeași linie
+  `angajat` trece (la comandă încă nu se știe bugetul)
+- [x] **#2** linie pe lucrare fără `stage_id` → `VALIDATION_FAILED: lucrarea … cere etapa pe fiecare
+  linie de cost`; reversul (etapă pe intervenție) → respins; etapa altei lucrări → respinsă
+- [x] **#3** linie fără `document_id` → `23502`
+- [x] **#4** `effect_date` în august → `period_id` se completează singur cu august, **chiar dacă
+  aplicația trimite altă lună**; `document_date` în iulie rămâne în iulie
+- [x] **#5** / **#6** `update` și `delete` nu sunt acordate **nimănui**, nici `app_service`
+- [x] **#7** corecția prin storno: trei linii rămân vizibile, rollup-ul dă suma corectă
+- [x] **#8** (jumătatea de bază de date) rollup = suma din registru, verificat cu interogare
+  independentă **și** cu `app.rollup_verify` → zero divergențe. Seed-ul de 10.000 de linii e la 06b.
+- [x] **#9** rollup corupt manual → `rollup_verify` întoarce componenta, coloana, stocat și așteptat
+- [x] **#12** insert într-o lună închisă → `PERIOD_CLOSED: luna 07/2026 este inchisa`
+- [x] **#13** (jumătatea de bază de date) `recharge_cost_line` rescrie `charged_*`, **`used_*` și
+  `document_date` rămân neatinse**, iar rollup-urile ambelor componente se mișcă în aceeași tranzacție
+- [x] **#15** linia mutată pe alt contract intră în raportul de reconciliere; înainte de mutare nu era
+- [x] **#20** `app_field` nu vede niciun rând și nicio coloană din registru sau din rollup-uri
+- [x] `pnpm typecheck` 12/12 · `pnpm lint` verde · `pnpm test` verde · `pnpm build` verde ·
+  `pnpm scan:secrets` curat
+- [ ] Cele **19 teste noi** din `packages/db/tests/cost-ledger.test.ts` — **nerulate local**, mașina
+  n-are Docker. Se confirmă la primul CI.
+
+**Observații / decizii luate / abateri de la plan:**
+
+- **Numerotarea migrărilor:** `0017` și `0018`, nu `0014`/`0015` ca în textul pasului — drizzle e la 16.
+- **`amount` NU are `check (>= 0)`.** Semnul are înțeles: o linie de storno e negativă, și de aceea
+  corecția e o linie în minus, nu un `update`. Un `check` pe pozitiv ar fi făcut regula 1 imposibilă.
+- **`charged_contract_id` e obligatoriu de la `receptionat` în sus, nu de la prima linie.** La
+  `angajat` se știe ce se comandă înainte să se știe pe ce buget cade; o comandă lansată nu așteaptă
+  decizia de rutare. Litera verificării #1 vorbește doar de `consumat`, dar `check`-ul e scris pe
+  `stage <> 'angajat'`, ca în PLAN_TEHNIC.
+- **`period_id` e nullabil în Drizzle și `not null` în bază.** Triggerele `before` rulează înaintea
+  verificării constrângerilor, deci valoarea există întotdeauna; tipul TypeScript spune astfel
+  adevărul despre ce trimite aplicația la `insert`, adică nimic.
+- **Ușa de rescriere e o funcție, nu un grant.** `update` nu se acordă niciunui rol, deci singura cale
+  e `app.recharge_cost_line`, `security definer`. Ea **nu** deschide luna închisă — mutarea pe o lună
+  raportată cade cu `PERIOD_CLOSED` și trebuie să treacă prin documentul de re-alocare. Două uși
+  diferite, dinadins. `moveFunding` din 06b o cheamă pentru fiecare id din `costLineIds`.
+- **Trigger-ul de append-only compară `to_jsonb(row)` fără cele două chei mutabile**, ca la alocări în
+  0016 — deci o coloană adăugată la pașii 07–10 intră automat sub regulă.
+- **Ramura lui de mesaj („s-a incercat: …") e momentan inaccesibilă din aplicație**, pentru că niciun
+  rol n-are `update`, iar singura funcție `security definer` care scrie schimbă doar `charged_*`.
+  Rămâne ca plasă pentru funcțiile definer din 06b–10, care rulează pe lângă orice grant.
+- **`allocated_revenue` se recalculează întreg, nu prin deltă**, spre deosebire de coloanele de cost.
+  Alocările active pe o componentă × lună sunt unități, nu mii: unde recalculul e ieftin, el e și
+  răspunsul corect — o deltă greșită o dată rămâne greșită până la jobul de verificare.
+- **Alocarea în procent contribuie cu `pct × estimated_value` al unității**, iar o unitate fără
+  valoare estimată contribuie cu zero. Nu inventăm o cifră pentru că ecranul ar arăta mai plin.
+- **`app.rollup_apply_cost` și `app.rollup_recompute_allocated` s-au luat de la `public`** și s-au dat
+  doar lui `app_service`: sunt `security definer`, deci cine le poate chema poate schimba cifra de pe
+  ecran fără urmă în registru. Triggerele nu sunt afectate — Postgres verifică dreptul de execuție pe
+  funcția de trigger la **crearea** trigger-ului, nu la fiecare rând.
+- **Poarta de bani a prins ceva real.** Regexul din 0012 nu vede `committed`, `received`, `consumed`,
+  `invoiced`, `allocated_revenue` — toate sunt bani cu alt nume. Sunt trecute explicit în lista lui
+  `app.assert_no_money_leak`. **Pașii următori care adaugă bani trebuie să facă la fel.**
+- **`app.period_close_checks` acceptă doar `pending|ok|blocked`** (constrângere din 0005), dar pasul
+  cere și `not_applicable` / `pending_module` pentru modulele care nu există încă. **Migrarea care
+  lărgește `check`-ul e treaba lui 06b**, împreună cu registrul de check-uri.
+- Documentat în `docs/cost-ledger.md`: cele patru reguli, cum se leagă un tip nou de document, ce se
+  întâmplă la mutarea finanțării, și cine vede registrul.
 
 ---
 
