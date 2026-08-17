@@ -43,7 +43,7 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Cheia de service a trecut printr-o fereastră de chat pe 17 august 2026 | **De rotit** din Project Settings → API. |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **214**, iar după 02d **224** | 96 unitare (`shared` 39 · `domain` 29 · `auth` 19 · `storage` 6 · `i18n` 3) + 91 `packages/db` + 27 `packages/services`. Cifrele de bază sunt din run-ul CI `32004465200`, pe `19ee1d4`. 02d adaugă 10 teste în `packages/services/tests/admin.test.ts`, **nerulate local** (mașina n-are Docker). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **225** | 96 unitare (`shared` 39 · `domain` 29 · `auth` 19 · `storage` 6 · `i18n` 3) + 91 `packages/db` + 38 `packages/services`. Confirmate în CI `32009107114`, pe `d0d5d39`. Testele de bază de date rulează **doar în CI** — mașina de dezvoltare n-are Docker. Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | Docker nu există pe mașina de dezvoltare | Testele de bază de date rulează **doar în CI**. Verificările pe date reale se fac pe Supabase dev, în blocuri anulate la final. |
 
 ---
@@ -592,8 +592,8 @@ doilea, apoi în al treilea.
   vechi; parcursul a rulat pe 3211 și 3212.
 
 **Ce rămâne pentru sesiunea următoare:**
-1. Push → CI. Testele de servicii ar trebui să urce 27 → **37**, totalul 214 → **224**. E singura
-   verificare a lui 02d nerulată local.
+1. ~~Push → CI.~~ **Făcut**, run `32009107114` verde pe `d0d5d39`. Serviciile au urcat 27 → **38**
+   (nu 37 — `admin.test.ts` are 11 teste, nu 10, cum estimasem), totalul **225**.
 2. **02c′** — MFA TOTP pentru `admin` și `financiar`, rate limit pe login, revocarea sesiunii prin
    Admin API la retragerea accesului la prețuri (#16, #18). Cu 02d gata, pasul 02 se închide acolo.
 3. Playwright — încă neinstalat; blochează #13 din pasul 03 și clicul pe hartă din 04b.
