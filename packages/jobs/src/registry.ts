@@ -91,8 +91,28 @@ export const deltaFillScan = defineJob({
   singletonKey: (payload) => payload.on ?? new Date().toISOString().slice(0, 10),
 });
 
+/**
+ * `rollup.verify` — controlul nocturn al rollup-urilor (pasul 06, §3.2).
+ *
+ * Rollup-ul e o suma derivata, intretinuta prin trigger. Daca trigger-ul are un
+ * bug, cifra de pe ecran se abate de la registru **tacut**: nimic nu cade, doar
+ * raportul incepe sa mintă. Jobul recalculeaza din registru si compara.
+ *
+ * Nocturn, nu la cerere: un ERP nu cade cu 500, cade cu cifre care nu se mai
+ * potrivesc. Vrei sa afli in ziua in care apare, nu in luna in care o vezi in
+ * factura.
+ */
+export const rollupVerify = defineJob({
+  name: 'rollup.verify',
+  schema: z.object({ on: z.string().optional(), periodId: z.string().uuid().optional() }),
+  retryLimit: 3,
+  retryDelaySeconds: 300,
+  expireInSeconds: 30 * 60,
+  singletonKey: (payload) => payload.periodId ?? payload.on ?? new Date().toISOString().slice(0, 10),
+});
+
 /** Toate cozile cunoscute. Worker-ul le creeaza pe toate la pornire. */
-export const ALL_JOBS = [systemPing, contractExpiryScan, deltaFillScan] as const;
+export const ALL_JOBS = [systemPing, contractExpiryScan, deltaFillScan, rollupVerify] as const;
 
 /**
  * Cozile care ruleaza pe ceas, cu expresia lor cron. Fusul e cel al aplicatiei
@@ -113,6 +133,11 @@ export const SCHEDULED_JOBS: readonly {
     name: deltaFillScan.name,
     cron: '0 9 10,20 * *',
     why: 'Pe 10 si pe 20, la 09:00. La inchidere ar fi prea tarziu: Delta neumpluta se pierde.',
+  },
+  {
+    name: rollupVerify.name,
+    cron: '0 2 * * *',
+    why: 'Nocturn la 02:00, cand registrul sta linistit. O divergenta se afla a doua zi, nu peste o luna.',
   },
 ];
 

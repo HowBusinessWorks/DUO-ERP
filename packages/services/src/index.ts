@@ -195,3 +195,44 @@ export type {
   StageWithWorkUnitRow,
   WorkUnitRow,
 } from './work-units';
+
+export {
+  costBreakdown,
+  costLineIdsForMove,
+  listCostLines,
+  listReconciliation,
+  rechargeCostLines,
+  recordCost,
+  stornoCost,
+  verifyRollups,
+} from './cost';
+export type {
+  CostBreakdownRow,
+  CostLineRow,
+  RecordCostResult,
+  ReconciliationRow,
+  RollupDivergence,
+} from './cost';
+
+export {
+  clearRollupAlert,
+  COST_ALERT_KINDS,
+  readIntegrityMetrics,
+  verifyRollupsJob,
+} from './cost-integrity';
+export type { IntegrityMetrics } from './cost-integrity';
+
+export {
+  CLOSE_CHECKS,
+  closePeriod,
+  evaluatePeriodClose,
+  reopenPeriod,
+  startClosing,
+} from './period-close';
+export type {
+  CloseCheckResult,
+  CloseCheckRow,
+  CloseCheckSpec,
+  CloseCheckStatus,
+  PeriodCloseState,
+} from './period-close';

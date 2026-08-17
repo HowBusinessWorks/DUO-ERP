@@ -74,7 +74,19 @@ export const periodCloseChecks = app.table(
   },
   (t) => [
     unique('period_close_checks_period_key_unique').on(t.periodId, t.checkKey),
-    check('period_close_checks_status', sql`${t.status} in ('pending', 'ok', 'blocked')`),
+    /*
+     * Cinci stari, nu trei (pasul 06, §3.3). Cele doua adaugate spun lucruri
+     * diferite, si de-aia sunt doua:
+     *   `not_applicable` — verificarea nu se aplica firmei asteia (n-are flota,
+     *      n-are subcontractanti). Ramane asa pana se schimba firma.
+     *   `pending_module` — modulul care raspunde inca nu exista (SL, SPV, Saga).
+     *      Se aprinde SINGURA cand apare modulul, fara migrare — de aceea nu e
+     *      acelasi lucru cu `not_applicable`, desi pe ecran arata la fel.
+     */
+    check(
+      'period_close_checks_status',
+      sql`${t.status} in ('pending', 'ok', 'blocked', 'not_applicable', 'pending_module')`,
+    ),
     check('period_close_checks_blocking_count', sql`${t.blockingCount} >= 0`),
   ],
 );

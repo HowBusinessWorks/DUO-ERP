@@ -1,0 +1,499 @@
+import type { CostQuery, RecordCostInput, StornoCostInput } from '@damina/contracts';
+import { costQuerySchema, recordCostInputSchema, stornoCostInputSchema } from '@damina/contracts';
+import { schema, withActor, type Actor, type ActorTx } from '@damina/db';
+import { AppError, Money, Quantity, uuidv7 } from '@damina/shared';
+import { and, asc, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
+import { translateDbError } from './db-errors';
+
+/**
+ * Registrul de cost: inregistrare, storno, citiri.
+ *
+ * **Serviciul nu decide nimic despre bani.** Regulile stau in baza — analitica
+ * obligatorie de la receptie in sus, etapa pe lucrari, luna derivata din data de
+ * efect, append-only. Aici se orchestreaza tranzactia si se traduc erorile.
+ *
+ * Ce face totusi serviciul, si e important: **face cele doua analitici egale
+ * cand apelantul nu le desparte**. Implicit sunt egale (§12); cine le desparte o
+ * face explicit, si atunci linia intra automat in raportul de reconciliere.
+ */
+
+const DEFAULT_LIMIT = 200;
+
+// ── Scriere ──────────────────────────────────────────────────────────────────
+
+export interface RecordCostResult {
+  readonly costLineId: string;
+  /** Luna in care a cazut linia, derivata din `effectDate` de trigger. */
+  readonly periodId: string;
+}
+
+/**
+ * Inregistreaza o linie de cost.
+ *
+ * E use-case-ul generic pe care il vor chema toate documentele care produc
+ * costuri — bon de consum, NIR, pontaj, fisa de motorina (pasii 09-10). Pana
+ * atunci e si singura cale de a pune ceva in registru.
+ *
+ * `periodId` nu se trimite si nu se poate trimite: il pune trigger-ul din
+ * `effect_date`. Daca ai nevoie sa stii in ce luna a cazut linia, il primesti
+ * inapoi — nu-l calcula a doua oara in apelant.
+ */
+export async function recordCost(
+  actor: Actor,
+  input: RecordCostInput,
+): Promise<RecordCostResult> {
+  const values = recordCostInputSchema.parse(input);
+
+  try {
+    return await withActor(actor, async (tx) => insertCostLine(tx, actor, values));
+  } catch (error) {
+    return translateDbError(error);
+  }
+}
+
+/** Scrierea propriu-zisa, refolosita de storno si de seed. */
+async function insertCostLine(
+  tx: ActorTx,
+  actor: Actor,
+  values: RecordCostInput,
+  extra: { readonly reallocationOfId?: string; readonly isReallocation?: boolean } = {},
+): Promise<RecordCostResult> {
+  const id = uuidv7();
+
+  // Implicit cele doua analitici sunt egale. Le desparte doar cine trimite
+  // explicit `charged*` — si atunci linia apare in raportul de reconciliere.
+  const chargedContractId = values.chargedContractId ?? values.usedContractId;
+  const chargedComponentId =
+    values.chargedContractId === null
+      ? values.usedComponentId
+      : (values.chargedComponentId ?? null);
+
+  const rows = await tx
+    .insert(schema.costLines)
+    .values({
+      id,
+      companyId: values.companyId,
+      documentDate: values.documentDate,
+      effectDate: values.effectDate,
+      usedContractId: values.usedContractId,
+      usedComponentId: values.usedComponentId,
+      objectiveId: values.objectiveId,
+      workUnitId: values.workUnitId,
+      stageId: values.stageId,
+      chargedContractId,
+      chargedComponentId,
+      expenseType: values.expenseType,
+      productId: values.productId,
+      qualificationId: values.qualificationId,
+      quantity: values.quantity,
+      uom: values.uom,
+      amount: Money.fromDb(values.amount).toDbString(),
+      stage: values.stage,
+      documentType: values.documentType,
+      documentId: values.documentId,
+      documentLineId: values.documentLineId,
+      supplierId: values.supplierId,
+      subcontractorId: values.subcontractorId,
+      reallocationOfId: extra.reallocationOfId ?? null,
+      isReallocation: extra.isReallocation ?? false,
+      createdBy: actor.personId,
+    })
+    .returning({ id: schema.costLines.id, periodId: schema.costLines.periodId });
+
+  const row = rows[0];
+  if (row === undefined || row.periodId === null) {
+    throw new AppError('VALIDATION_FAILED', 'Linia de cost nu s-a putut înregistra.');
+  }
+
+  return { costLineId: row.id, periodId: row.periodId };
+}
+
+/**
+ * Corectia unei linii gresite, prin storno.
+ *
+ * Registrul e append-only: linia gresita ramane, iar deasupra ei se scrie una
+ * egala si opusa. Amandoua se vad, si de aceea cifra finala poate fi explicata —
+ * un `update` ar fi sters intrebarea „de ce 250 si nu 2500".
+ *
+ * Suma nu se trimite din afara: se ia din linia stornata si se inverseaza. O
+ * suma scrisa a doua oara de mana e o suma care se poate scrie gresit a doua oara.
+ *
+ * Storno-ul intra in **luna liniei originale** daca ea e deschisa. Daca s-a
+ * inchis, `guard_closed_period` refuza scrierea — si atunci corectia trece prin
+ * documentul de re-alocare, ca orice miscare pe o luna raportata.
+ */
+export async function stornoCost(
+  actor: Actor,
+  input: StornoCostInput,
+): Promise<RecordCostResult> {
+  const values = stornoCostInputSchema.parse(input);
+
+  try {
+    return await withActor({ ...actor, reason: values.reason }, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(schema.costLines)
+        .where(eq(schema.costLines.id, values.costLineId))
+        .limit(1);
+
+      const original = rows[0];
+      if (original === undefined) {
+        throw new AppError('NOT_FOUND', 'Linia de cost nu există sau nu e vizibilă.');
+      }
+
+      if (original.reallocationOfId !== null) {
+        throw new AppError(
+          'CONFLICT',
+          'Linia asta e deja o corecție — stornează linia originală, nu storno-ul ei.',
+        );
+      }
+
+      const id = uuidv7();
+      const inserted = await tx
+        .insert(schema.costLines)
+        .values({
+          ...original,
+          id,
+          // Data documentului ramane a documentului stornat: corectia se refera
+          // la el, nu la ziua in care si-a dat cineva seama de greseala.
+          amount: Money.fromDb(original.amount).negate().toDbString(),
+          // Si cantitatea se inverseaza: altfel „cate bucati am consumat" ar
+          // aduna bucatile stornate peste cele reale, desi banii s-ar fi anulat.
+          quantity:
+            original.quantity === null
+              ? null
+              : Quantity.fromDb(original.quantity).negate().toDbString(),
+          reallocationOfId: original.id,
+          createdBy: actor.personId,
+          createdAt: undefined,
+          periodId: undefined,
+        })
+        .returning({ id: schema.costLines.id, periodId: schema.costLines.periodId });
+
+      const row = inserted[0];
+      if (row === undefined || row.periodId === null) {
+        throw new AppError('VALIDATION_FAILED', 'Storno-ul nu s-a putut înregistra.');
+      }
+
+      return { costLineId: row.id, periodId: row.periodId };
+    });
+  } catch (error) {
+    return translateDbError(error);
+  }
+}
+
+/**
+ * Rescrie analitica „descarcat" pe liniile date. Ramura de luna DESCHISA a
+ * mutarii de finantare (§13.1).
+ *
+ * Trece prin `app.recharge_cost_line`, functia `security definer` din 0017:
+ * `update` pe registru nu e acordat niciunui rol, deci asta e singura usa. Ea
+ * cere motiv scris, il pune in audit, si lasa `used_*` si `document_date`
+ * neatinse — trigger-ul de append-only le apara oricum.
+ *
+ * Pe o luna inchisa functia ridica `PERIOD_CLOSED`, si asta e corect: mutarea
+ * trebuie sa treaca atunci prin documentul de re-alocare.
+ */
+export async function rechargeCostLines(
+  tx: ActorTx,
+  costLineIds: readonly string[],
+  target: { readonly contractId: string; readonly componentId: string | null },
+  reason: string,
+): Promise<number> {
+  for (const costLineId of costLineIds) {
+    await tx.execute(sql`
+      select app.recharge_cost_line(
+        ${costLineId}, ${target.contractId}, ${target.componentId}, ${reason}
+      )`);
+  }
+
+  return costLineIds.length;
+}
+
+/**
+ * Liniile de cost ale unei unitati de lucru care se muta odata cu ea.
+ *
+ * Se iau doar cele din luna care se muta: costurile lunilor deja raportate raman
+ * unde sunt, si pentru ele exista documentul de re-alocare. Fara filtrul asta, o
+ * mutare pe septembrie ar rescrie tacut si august.
+ */
+export async function costLineIdsForMove(
+  tx: ActorTx,
+  workUnitId: string,
+  fromPeriodId: string,
+  fromComponentId: string,
+): Promise<string[]> {
+  const rows = await tx
+    .select({ id: schema.costLines.id })
+    .from(schema.costLines)
+    .where(
+      and(
+        eq(schema.costLines.workUnitId, workUnitId),
+        eq(schema.costLines.periodId, fromPeriodId),
+        eq(schema.costLines.chargedComponentId, fromComponentId),
+      ),
+    );
+
+  return rows.map((row) => row.id);
+}
+
+// ── Citiri ───────────────────────────────────────────────────────────────────
+
+export type CostLineRow = typeof schema.costLines.$inferSelect & {
+  readonly workUnitCode: string | null;
+  readonly stageName: string | null;
+  readonly chargedComponentName: string | null;
+  readonly usedComponentName: string | null;
+  readonly createdByName: string | null;
+};
+
+/**
+ * Liniile de cost, filtrate si paginate.
+ *
+ * **Paginare cursor pe `(effect_date, id)`, niciodata `OFFSET`** (§3.5): la a
+ * zecea pagina dintr-un registru de o suta de mii de linii, `OFFSET` citeste
+ * toate randurile dinainte ca sa le arunce.
+ */
+export async function listCostLines(
+  actor: Actor,
+  query: CostQuery = {},
+): Promise<{ rows: CostLineRow[]; nextCursor: { effectDate: string; id: string } | null }> {
+  const values = costQuerySchema.parse(query);
+  const limit = values.limit ?? DEFAULT_LIMIT;
+
+  return withActor(actor, async (tx) => {
+    // Un filtru absent inseamna „nu filtra pe asta". `null` vine din `''`, deci
+    // e tot absenta — un `<select>` gol nu e o cerere de „unde e null".
+    const set = (value: string | null | undefined): value is string =>
+      value !== null && value !== undefined;
+
+    const conditions = [];
+    if (set(values.companyId)) conditions.push(eq(schema.costLines.companyId, values.companyId));
+    if (set(values.periodId)) conditions.push(eq(schema.costLines.periodId, values.periodId));
+    if (set(values.workUnitId)) conditions.push(eq(schema.costLines.workUnitId, values.workUnitId));
+    if (set(values.stageId)) conditions.push(eq(schema.costLines.stageId, values.stageId));
+    if (set(values.objectiveId))
+      conditions.push(eq(schema.costLines.objectiveId, values.objectiveId));
+    if (set(values.chargedComponentId))
+      conditions.push(eq(schema.costLines.chargedComponentId, values.chargedComponentId));
+    if (values.expenseType !== undefined)
+      conditions.push(eq(schema.costLines.expenseType, values.expenseType));
+    if (values.stage !== undefined) conditions.push(eq(schema.costLines.stage, values.stage));
+
+    // Cursorul: „mai vechi decat ultima linie afisata", cu id-ul ca departajare.
+    if (values.cursorEffectDate !== undefined && values.cursorId !== undefined) {
+      conditions.push(
+        or(
+          lt(schema.costLines.effectDate, values.cursorEffectDate),
+          and(
+            eq(schema.costLines.effectDate, values.cursorEffectDate),
+            lt(schema.costLines.id, values.cursorId),
+          ),
+        ),
+      );
+    }
+
+    const rows = await tx
+      .select({
+        line: schema.costLines,
+        workUnitCode: schema.workUnits.code,
+        stageName: schema.workStages.name,
+        chargedComponentName: sql<string | null>`(
+          select cc.name from app.contract_components cc
+           where cc.id = app.cost_lines.charged_component_id
+        )`,
+        usedComponentName: sql<string | null>`(
+          select cc.name from app.contract_components cc
+           where cc.id = app.cost_lines.used_component_id
+        )`,
+        createdByName: schema.persons.fullName,
+      })
+      .from(schema.costLines)
+      .leftJoin(schema.workUnits, eq(schema.workUnits.id, schema.costLines.workUnitId))
+      .leftJoin(schema.workStages, eq(schema.workStages.id, schema.costLines.stageId))
+      .leftJoin(schema.persons, eq(schema.persons.id, schema.costLines.createdBy))
+      .where(conditions.length === 0 ? undefined : and(...conditions))
+      .orderBy(desc(schema.costLines.effectDate), desc(schema.costLines.id))
+      .limit(limit + 1);
+
+    const page = rows.slice(0, limit);
+    const last = page.at(-1);
+
+    return {
+      rows: page.map((row) => ({
+        ...row.line,
+        workUnitCode: row.workUnitCode,
+        stageName: row.stageName,
+        chargedComponentName: row.chargedComponentName,
+        usedComponentName: row.usedComponentName,
+        createdByName: row.createdByName,
+      })),
+      nextCursor:
+        rows.length > limit && last !== undefined
+          ? { effectDate: last.line.effectDate, id: last.line.id }
+          : null,
+    };
+  });
+}
+
+export interface CostBreakdownRow {
+  readonly expenseType: string;
+  readonly committed: Money;
+  readonly received: Money;
+  readonly consumed: Money;
+  readonly invoiced: Money;
+}
+
+/**
+ * Tab-ul Costuri al unei unitati de lucru sau al unei etape: cheltuiala desfacuta
+ * pe fel si pe stadiu, dintr-o singura interogare.
+ */
+export async function costBreakdown(
+  actor: Actor,
+  scope: { readonly workUnitId?: string; readonly stageId?: string },
+): Promise<CostBreakdownRow[]> {
+  if (scope.workUnitId === undefined && scope.stageId === undefined) {
+    return [];
+  }
+
+  return withActor(actor, async (tx) => {
+    const conditions = [];
+    if (scope.workUnitId !== undefined)
+      conditions.push(eq(schema.costLines.workUnitId, scope.workUnitId));
+    if (scope.stageId !== undefined) conditions.push(eq(schema.costLines.stageId, scope.stageId));
+
+    const rows = await tx
+      .select({
+        expenseType: schema.costLines.expenseType,
+        committed: sql<string>`coalesce(sum(amount) filter (where stage = 'angajat'), 0)::text`,
+        received: sql<string>`coalesce(sum(amount) filter (where stage = 'receptionat'), 0)::text`,
+        consumed: sql<string>`coalesce(sum(amount) filter (where stage = 'consumat'), 0)::text`,
+        invoiced: sql<string>`coalesce(sum(amount) filter (where stage = 'facturat'), 0)::text`,
+      })
+      .from(schema.costLines)
+      .where(and(...conditions))
+      .groupBy(schema.costLines.expenseType)
+      .orderBy(asc(schema.costLines.expenseType));
+
+    return rows.map((row) => ({
+      expenseType: row.expenseType,
+      committed: Money.fromDb(row.committed),
+      received: Money.fromDb(row.received),
+      consumed: Money.fromDb(row.consumed),
+      invoiced: Money.fromDb(row.invoiced),
+    }));
+  });
+}
+
+export type ReconciliationRow = CostLineRow & {
+  readonly usedContractCode: string | null;
+  readonly chargedContractCode: string | null;
+};
+
+/**
+ * „Bani › Reconciliere folosit vs descarcat" (§12, verificarea #15).
+ *
+ * Interogarea merge pe indexul partial din 0017, care contine EXACT anomaliile:
+ * o linie normala, cu cele doua analitici egale, nu intra in index deloc. Daca
+ * lista creste necontrolat, problema e in firma, nu in software.
+ */
+export async function listReconciliation(
+  actor: Actor,
+  options: { readonly companyIds: readonly string[]; readonly periodId?: string },
+): Promise<ReconciliationRow[]> {
+  if (options.companyIds.length === 0) {
+    return [];
+  }
+
+  return withActor(actor, async (tx) => {
+    const conditions = [
+      inArray(schema.costLines.companyId, [...options.companyIds]),
+      sql`app.cost_lines.used_contract_id is distinct from app.cost_lines.charged_contract_id`,
+    ];
+    if (options.periodId !== undefined) {
+      conditions.push(eq(schema.costLines.periodId, options.periodId));
+    }
+
+    const rows = await tx
+      .select({
+        line: schema.costLines,
+        workUnitCode: schema.workUnits.code,
+        stageName: schema.workStages.name,
+        createdByName: schema.persons.fullName,
+        usedContractCode: sql<string | null>`(
+          select c.code from app.contracts c where c.id = app.cost_lines.used_contract_id
+        )`,
+        chargedContractCode: sql<string | null>`(
+          select c.code from app.contracts c where c.id = app.cost_lines.charged_contract_id
+        )`,
+        chargedComponentName: sql<string | null>`(
+          select cc.name from app.contract_components cc
+           where cc.id = app.cost_lines.charged_component_id
+        )`,
+        usedComponentName: sql<string | null>`(
+          select cc.name from app.contract_components cc
+           where cc.id = app.cost_lines.used_component_id
+        )`,
+      })
+      .from(schema.costLines)
+      .leftJoin(schema.workUnits, eq(schema.workUnits.id, schema.costLines.workUnitId))
+      .leftJoin(schema.workStages, eq(schema.workStages.id, schema.costLines.stageId))
+      .leftJoin(schema.persons, eq(schema.persons.id, schema.costLines.createdBy))
+      .where(and(...conditions))
+      .orderBy(desc(schema.costLines.effectDate), desc(schema.costLines.id))
+      .limit(DEFAULT_LIMIT);
+
+    return rows.map((row) => ({
+      ...row.line,
+      workUnitCode: row.workUnitCode,
+      stageName: row.stageName,
+      chargedComponentName: row.chargedComponentName,
+      usedComponentName: row.usedComponentName,
+      createdByName: row.createdByName,
+      usedContractCode: row.usedContractCode,
+      chargedContractCode: row.chargedContractCode,
+    }));
+  });
+}
+
+export interface RollupDivergence {
+  readonly componentId: string;
+  readonly periodId: string;
+  readonly columnName: string;
+  readonly stored: Money;
+  readonly expected: Money;
+}
+
+/**
+ * Recalculeaza rollup-urile din registru si intoarce DOAR diferentele.
+ *
+ * Interogarea traieste in baza (`app.rollup_verify`), nu aici, si dinadins: un
+ * test care ar verifica rollup-ul cu aceeasi formula care l-a produs n-ar
+ * verifica nimic. Jobul nocturn `rollup.verify` cheama functia asta.
+ */
+export async function verifyRollups(
+  actor: Actor,
+  periodId?: string,
+): Promise<RollupDivergence[]> {
+  return withActor(actor, async (tx) => {
+    const result = await tx.execute(sql`
+      select component_id, period_id, column_name, stored, expected
+        from app.rollup_verify(${periodId ?? null})`);
+
+    return (
+      result.rows as {
+        component_id: string;
+        period_id: string;
+        column_name: string;
+        stored: string;
+        expected: string;
+      }[]
+    ).map((row) => ({
+      componentId: row.component_id,
+      periodId: row.period_id,
+      columnName: row.column_name,
+      stored: Money.fromDb(row.stored),
+      expected: Money.fromDb(row.expected),
+    }));
+  });
+}

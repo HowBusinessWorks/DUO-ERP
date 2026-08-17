@@ -3,6 +3,7 @@ export {
   contractExpiryScan,
   defineJob,
   deltaFillScan,
+  rollupVerify,
   SCHEDULED_JOBS,
   systemPing,
 } from './registry';

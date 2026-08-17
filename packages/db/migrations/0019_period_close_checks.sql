@@ -1,0 +1,2 @@
+ALTER TABLE "app"."period_close_checks" DROP CONSTRAINT "period_close_checks_status";--> statement-breakpoint
+ALTER TABLE "app"."period_close_checks" ADD CONSTRAINT "period_close_checks_status" CHECK ("app"."period_close_checks"."status" in ('pending', 'ok', 'blocked', 'not_applicable', 'pending_module'));

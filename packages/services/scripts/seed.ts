@@ -1,5 +1,6 @@
 import { closeConnections, loadEnvFiles, schema, withActor, type Actor } from '@damina/db';
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { uuidv7 } from '@damina/shared';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import {
   createComponent,
   createContract,
@@ -124,6 +125,8 @@ async function assertWipeable(): Promise<void> {
     throw new Error(
       'Exista unitati de lucru de seed, iar alocarile lor de finantare nu se pot sterge ' +
         '(regula pasului 05: o alocare stearsa ia cu ea explicatia unei cifre raportate). ' +
+        'De la 06a incoace, nici liniile de cost nu se sterg — registrul e append-only, ' +
+        'iar corectia acolo e storno, nu `delete`. ' +
         'Ca sa reconstruiesti de la zero, ruleaza `pnpm db:reset`.',
     );
   }
@@ -337,12 +340,62 @@ function ignoreConflict(error: unknown): void {
   }
 }
 
+/** Contractul si componentele de seed, citite din baza. Pentru `--costs`. */
+async function costGround(): Promise<WorkUnitGround | null> {
+  return withActor(actor(), async (tx) => {
+    const contracts = await tx
+      .select({ id: schema.contracts.id })
+      .from(schema.contracts)
+      .where(and(eq(schema.contracts.companyId, IDS.companyA), eq(schema.contracts.code, '4700')))
+      .limit(1);
+
+    const contractId = contracts[0]?.id;
+    if (contractId === undefined) {
+      return null;
+    }
+
+    const components = await tx
+      .select({ id: schema.contractComponents.id, type: schema.contractComponents.type })
+      .from(schema.contractComponents)
+      .where(eq(schema.contractComponents.contractId, contractId));
+
+    const byType = (type: string): string =>
+      components.find((row) => row.type === type)?.id ?? '';
+
+    return {
+      objectiveIds: Array.from({ length: 20 }, (_, index) => IDS.objective(index + 1)),
+      contractId,
+      delta: byType('delta'),
+      maintenance: byType('mentenanta'),
+    };
+  });
+}
+
 async function main(): Promise<void> {
   const force = process.argv.includes('--force');
+  const onlyCosts = process.argv.includes('--costs');
 
   if (await exists()) {
+    /*
+     * `--costs` adauga DOAR registrul de cost peste un seed existent.
+     *
+     * Exista pentru ca liniile de cost nu se pot sterge (registrul e append-only),
+     * deci `--force` nu le poate reface, iar `db:reset` sterge tot — inclusiv ce
+     * ai construit de mana pe ecran. Cele zece mii de linii sunt insa exact ce
+     * lipseste ca sa se vada daca un ecran e rapid.
+     */
+    if (onlyCosts) {
+      const ground = await costGround();
+      if (ground === null) {
+        console.log('Contractul de seed lipseste; nu am pe ce sa pun linii de cost.');
+        return;
+      }
+      await seedCostLines(ground);
+      return;
+    }
+
     if (!force) {
-      console.log('Seed-ul exista deja. Ruleaza cu --force ca sa-l refaci.');
+      console.log('Seed-ul exista deja. Ruleaza cu --force ca sa-l refaci (sau --costs).');
       return;
     }
     await wipe();
@@ -532,15 +585,20 @@ async function main(): Promise<void> {
   }
 
   // ── Unitatile de lucru (pasul 05) ──────────────────────────────────────────
-  await seedWorkUnits({
+  const workUnitGround = {
     objectiveIds,
     delta: components.delta.id,
     maintenance: components.maintenance.id,
     contractId: maintenance.id,
-  });
+  };
+  await seedWorkUnits(workUnitGround);
+
+  // ── Registrul de cost (pasul 06) ───────────────────────────────────────────
+  await seedCostLines(workUnitGround);
 
   console.log(
-    'Seed complet: 2 firme, 2 contracte, 20 obiective, plafoane pe 3 luni, 3 unitati de lucru.',
+    'Seed complet: 2 firme, 2 contracte, 20 obiective, plafoane pe 3 luni, 3 unitati de lucru,\n' +
+      'si 10.000 de linii de cost.',
   );
 }
 
@@ -774,9 +832,149 @@ async function seedWorkUnits(base: WorkUnitGround): Promise<void> {
   console.log('3 unitati de lucru: o lucrare pe 3 luni de Delta, o interventie, o inspectie.');
 }
 
+/**
+ * Zece mii de linii de cost (verificarea #8 a pasului 06).
+ *
+ * Volumul nu e decor: la o suta de linii, un rollup gresit trece neobservat, iar
+ * un ecran care agrega registrul la fiecare afisare pare rapid. La zece mii,
+ * amandoua se vad. Verificarea #10 („Contract › Prezentare sub 200 ms") si #21
+ * (drill-down cu paginare cursor) au nevoie exact de datele astea.
+ *
+ * Cifrele sunt DETERMINISTE, nu aleatoare: aceeasi rulare da aceleasi totaluri,
+ * deci un test se poate lega de ele. Sumele cresc ciclic si se inchid pe sute,
+ * ca totalul lunii sa fie o cifra pe care o poti verifica din cap.
+ *
+ * Se insereaza direct, in loturi, nu prin `recordCost`: use-case-ul valideaza si
+ * scrie o linie odata, ceea ce e corect pentru un bon de consum si nepotrivit
+ * pentru zece mii. Triggerele — luna derivata, etapa pe lucrari, rollup-ul —
+ * ruleaza oricum, si ele sunt lucrul care se testeaza aici.
+ */
+async function seedCostLines(base: WorkUnitGround): Promise<void> {
+  const already = await withActor(actor(), async (tx) =>
+    tx.select({ id: schema.costLines.id }).from(schema.costLines).limit(1),
+  );
+  if (already.length > 0) {
+    console.log('Registrul de cost are deja linii; seed-ul lor se sare.');
+    return;
+  }
+
+  // Lucrarea si etapele ei se citesc din baza, nu se primesc ca parametru: asa
+  // pasul asta merge si singur, pe o baza in care unitatile exista deja.
+  const stageIds = await withActor(actor(), async (tx) =>
+    (
+      await tx
+        .select({ id: schema.workStages.id })
+        .from(schema.workStages)
+        .where(eq(schema.workStages.workUnitId, IDS.workUnitLucrare))
+        .orderBy(schema.workStages.position)
+    ).map((row) => row.id),
+  );
+
+  if (stageIds.length === 0) {
+    console.log('Lucrarea de seed n-are etape; liniile de cost se sar.');
+    return;
+  }
+
+  const periods = await withActor(actor(), async (tx) =>
+    tx.select().from(schema.periods).where(eq(schema.periods.companyId, IDS.companyA)),
+  );
+
+  /*
+   * Doar lunile DESCHISE dintre cele trei pe care sta finantarea. Intr-o luna
+   * inchisa nu se scrie, si asa trebuie: daca cineva a inchis martie ca sa
+   * incerce ecranul de inchidere, seed-ul n-are voie sa treaca peste asta. Mai
+   * bine mai putine luni decat o regula ocolita de un script.
+   */
+  const months = ([3, 4, 5] as const)
+    .map((month) => periods.find((row) => row.year === 2026 && row.month === month))
+    .filter((row): row is NonNullable<typeof row> => row !== undefined && row.status === 'open')
+    .map((row) => ({ date: `2026-0${String(row.month)}-1${String(row.month % 5)}`, period: row.id }));
+
+  if (months.length === 0) {
+    console.log('Lunile 03-05/2026 lipsesc sau sunt inchise; liniile de cost se sar.');
+    return;
+  }
+
+  const EXPENSE_TYPES = [
+    'material',
+    'manopera_proprie',
+    'servicii_subc',
+    'utilaj',
+    'motorina',
+    'transport',
+    'reparatii',
+    'alte',
+  ] as const;
+  const STAGES = ['angajat', 'receptionat', 'consumat', 'facturat'] as const;
+  const DOCUMENTS = ['bon_consum', 'nir', 'factura_furnizor', 'pontaj', 'fisa_utilaj'] as const;
+
+  // Lunile pe care se imprastie: cele deschise dintre cele trei pe care sta si
+  // finantarea, ca suma consumata sa se poata compara cu venitul alocat.
+  const MONTHS = months;
+
+  const TOTAL = 10_000;
+  const BATCH = 500;
+
+  const objective = base.objectiveIds[0] ?? IDS.objective(1);
+  const rows: (typeof schema.costLines.$inferInsert)[] = [];
+
+  for (let index = 0; index < TOTAL; index += 1) {
+    const month = MONTHS[index % MONTHS.length];
+    const stage = STAGES[index % STAGES.length];
+    const expenseType = EXPENSE_TYPES[index % EXPENSE_TYPES.length];
+    const documentType = DOCUMENTS[index % DOCUMENTS.length];
+    // Etapa e OBLIGATORIE pe lucrari — trigger-ul din 0017. Ciclam cele trei.
+    const stageId = stageIds[index % Math.max(stageIds.length, 1)];
+
+    if (month === undefined || stage === undefined || expenseType === undefined) continue;
+    if (documentType === undefined || stageId === undefined) continue;
+
+    rows.push({
+      id: uuidv7(),
+      companyId: IDS.companyA,
+      documentDate: month.date,
+      effectDate: month.date,
+      usedContractId: base.contractId,
+      usedComponentId: base.delta,
+      objectiveId: objective,
+      workUnitId: IDS.workUnitLucrare,
+      stageId,
+      chargedContractId: base.contractId,
+      chargedComponentId: base.delta,
+      expenseType,
+      quantity: String((index % 7) + 1),
+      uom: 'buc',
+      amount: `${String(10 + (index % 90))}.00`,
+      stage,
+      documentType,
+      documentId: uuidv7(),
+      createdBy: IDS.pm,
+    });
+  }
+
+  await withActor(actor('seed registru de cost'), async (tx) => {
+    for (let start = 0; start < rows.length; start += BATCH) {
+      await tx.insert(schema.costLines).values(rows.slice(start, start + BATCH));
+    }
+  });
+
+  const rollup = await withActor(actor(), async (tx) =>
+    tx.execute(sql`
+      select coalesce(sum(consumed), 0)::text as consumed
+        from app.component_period_rollup where component_id = ${base.delta}`),
+  );
+  const consumed = (rollup.rows[0] as { consumed: string } | undefined)?.consumed ?? '0';
+
+  console.log(
+    `${String(rows.length)} linii de cost pe ${String(MONTHS.length)} luni deschise; ` +
+      `consumat in rollup: ${consumed} RON.`,
+  );
+}
+
 main()
   .catch((error: unknown) => {
     console.error(error);
     process.exitCode = 1;
   })
   .finally(() => void closeConnections());
+

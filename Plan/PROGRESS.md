@@ -149,7 +149,7 @@ scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat: #8, #10, #13, #14) | 2026-08-15 |
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
-| 06 — Registrul de cost, închidere | 🟨 în lucru (06a gata, CI verde; 06b, 06c neîncepute) | 2026-08-17 |
+| 06 — Registrul de cost, închidere | 🟨 în lucru (06a gata cu CI verde; 06b gata local; 06c neînceput) | 2026-08-17 |
 | 07 — File management (R2) | ⬜ neînceput | — |
 | 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
 | 09 — Fișe de lucru | ⬜ neînceput | — |
@@ -1667,6 +1667,75 @@ efectiv aplicat:
 
 ---
 
+### 2026-08-17 — [status: gata local, CI de confirmat] — 06b, use-case-urile și închiderea
+
+**Pachet nou de use-case-uri: `packages/services/cost.ts`** — `recordCost`, `stornoCost`,
+`rechargeCostLines`, `costLineIdsForMove`, `listCostLines` (paginare **cursor**, niciodată `OFFSET`),
+`costBreakdown`, `listReconciliation`, `verifyRollups`.
+
+**`moveFunding` nu mai minte.** `costLineIds: []` a devenit lista reală: liniile din luna și
+componenta din care se mută. Pe ramura lunii deschise ele trec prin `app.recharge_cost_line`, **în
+aceeași tranzacție** cu supersedarea alocării. Rezultatul are un câmp nou, `rechargedCostLines`.
+
+**Închiderea de lună** (`packages/services/period-close.ts`): `open → closing → closed`, cu
+redeschidere de administrator. Checklist-ul e **date**, cu registrul de verificări în cod și
+`app.period_close_checks` ca stare.
+
+**Jobul `rollup.verify`**, cron `0 2 * * *`, plus cele patru metrici de integritate din §3.6.
+
+**Migrare nouă: `0019_period_close_checks`** — cele cinci stări ale unui rând de checklist.
+
+**Verificări din pas care trec / nu trec:**
+
+Rulate pe **Supabase dev (Postgres 17.6) real**, prin use-case-uri, nu prin SQL:
+
+- [x] **#9** rollup corupt → `rollup_verify` îl găsește; jobul ridică alertă cu componenta și diferența
+- [x] **#13** mutarea pe lună deschisă rescrie `charged_*` pe linii, `used_*` și `document_date` rămân,
+  ambele rollup-uri se mișcă în aceeași tranzacție
+- [x] **#14** mutarea pe lună închisă: document de re-alocare, **zero linii rescrise**
+- [x] **#15** linia mutată pe alt contract apare în reconciliere; înainte de mutare, nu
+- [x] **#16** o comandă lansată și nelămurită blochează închiderea, cu contor și link; butonul e
+  inactiv, **și serviciul refuză din nou** — butonul inactiv e comoditate, regula e în `closePeriod`
+- [x] **#17** închiderea cere motiv, îl scrie în audit, iar scrierile ulterioare în lună eșuează
+- [x] **#18** redeschiderea fără motiv e blocată; cu motiv, trece
+- [x] **#8** (jumătatea de volum) seed cu **10.000 de linii**: `sum(amount)` din registru =
+  `sum(committed+received+consumed+invoiced)` din rollup-uri, la leu — `548360.00` — și
+  `rollup_verify()` întoarce **zero** divergențe
+- [x] `pnpm typecheck` 12/12 · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets` — verzi
+- [ ] Cele **17 teste noi** din `packages/services/tests/cost.test.ts` — nerulate local (fără Docker).
+  Se confirmă la primul CI. Toate scenariile lor au trecut însă prin harness-ul de pe Supabase dev.
+
+**Observații / decizii luate / abateri de la plan:**
+
+- **Storno-ul nu primește suma din afară.** O ia din linia stornată și o inversează — o sumă scrisă a
+  doua oară de mână e o sumă care se poate scrie greșit a doua oară. Se inversează **și cantitatea**:
+  altfel „câte bucăți am consumat" ar aduna bucățile stornate peste cele reale, deși banii s-ar fi
+  anulat. Storno-ul unui storno e refuzat: corecția se face pe linia originală.
+- **Serviciul face cele două analitici egale când apelantul nu le desparte.** Implicit sunt egale
+  (§12); cine le desparte o face explicit, și atunci linia intră singură în raportul de reconciliere.
+- **Rândul de checklist „linii fără analitică «descărcat»" a fost ARUNCAT.** `check`-ul din 0017 îl
+  face imposibil, iar un rând care nu poate cădea niciodată e un rând pe care oamenii învață să nu-l
+  mai citească. În locul lui: **comenzile lansate care n-au ajuns la recepție**, grupate pe document,
+  cu sold ≠ 0. Rămâne ca metrică de integritate (§3.6), unde e la locul ei.
+- **Soldul, nu numărul de linii.** Registrul fiind append-only, o comandă anulată nu dispare: se
+  eliberează cu o linie negativă pe același stadiu. Dacă rândul ar număra linii `angajat`, ar rămâne
+  roșu pentru totdeauna — adică ar face închiderea imposibilă.
+- **`recordCost` nu primește `periodId` și nu poate.** Îl pune trigger-ul din `effect_date`; îl
+  primești înapoi în rezultat, ca să nu-l recalculeze apelantul.
+- **Alertele de rollup se grupează pe componentă**, nu pe coloană: patru coloane divergente pe aceeași
+  componentă sunt o singură problemă. Alerta se închide singură — indexul unic parțial din 0008.
+- **Seed-ul a căpătat `--costs`.** Liniile de cost nu se pot șterge, deci `--force` nu le poate reface,
+  iar `db:reset` șterge tot — inclusiv ce ai construit de mână pe ecran. `--costs` adaugă doar
+  registrul peste un seed existent. Scrie **numai în lunile deschise** dintre 03–05/2026: dacă cineva
+  a închis martie ca să încerce ecranul de închidere, seed-ul n-are voie să treacă peste asta.
+- **Ce rămâne pentru 06c:** verificările **#10** (Prezentare sub 200 ms, o singură interogare pe
+  rollup), **#11** (drill-down până la document), **#19** (comutatorul brut/net) și **#21** (100.000
+  de linii, prima pagină sub 500 ms). Toate trei cer ecranul; datele pentru ele există deja.
+- **Regia (`overhead_snapshots`) e scrisă, dar încă nu o populează nimeni.** Recalcularea lunară e a
+  worker-ului și intră tot la 06c, împreună cu comutatorul de marjă care o afișează.
+
+---
+
 ## Pasul 07 — File management (R2)
 
 *(nicio sesiune n-a lucrat încă aici)*
@@ -1709,4 +1778,5 @@ efectiv aplicat:
 **Ce rămâne pentru sesiunea următoare:**
 - ...
 ```
+
 

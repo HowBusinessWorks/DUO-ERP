@@ -132,3 +132,18 @@ export type {
   WorkUnitStatusValue,
   WorkUnitType,
 } from './work-units';
+
+export {
+  COST_DOCUMENT_TYPE_LABELS,
+  COST_DOCUMENT_TYPES,
+  COST_STAGE_LABELS,
+  COST_STAGES,
+  costQuerySchema,
+  EXPENSE_TYPE_LABELS,
+  EXPENSE_TYPES,
+  MARGIN_BASES,
+  MARGIN_BASIS_LABELS,
+  recordCostInputSchema,
+  stornoCostInputSchema,
+} from './cost';
+export type { CostQuery, MarginBasis, RecordCostInput, StornoCostInput } from './cost';

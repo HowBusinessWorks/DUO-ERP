@@ -34,6 +34,7 @@ import {
 } from '@damina/domain';
 import { AppError, Money, uuidv7 } from '@damina/shared';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { costLineIdsForMove, rechargeCostLines } from './cost';
 import { SQLSTATE, sqlstate, translateDbError } from './db-errors';
 
 /**
@@ -875,6 +876,11 @@ export interface MoveFundingResult {
   /** Documentul de re-alocare, doar pe ramura lunii inchise. */
   readonly reallocationDocumentId: string | null;
   readonly reallocationNumber: string | null;
+  /**
+   * Cate linii de cost si-au schimbat analitica „descarcat". Zero pe ramura lunii
+   * inchise, unde liniile raman dinadins acolo unde sunt.
+   */
+  readonly rechargedCostLines: number;
 }
 
 /**
@@ -915,6 +921,21 @@ export async function moveFunding(
         );
       }
 
+      /*
+       * Costurile urmeaza unitatea de lucru (§13.1). Se iau doar liniile din luna
+       * si componenta din care se muta — cele din lunile deja raportate raman
+       * unde sunt, si pentru ele exista documentul de re-alocare.
+       *
+       * Pe ramura lunii inchise lista nu se foloseste: `planFundingMove` o ignora,
+       * si asa trebuie. O calculam oricum, pentru ca e aceeasi intrebare.
+       */
+      const costLineIds = await costLineIdsForMove(
+        tx,
+        values.workUnitId,
+        context.allocation.periodId,
+        context.allocation.componentId,
+      );
+
       const plan = planFundingMove({
         workUnitId: values.workUnitId,
         from: {
@@ -930,9 +951,7 @@ export async function moveFunding(
         fromPeriodStatus: context.fromPeriodStatus,
         currentPeriodId: current.id,
         amount: Money.fromDb(context.allocation.allocatedAmount),
-        // Registrul de cost vine la pasul 06. Pana atunci nu exista linii de
-        // rescris, si planul nu se preface ca exista.
-        costLineIds: [],
+        costLineIds,
         reason: values.reason,
       });
 
@@ -955,12 +974,28 @@ export async function moveFunding(
           .set({ status: 'superseded', supersededBy: newAllocationId })
           .where(eq(schema.fundingAllocations.id, values.allocationId));
 
+        /*
+         * Si liniile de cost, in ACEEASI tranzactie: daca supersedarea trece si
+         * rescrierea cade, unitatea ar fi finantata dintr-o parte si consumata
+         * din alta — exact starea pe care raportul de reconciliere o cauta.
+         *
+         * `used_*` ramane neatins: rescrierea schimba doar cine plateste.
+         * Rollup-urile ambelor componente se misca prin trigger.
+         */
+        await rechargeCostLines(
+          tx,
+          plan.costLineIds,
+          { contractId: plan.target.contractId, componentId: plan.target.componentId },
+          values.reason,
+        );
+
         return {
           kind: plan.kind,
           newAllocationId,
           supersededAllocationId: values.allocationId,
           reallocationDocumentId: null,
           reallocationNumber: null,
+          rechargedCostLines: plan.costLineIds.length,
         };
       }
 
@@ -994,6 +1029,9 @@ export async function moveFunding(
         supersededAllocationId: null,
         reallocationDocumentId: documentId,
         reallocationNumber: number,
+        // Luna raportata nu se rescrie: liniile raman datate in luna lor, iar
+        // miscarea se vede in documentul de mai sus. Ambele capete vizibile.
+        rechargedCostLines: 0,
       };
     });
   } catch (error) {
