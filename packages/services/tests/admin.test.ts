@@ -8,11 +8,12 @@ import {
   linkAuthUser,
   listPersonOptions,
   listPersons,
+  revokeSessions,
   setCompanyAccess,
   setOfficeRoles,
   updatePerson,
 } from '../src/admin';
-import { officeActor, rejection } from './helpers';
+import { actorFor, officeActor, rejection } from './helpers';
 
 afterAll(async () => {
   await closeConnections();
@@ -194,5 +195,49 @@ describe('liste', () => {
     expect(ids).toContain(active.id);
     expect(ids).not.toContain(inactive.id);
     expect(ids).not.toContain(fieldPerson.id);
+  });
+});
+
+describe('inchiderea sesiunilor (verificarea #18)', () => {
+  it('nu face nimic pentru o persoana fara cont, si nu minte despre asta', async () => {
+    const { id } = await createPerson(officeActor(), personForm() as never);
+
+    // Fara cont nu exista sesiuni. Zero nu e un esec — e raspunsul corect, si
+    // ecranul are voie sa-l spuna in loc sa raporteze o revocare imaginara.
+    expect(await revokeSessions(officeActor('test'), id)).toBe(0);
+
+    // Si nu se scrie nimic in jurnal: nu s-a intamplat nimic de consemnat.
+    expect((await getPerson(officeActor(), id)).sessionsRevokedAt).toBeNull();
+  });
+
+  it('marcheaza momentul, ca revocarea sa ajunga in jurnal', async () => {
+    const { id } = await createPerson(officeActor(), personForm() as never);
+    await linkAuthUser(officeActor('test'), id, uuidv7());
+
+    /*
+     * Numarul de sesiuni sterse depinde de mediu: pe Supabase exista
+     * `auth.sessions`, in Postgres-ul din CI nu — si functia se uita la
+     * `to_regclass` inainte sa stearga. Ce e ACELASI in amandoua, si ce
+     * conteaza aici, e urma: coloana se scrie, deci trigger-ul de audit are ce
+     * consemna, cu actor si cu motiv.
+     */
+    await revokeSessions(officeActor('închidere de sesiuni'), id);
+
+    const person = await getPerson(officeActor(), id);
+    expect(person.sessionsRevokedAt).not.toBeNull();
+  });
+
+  it('nu lasa pe oricine sa deconecteze pe oricine', async () => {
+    const { id } = await createPerson(officeActor(), personForm() as never);
+    await linkAuthUser(officeActor('test'), id, uuidv7());
+
+    // Guard-ul e in functia din baza (0015), nu doar in ruta: o functie
+    // `security definer` care sterge sesiuni si se increde in apelant ar fi o
+    // unealta de deconectare a oricui, la dispozitia oricarei sesiuni.
+    const magazioner = actorFor('office', 'app_office', 'test', {
+      office_roles: ['magazie'],
+    });
+    const error = await rejection(revokeSessions(magazioner, id));
+    expect(String(error)).toMatch(/FORBIDDEN|administrator/i);
   });
 });

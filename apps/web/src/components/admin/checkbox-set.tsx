@@ -22,22 +22,41 @@ export interface CheckboxOption {
   readonly hint?: string;
 }
 
+/**
+ * Unde se trimite setul.
+ *
+ * Doua variante pentru ca operatiile nu sunt la fel de scumpe: accesul pe firme
+ * schimba doar randuri si merge printr-un server action obisnuit, iar rolurile
+ * pot revoca sesiunea celui vizat (verificarea #18) — asta cere Admin API-ul
+ * GoTrue, deci cheia de service, deci o ruta `/api` (§4 regula 6).
+ *
+ * Varianta cu ruta accepta un `notice` in raspuns: mesajul care spune ce s-a
+ * mai intamplat pe langa salvare il scrie SERVERUL, langa decizia care l-a
+ * produs, nu componenta asta — ea n-are de unde sti daca s-a revocat ceva.
+ */
+export type CheckboxSetTarget =
+  | {
+      readonly kind: 'action';
+      /**
+       * Server action-ul, ca REFERINTA, nu ca inchidere.
+       *
+       * Un `save={(values) => actiune({ personId, roles: values })}` scris in
+       * componenta de server pare mai citibil si pica la randare: „Functions
+       * cannot be passed directly to Client Components”. O inchidere nu se
+       * serializeaza; un server action exportat cu `'use server'` da, pentru ca
+       * e o referinta pe care runtime-ul o poate rezolva de partea cealalta.
+       *
+       * De asta corpul cererii se compune AICI, din `personId` si `payloadKey`,
+       * in loc sa vina gata facut de sus.
+       */
+      readonly action: (raw: unknown) => Promise<ActionResult<{ id: string }>>;
+    }
+  | { readonly kind: 'endpoint'; readonly url: string };
+
 export interface CheckboxSetProps {
   readonly options: readonly CheckboxOption[];
   readonly selected: readonly string[];
-  /**
-   * Server action-ul, ca REFERINTA, nu ca inchidere.
-   *
-   * Un `save={(values) => actiune({ personId, roles: values })}` scris in
-   * componenta de server pare mai citibil si pica la randare: „Functions cannot
-   * be passed directly to Client Components”. O inchidere nu se serializeaza;
-   * un server action exportat cu `'use server'` da, pentru ca e o referinta pe
-   * care runtime-ul o poate rezolva de partea cealalta.
-   *
-   * De asta corpul cererii se compune AICI, din `personId` si `payloadKey`, in
-   * loc sa vina gata facut de sus.
-   */
-  readonly action: (raw: unknown) => Promise<ActionResult<{ id: string }>>;
+  readonly target: CheckboxSetTarget;
   readonly personId: string;
   /** Numele campului din corpul actiunii: `roles` sau `companyIds`. */
   readonly payloadKey: 'roles' | 'companyIds';
@@ -51,10 +70,39 @@ export interface CheckboxSetProps {
 const sameSet = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|');
 
+/** Rezultatul salvarii, indiferent pe unde a mers. */
+type SaveOutcome =
+  | { readonly ok: true; readonly notice?: string }
+  | { readonly ok: false; readonly message: string };
+
+async function post(url: string, body: unknown): Promise<SaveOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return { ok: false, message: 'Nu am putut ajunge la server. Verifică conexiunea.' };
+  }
+
+  const payload: unknown = await response.json().catch(() => null);
+  const record = typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>) : {};
+
+  if (!response.ok) {
+    const message = record['message'];
+    return { ok: false, message: typeof message === 'string' ? message : 'Salvarea n-a reușit.' };
+  }
+
+  const notice = record['notice'];
+  return typeof notice === 'string' ? { ok: true, notice } : { ok: true };
+}
+
 export function CheckboxSet({
   options,
   selected,
-  action,
+  target,
   personId,
   payloadKey,
   saveLabel,
@@ -114,10 +162,20 @@ export function CheckboxSet({
             void (async () => {
               setSaving(true);
               setError(undefined);
-              const result = await action({ personId, [payloadKey]: current });
+
+              const body = { personId, [payloadKey]: current };
+              const result: SaveOutcome =
+                target.kind === 'endpoint'
+                  ? await post(target.url, body)
+                  : await target.action(body).then((outcome) =>
+                      outcome.ok
+                        ? ({ ok: true } as const)
+                        : ({ ok: false, message: outcome.message } as const),
+                    );
+
               setSaving(false);
               if (result.ok) {
-                toast({ tone: 'success', title: 'Salvat' });
+                toast({ tone: 'success', title: 'Salvat', body: result.notice });
                 router.refresh();
               } else {
                 setError(result.message);

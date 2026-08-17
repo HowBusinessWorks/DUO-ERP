@@ -1,6 +1,12 @@
-import type { CompanyAccessInput, OfficeRolesInput, PersonInput } from '@damina/contracts';
+import type {
+  CompanyAccessInput,
+  OfficeRole,
+  OfficeRolesInput,
+  PersonInput,
+} from '@damina/contracts';
 import {
   companyAccessInputSchema,
+  officeRoleSchema,
   officeRolesInputSchema,
   personInputSchema,
 } from '@damina/contracts';
@@ -64,7 +70,16 @@ function asConflict(error: unknown, message: string): never {
 }
 
 export type PersonRow = typeof schema.persons.$inferSelect & {
-  readonly officeRoles: readonly string[];
+  /**
+   * Tipul ingust, nu `string[]`.
+   *
+   * Coloana vine dintr-un `array_agg` peste un enum Postgres, deci valorile SUNT
+   * roluri valide — dar `sql<...>` e o promisiune, nu o verificare. Promisiunea
+   * se face aici, o data, pentru ca altfel fiecare consumator care intreaba
+   * matricea de drepturi „vede preturi cu rolurile astea?” ar fi trebuit sa
+   * filtreze singur, iar unul dintre ei ar fi uitat.
+   */
+  readonly officeRoles: readonly OfficeRole[];
   readonly companyIds: readonly string[];
   readonly companyNames: readonly string[];
   readonly qualificationName: string | null;
@@ -127,7 +142,13 @@ type SelectedPerson = {
 function toRow(row: SelectedPerson): PersonRow {
   return {
     ...row.person,
-    officeRoles: row.officeRoles,
+    // Filtrarea nu e paranoia goala: `sql<...>` spune ce SPERAM sa vina, nu ce
+    // vine. Daca maine se adauga o valoare in enum-ul din baza si nu si in
+    // `officeRoleSchema`, aici se pierde un rol necunoscut in loc sa se
+    // strecoare unul pe care matricea nu-l cunoaste.
+    officeRoles: row.officeRoles.filter((role): role is OfficeRole =>
+      (officeRoleSchema.options as readonly string[]).includes(role),
+    ),
     companyIds: row.companyIds,
     companyNames: row.companyNames,
     qualificationName: row.qualificationName,
@@ -321,6 +342,35 @@ export async function setCompanyAccess(
         .values(unique.map((companyId) => ({ personId, companyId })));
     }
     return { id: personId };
+  });
+}
+
+/**
+ * Inchide toate sesiunile unei persoane, acum (verificarea #18).
+ *
+ * ── De ce nu prin Admin API, cum spunea planul ──────────────────────────────
+ *
+ * Pentru ca Admin API-ul GoTrue nu poate: singura lui functie de deconectare,
+ * `auth.admin.signOut(jwt)`, cere ACCESS TOKEN-UL omului, nu id-ul lui. Pe
+ * ecranul de administrare n-ai token-ul altcuiva. Endpoint-urile care ar fi
+ * facut-o dupa id (`DELETE /admin/users/{id}/sessions` si vecinii lor) intorc
+ * 404 — nu exista.
+ *
+ * Ce exista e mai direct: sesiunile stau in `auth.sessions`, iar GoTrue le
+ * verifica la fiecare `GET /user`. Sterse, urmatorul apel intoarce 403
+ * `session_not_found`. Detaliile si guard-ul sunt in migrarea 0015; aici e doar
+ * poarta.
+ *
+ * Intoarce cate sesiuni s-au inchis. `0` inseamna „n-avea niciuna deschisa”
+ * sau „n-are cont” — ecranul are voie sa spuna adevarul, nu o revocare
+ * imaginara.
+ */
+export async function revokeSessions(actor: Actor, personId: string): Promise<number> {
+  return withActor(actor, async (tx) => {
+    const result = await tx.execute<{ revoked: number }>(
+      sql`select app.revoke_sessions(${personId}) as revoked`,
+    );
+    return result.rows[0]?.revoked ?? 0;
   });
 }
 

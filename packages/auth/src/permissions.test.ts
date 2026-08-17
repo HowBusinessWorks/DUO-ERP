@@ -7,13 +7,22 @@ import {
   capabilitiesOf,
   CAPABILITIES,
   PERMISSION_MATRIX,
+  grantsCapability,
+  MFA_REQUIRED_ROLES,
+  mfaSatisfied,
   requireCapability,
+  requireMfa,
   requireOfficeRole,
   requirePersona,
+  requiresMfa,
 } from './permissions';
-import type { OfficeRole, Session } from './session';
+import type { AuthenticatorLevel, OfficeRole, Session } from './session';
 
-function session(persona: Session['persona'], officeRoles: readonly OfficeRole[] = []): Session {
+function session(
+  persona: Session['persona'],
+  officeRoles: readonly OfficeRole[] = [],
+  aal: AuthenticatorLevel = 'aal2',
+): Session {
   return {
     personId: '01950000-0000-7000-8000-000000030001',
     fullName: 'Test',
@@ -23,6 +32,7 @@ function session(persona: Session['persona'], officeRoles: readonly OfficeRole[]
     subcontractorId: persona === 'subcontractor' ? '01950000-0000-7000-8000-000000060001' : null,
     clientId: persona === 'client' ? '01950000-0000-7000-8000-000000020001' : null,
     mustChangePassword: false,
+    aal,
   };
 }
 
@@ -98,5 +108,67 @@ describe('guard-uri', () => {
     expect(() => requirePersona(admin, 'office', 'field')).not.toThrow();
     expect(() => requireOfficeRole(admin, 'admin', 'financiar')).not.toThrow();
     expect(() => requireCapability(admin, 'admin.users')).not.toThrow();
+  });
+});
+
+describe('al doilea factor', () => {
+  it('il cere exact rolurilor care dau drepturi si vad banii', () => {
+    for (const role of MFA_REQUIRED_ROLES) {
+      expect(requiresMfa(session('office', [role]))).toBe(true);
+    }
+    for (const role of ['pm', 'devizist', 'achizitii', 'magazie', 'flota'] as const) {
+      expect(requiresMfa(session('office', [role]))).toBe(false);
+    }
+  });
+
+  it('il cere si cand rolul obligat e doar unul dintre mai multe', () => {
+    // Un om cu `pm` si `financiar` nu scapa pentru ca primul rol nu cere nimic.
+    expect(requiresMfa(session('office', ['pm', 'financiar']))).toBe(true);
+  });
+
+  it('nu il cere in afara biroului', () => {
+    // Terenul si portalurile n-au roluri de birou, deci n-au cum sa intre in
+    // lista. Verificarea exista pentru ziua in care cineva pune un rand in
+    // `person_office_roles` pentru un sef de santier.
+    for (const persona of ['field', 'subcontractor', 'client'] as const) {
+      expect(requiresMfa(session(persona, ['admin']))).toBe(false);
+      expect(mfaSatisfied(session(persona, ['admin'], 'aal1'))).toBe(true);
+    }
+  });
+
+  it('un admin pe aal1 e oprit, acelasi admin pe aal2 trece', () => {
+    expect(mfaSatisfied(session('office', ['admin'], 'aal1'))).toBe(false);
+    expect(mfaSatisfied(session('office', ['admin'], 'aal2'))).toBe(true);
+
+    expect(() => requireMfa(session('office', ['admin'], 'aal1'))).toThrow(AppError);
+    expect(() => requireMfa(session('office', ['admin'], 'aal2'))).not.toThrow();
+  });
+
+  it('nu scade drepturile din matrice cand lipseste al doilea factor', () => {
+    // `aal` e o poarta pe drum, nu un drept. Daca ar intra in `can()`, ecranul
+    // de administrare si-ar arata propriile coloane golite.
+    const admin = session('office', ['admin'], 'aal1');
+    expect(can(admin, 'admin.users')).toBe(true);
+    expect(canSeeFinancials(admin)).toBe(true);
+  });
+});
+
+describe('grantsCapability', () => {
+  it('raspunde identic cu `can`, fara sesiune', () => {
+    for (const spec of PERMISSION_MATRIX) {
+      for (const role of ['admin', 'financiar', 'pm', 'magazie'] as const) {
+        expect(grantsCapability('office', [role], spec.key)).toBe(
+          can(session('office', [role]), spec.key),
+        );
+      }
+    }
+  });
+
+  it('vede pierderea dreptului la preturi intre doua seturi de roluri', () => {
+    // Exact intrebarea din verificarea #18, pusa asa cum o pune ruta de roluri.
+    const before = grantsCapability('office', ['pm', 'financiar'], 'financials.read');
+    const after = grantsCapability('office', ['magazie'], 'financials.read');
+    expect(before).toBe(true);
+    expect(after).toBe(false);
   });
 });

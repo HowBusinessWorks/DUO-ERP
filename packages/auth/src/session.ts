@@ -1,5 +1,3 @@
-import type { Actor } from '@damina/db';
-import { PG_ROLE_BY_PERSONA } from '@damina/db';
 import { isPersona, type Persona } from '@damina/shared';
 
 /**
@@ -38,36 +36,22 @@ export interface Session {
   readonly clientId: string | null;
   /** Parola temporara nu s-a schimbat inca — singurul ecran permis e cel de schimbare. */
   readonly mustChangePassword: boolean;
+  /**
+   * Cat de tare s-a autentificat omul, in vocabularul GoTrue: `aal1` = parola,
+   * `aal2` = parola + al doilea factor.
+   *
+   * Nu e claim de-al nostru — il pune GoTrue nativ, langa `amr`, si hook-ul din
+   * 0013 nici nu-l atinge. Conteaza ca e ASA: un claim pe care il calculeaza
+   * serverul de autentificare nu poate fi influentat de datele noastre.
+   */
+  readonly aal: AuthenticatorLevel;
 }
 
-/** Actorul de baza de date al sesiunii. `reason` se adauga per operatie. */
-export function actorFor(session: Session, reason?: string): Actor {
-  return {
-    personId: session.personId,
-    persona: session.persona,
-    pgRole: PG_ROLE_BY_PERSONA[session.persona],
-    claims: {
-      persona: session.persona,
-      person_id: session.personId,
-      office_roles: session.officeRoles,
-      company_ids: session.companyIds,
-      /*
-       * Cheile optionale LIPSESC cand n-au valoare, nu sunt `null`. Doua motive,
-       * si al doilea l-am aflat pe pielea noastra:
-       *
-       *  - setul de claim-uri vazut de RLS prin `withActor` trebuie sa fie
-       *    identic cu cel din JWT, iar hook-ul le omite (migrarea 0014);
-       *  - GoTrue refuza sa semneze un token cu `client_id: null` — e un nume
-       *    rezervat in specificatie. Trei din patru persone nu se puteau loga.
-       *
-       * Semantica e aceeasi: `app.current_client_id()` trateaza cheia lipsa si
-       * `null` la fel, cazand pe `app.persons`.
-       */
-      ...(session.subcontractorId === null ? {} : { subcontractor_id: session.subcontractorId }),
-      ...(session.clientId === null ? {} : { client_id: session.clientId }),
-    },
-    ...(reason === undefined ? {} : { reason }),
-  };
+/** Nivelul de asigurare al autentificarii (`aal` din JWT). */
+export type AuthenticatorLevel = 'aal1' | 'aal2';
+
+export function isAuthenticatorLevel(value: string): value is AuthenticatorLevel {
+  return value === 'aal1' || value === 'aal2';
 }
 
 /*
@@ -142,8 +126,11 @@ export function parseDevSession(raw: string | undefined): Session | null {
     subcontractorId: typeof seed.subcontractorId === 'string' ? seed.subcontractorId : null,
     clientId: typeof seed.clientId === 'string' ? seed.clientId : null,
     // Sesiunea de dezvoltare nu trece niciodata prin ecranul de schimbare a
-    // parolei: n-are parola.
+    // parolei: n-are parola. Din acelasi motiv e `aal2` — n-are nici al doilea
+    // factor pe care sa-l ceara cineva, iar un `pnpm dev` care se opreste la un
+    // cod TOTP inexistent ar fi o poarta fara usa.
     mustChangePassword: false,
+    aal: 'aal2',
   };
 }
 

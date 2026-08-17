@@ -78,6 +78,60 @@ falsificată ar stinge flagul altcuiva.
 e o portiță: rolul nu e accesibil dintr-o sesiune de utilizator, iar tot ce scrie trece prin
 același trigger de audit.
 
+## Al doilea factor
+
+TOTP e **obligatoriu** pentru rolurile `admin` și `financiar` — cele care pot da drepturi altora
+și văd toți banii. Lista trăiește lângă matricea de drepturi, în `packages/auth/src/permissions.ts`
+(`MFA_REQUIRED_ROLES`), pentru că ecranul care spune „rolul tău cere verificare în doi pași” și
+poarta care oprește omul citesc amândouă de acolo.
+
+`aal` (`aal1` = parolă, `aal2` = parolă + factor) e claim **nativ GoTrue** — hook-ul nostru nici
+nu-l atinge. Contează că e așa: un claim calculat de serverul de autentificare nu poate fi
+influențat de datele noastre. Lipsa lui sau o valoare necunoscută se citesc ca `aal1`, adică
+„nu s-a dovedit nimic”: un claim deteriorat trebuie să te facă să ceri mai mult, nu mai puțin.
+
+`aal` **nu intră în `can()`**. Matricea descrie ce poate un ROL, nu cât de tare s-a autentificat
+sesiunea curentă; altfel un admin proaspăt logat și-ar vedea propriile drepturi dispărând din
+tabel. Nivelul de autentificare e o poartă pe drum, aplicată în două locuri:
+
+- **middleware**, pentru ecrane — redirect către `/doi-pasi`, după schimbarea parolei temporare și
+  înaintea rutării pe personas;
+- **`requireMfa()` în rutele `/api/admin/*`**, cu 403 și mesaj. Rutele sunt scutite dinadins de
+  redirect: un `fetch` care primește 307 către HTML îl urmează și încearcă să citească JSON dintr-o
+  pagină.
+
+Un `admin` care și-a schimbat telefonul se deblochează din Administrare › fișa lui › *Cont de
+login* → „Resetează verificarea în doi pași”, de către **alt** administrator — pe sine nu se poate.
+Fără ușa asta, un mecanism obligatoriu ar fi o capcană.
+
+## Revocarea sesiunii
+
+Drepturile călătoresc în JWT, iar JWT-ul trăiește o oră. La **retragerea accesului la prețuri**,
+asta nu e acceptabil: `/api/admin/roles` compară `financials.read` înainte și după salvare și, dacă
+dreptul a dispărut, închide sesiunile pe loc. Câștigarea unui drept nu declanșează nimic — un drept
+care apare cu întârziere e o neplăcere, unul care dispare cu întârziere e o scurgere.
+
+**Nu se face prin Admin API, pentru că Admin API-ul nu poate.** `auth.admin.signOut(jwt)` cere
+access token-ul omului, nu id-ul lui, iar endpoint-urile care ar fi făcut-o după id răspund 404.
+Mecanismul real e `app.revoke_sessions(uuid)` (migrarea `0015`): șterge rândurile din
+`auth.sessions`, iar GoTrue întoarce apoi `403 session_not_found` la primul `GET /user`. Cum
+`apps/web` cheamă `getUser()` la fiecare cerere, omul e afară la următoarea pagină.
+
+Funcția e `security definer` — rolurile de aplicație n-au și nu trebuie să aibă drepturi pe schema
+`auth` — și **își verifică singură apelantul** (`app.has_office_role('admin')`). O funcție care
+șterge sesiuni și s-ar încrede în apelant ar fi o unealtă de deconectare a oricui.
+
+Fiecare revocare scrie `persons.sessions_revoked_at`. Nu e decor: jurnalul se scrie **numai** din
+trigger-ul de pe o tabelă auditată, deci fără coloana asta o revocare n-ar lăsa urmă nicăieri.
+
+## Limita de încercări la login
+
+10 încercări / 10 minute, pe cheia IP + email (`packages/auth/src/rate-limit.ts`), ștearsă la un
+login reușit. Contorul e în memoria procesului: se pierde la repornire și nu se împarte între
+instanțe. E o **frânare**, nu un zid — zidul e limita proprie a lui GoTrue, care vede toate
+instanțele. Alternativa, un tabel în Postgres, ar fi însemnat o scriere la fiecare încercare de
+login, adică exact suprafața pe care vrea s-o obosească un atacator.
+
 ## Ce nu se face niciodată
 
 - Politici sau grant-uri din dashboard. Totul e migrare versionată.

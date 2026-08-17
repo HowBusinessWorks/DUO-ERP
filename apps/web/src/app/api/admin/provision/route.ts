@@ -1,11 +1,12 @@
 import { randomBytes } from 'node:crypto';
-import { actorFor, can } from '@damina/auth';
+import { actorFor, can, requireMfa } from '@damina/auth';
 import { provisionAccountInputSchema } from '@damina/contracts';
 import { getPerson, linkAuthUser } from '@damina/services';
 import { AppError } from '@damina/shared';
-import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
+import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { getSession } from '../../../../lib/session';
+import { serviceClient, statusForError } from '../service';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -18,13 +19,13 @@ export const runtime = 'nodejs';
  * Regula 6 din §4 al pasului 02: `SUPABASE_SERVICE_ROLE_KEY` traieste doar in
  * worker si in rute `/api` dedicate. Tehnic, un server action ar fi tot cod de
  * server si ar fi mers la fel de bine — dar regula nu e despre unde se executa,
- * e despre unde se poate CAUTA. Cu cheia intr-un singur fisier, `grep` peste
- * `apps/web` da un raspuns complet la „cine o atinge”; cu ea intr-un server
- * action, urmatorul care are nevoie de Admin API o va importa in al doilea, si
- * al treilea, si nimeni n-o sa mai stie cate locuri sunt.
+ * e despre unde se poate CAUTA. Cu cheia intr-un singur loc, `grep` peste
+ * `apps/web` da un raspuns complet la „cine o atinge”.
  *
  * Decizia s-a luat inainte de prima linie de cod a lui 02d (17 august 2026),
- * pentru ca era singurul conflict real dintre pas si ecranul lui.
+ * pentru ca era singurul conflict real dintre pas si ecranul lui. Din 02c′,
+ * clientul de service sta in `../service.ts`, langa celelalte doua operatii
+ * care au nevoie de el.
  *
  * ── Parola ───────────────────────────────────────────────────────────────────
  *
@@ -37,18 +38,6 @@ export const runtime = 'nodejs';
 interface ProvisionResponse {
   readonly email: string;
   readonly password: string;
-}
-
-function serviceClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (url === undefined || url === '' || key === undefined || key === '') {
-    throw new AppError(
-      'VALIDATION_FAILED',
-      'Provizionarea de conturi cere SUPABASE_SERVICE_ROLE_KEY în .env.local. Cheia se ia din Supabase → Project Settings → API.',
-    );
-  }
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 /**
@@ -94,6 +83,11 @@ export async function POST(request: Request): Promise<NextResponse> {
   const actor = actorFor(session, 'provizionare cont');
 
   try {
+    // Middleware-ul nu redirecteaza cererile `/api` catre ecranul de
+    // verificare, dinadins: un `fetch` n-are ce face cu un redirect spre HTML.
+    // Deci poarta celui de-al doilea factor se aplica AICI, cu 403 si mesaj.
+    requireMfa(session);
+
     const person = await getPerson(actor, parsed.data.personId);
 
     if (person.email === null) {
@@ -144,8 +138,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(body, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
     if (AppError.is(error)) {
-      const status = error.code === 'CONFLICT' ? 409 : error.code === 'NOT_FOUND' ? 404 : 400;
-      return NextResponse.json({ message: error.message }, { status });
+      return NextResponse.json({ message: error.message }, { status: statusForError(error.code) });
     }
     throw error;
   }

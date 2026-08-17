@@ -57,6 +57,8 @@ export type {
 } from './contracts';
 
 export {
+  accountActionInputSchema,
+  ACCOUNT_ACTIONS,
   companyAccessInputSchema,
   officeRolesInputSchema,
   OFFICE_ROLE_LABELS,
@@ -68,6 +70,8 @@ export {
   provisionAccountInputSchema,
 } from './admin';
 export type {
+  AccountAction,
+  AccountActionInput,
   CompanyAccessInput,
   OfficeRolesInput,
   PersonCategory,

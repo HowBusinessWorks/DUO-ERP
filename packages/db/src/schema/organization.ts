@@ -145,6 +145,15 @@ export const persons = app.table(
     subcontractorId: uuid('subcontractor_id').references(() => subcontractors.id),
     clientId: uuid('client_id').references(() => clients.id),
     mustChangePassword: boolean('must_change_password').notNull().default(false),
+    /**
+     * Ultima inchidere fortata de sesiuni (0015).
+     *
+     * Nu e doar informativa: `audit.entries` se scrie numai din trigger-ul de pe
+     * o tabela auditata, deci fara coloana asta o revocare n-ar lasa urma
+     * nicaieri. Ea transforma „i-am inchis sesiunile” intr-o modificare cu
+     * actor, motiv si ora.
+     */
+    sessionsRevokedAt: timestamp('sessions_revoked_at', { withTimezone: true }),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: createdAt(),
   },

@@ -112,6 +112,24 @@ export const provisionAccountInputSchema = z.object({
   personId: uuidSchema,
 });
 
+/**
+ * Operatiile pe contul GoTrue al unei persoane, altele decat crearea lui.
+ *
+ * Amandoua exista pentru zile proaste: `revoke` cand vrei omul afara acum —
+ * concediat, plecat, telefon pierdut — si `mfa-reset` cand a ramas blocat in
+ * afara propriului cont pentru ca si-a schimbat telefonul. Un al doilea factor
+ * obligatoriu fara cale de resetare nu e o masura de securitate, e o capcana.
+ */
+export const ACCOUNT_ACTIONS = ['revoke', 'mfa-reset'] as const;
+
+export const accountActionInputSchema = z.object({
+  personId: uuidSchema,
+  action: z.enum(ACCOUNT_ACTIONS),
+});
+
+export type AccountAction = (typeof ACCOUNT_ACTIONS)[number];
+export type AccountActionInput = z.output<typeof accountActionInputSchema>;
+
 export type OfficeRolesInput = z.output<typeof officeRolesInputSchema>;
 export type CompanyAccessInput = z.output<typeof companyAccessInputSchema>;
 export type ProvisionAccountInput = z.output<typeof provisionAccountInputSchema>;

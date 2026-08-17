@@ -541,6 +541,41 @@ export const roRO = {
     rateLimited: 'Prea multe încercări. Așteaptă un minut și încearcă din nou.',
     generic: 'Autentificarea n-a reușit. Încearcă din nou.',
   },
+
+  // ── Verificarea în doi pași ───────────────────────────────────────────────
+  mfa: {
+    title: 'Verificare în doi pași',
+
+    enrollBody:
+      'Rolul tău dă drepturi altora și vede toți banii. Pentru el, o parolă furată nu e un incident — de aceea mai e nevoie de un cod din telefonul tău.',
+    enrollStep1: 'Deschide aplicația de autentificare de pe telefon și scanează codul.',
+    enrollStep2: 'Scrie codul de șase cifre pe care ți-l arată, ca să confirmi legătura.',
+    enrollApps: 'Merge cu Google Authenticator, Microsoft Authenticator, 1Password, Authy.',
+    secretLabel: 'Nu poți scana? Introdu manual cheia:',
+    secretCopied: 'Cheia a fost copiată.',
+
+    challengeBody: 'Deschide aplicația de autentificare și scrie codul de șase cifre.',
+    code: 'Cod din aplicație',
+    codeHint: 'Șase cifre. Se schimbă la fiecare 30 de secunde.',
+    verify: 'Confirmă',
+    verifying: 'Se verifică…',
+
+    invalidCode: 'Codul nu e bun. Mai încearcă — se schimbă la fiecare 30 de secunde.',
+    enrollFailed:
+      'Nu am putut porni configurarea. Reîncarcă pagina; dacă se repetă, anunță un administrator.',
+    lockedOut:
+      'Ți-ai pierdut telefonul? Un administrator îți poate reseta verificarea în doi pași din Administrare › Utilizatori.',
+
+    // Ecranul de administrare.
+    adminRequired: 'Cere verificare în doi pași',
+    adminEnrolled: 'Verificare în doi pași activă',
+    adminMissing: 'Verificarea în doi pași nu e configurată încă',
+    adminReset: 'Resetează verificarea în doi pași',
+    adminResetDone:
+      'Verificarea a fost resetată și sesiunile au fost închise. La următorul login va configura din nou.',
+    adminRevoke: 'Închide toate sesiunile',
+    adminRevokeDone: 'Sesiunile au fost închise. Următoarea cerere a lui cere login din nou.',
+  },
 } as const;
 
 export type Dictionary = typeof roRO;

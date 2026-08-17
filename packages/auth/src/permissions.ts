@@ -150,18 +150,36 @@ const BY_KEY: ReadonlyMap<Capability, CapabilitySpec> = new Map(
 );
 
 export function can(session: Session, capability: Capability): boolean {
+  return grantsCapability(session.persona, session.officeRoles, capability);
+}
+
+/**
+ * Acelasi raspuns ca `can`, dar pornind de la persona si roluri brute, fara
+ * sesiune.
+ *
+ * Exista pentru o singura intrebare, si e cea din verificarea #18: „inainte de
+ * salvarea asta, omul vedea preturi?”. Acolo nu avem sesiunea LUI — avem doua
+ * seturi de roluri, cel vechi si cel nou, si trebuie sa stim daca dreptul a
+ * disparut intre ele. Raspunsul trebuie sa vina din aceeasi matrice, nu dintr-o
+ * lista de roluri copiata langa codul de revocare.
+ */
+export function grantsCapability(
+  persona: Persona,
+  officeRoles: readonly OfficeRole[],
+  capability: Capability,
+): boolean {
   const spec = BY_KEY.get(capability);
   if (spec === undefined) {
     return false;
   }
-  if (!spec.personas.includes(session.persona)) {
+  if (!spec.personas.includes(persona)) {
     return false;
   }
   // Personele non-birou n-au roluri: pentru ele decide doar linia `personas`.
-  if (session.persona !== 'office') {
+  if (persona !== 'office') {
     return true;
   }
-  return session.officeRoles.some((role) => spec.officeRoles.includes(role));
+  return officeRoles.some((role) => spec.officeRoles.includes(role));
 }
 
 /**
@@ -195,6 +213,62 @@ export function capabilitiesOf(session: Session): {
     (can(session, spec.key) ? granted : denied).push(spec);
   }
   return { granted, denied };
+}
+
+/*
+ * ── Al doilea factor ────────────────────────────────────────────────────────
+ *
+ * §3.5: TOTP obligatoriu pentru `admin` si `financiar`. Sunt rolurile care pot
+ * da drepturi altora si care vad toti banii — pentru ele, o parola furata nu e
+ * un incident, e sfarsitul.
+ *
+ * Lista sta aici, langa matrice, pentru acelasi motiv pentru care sta si
+ * matricea: ecranul care spune omului „rolul tau cere verificare in doi pasi”
+ * si middleware-ul care il opreste citesc AMANDOUA de aici.
+ *
+ * De ce nu intra `aal` in `can()`: matricea se randeaza pe ecranul de
+ * administrare ca proprietate a ROLULUI, nu a sesiunii curente. Daca `can()` ar
+ * scadea la `aal1`, un admin proaspat logat si-ar vedea propriile drepturi
+ * disparand din tabel — desi le are, si desi urmatorul pas oricum e sa treaca
+ * prin verificare. Nivelul de autentificare e o poarta pe drum, nu un drept.
+ */
+
+export const MFA_REQUIRED_ROLES: readonly OfficeRole[] = ['admin', 'financiar'];
+
+/** Rolul acestui om cere al doilea factor? */
+export function requiresMfa(session: Session): boolean {
+  return rolesRequireMfa(session.persona, session.officeRoles);
+}
+
+/**
+ * Acelasi raspuns, pornind de la roluri brute.
+ *
+ * Ecranul de administrare pune intrebarea despre ALTCINEVA — o persoana din
+ * nomenclator, care poate nici n-are cont — deci n-are o sesiune pe care sa se
+ * uite. Ca la `grantsCapability`: aceeasi regula, o singura data.
+ */
+export function rolesRequireMfa(persona: Persona, officeRoles: readonly OfficeRole[]): boolean {
+  return persona === 'office' && officeRoles.some((role) => MFA_REQUIRED_ROLES.includes(role));
+}
+
+/** A facut ce i se cere? Cine nu e obligat, trece intotdeauna. */
+export function mfaSatisfied(session: Session): boolean {
+  return !requiresMfa(session) || session.aal === 'aal2';
+}
+
+/**
+ * Guard pentru operatiile administrative. E al doilea strat, ca toate
+ * guard-urile de aici: primul e rutarea, care nu lasa un `aal1` obligat sa
+ * ajunga pe ecran. Rutele `/api` nu trec insa prin rutare — middleware-ul le
+ * lasa sa treaca, ca sa poata raspunde ele cu 401/403 in loc de un redirect pe
+ * care un `fetch` nu-l poate urma util.
+ */
+export function requireMfa(session: Session): void {
+  if (!mfaSatisfied(session)) {
+    throw AppError.forbidden(
+      'Rolul tău cere verificare în doi pași. Configureaz-o și intră din nou.',
+    );
+  }
 }
 
 /*

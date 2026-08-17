@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sessionFromClaims } from './claims';
-import { actorFor } from './session';
+import { actorFor } from './actor';
 
 const PERSON = '01950000-0000-7000-8000-000000030001';
 const COMPANY = '01950000-0000-7000-8000-000000010001';
@@ -38,6 +38,8 @@ describe('sessionFromClaims', () => {
       subcontractorId: null,
       clientId: null,
       mustChangePassword: false,
+      // Fixtura n-are `aal`, iar lipsa lui se citeste in jos, nu in sus.
+      aal: 'aal1',
     });
   });
 
@@ -148,5 +150,21 @@ describe('sessionFromClaims', () => {
       company_ids: [COMPANY],
       client_id: '01950000-0000-7000-8000-000002000001',
     });
+  });
+});
+
+describe('nivelul de autentificare', () => {
+  it('citeste `aal` asa cum il pune GoTrue', () => {
+    const result = sessionFromClaims(officeClaims({ aal: 'aal2' }));
+    expect(result.ok && result.session.aal).toBe('aal2');
+  });
+
+  it('trateaza lipsa sau gunoiul ca `aal1`', () => {
+    // Directia contează: un claim deteriorat trebuie sa ceara mai mult, nu mai
+    // putin. Fara `aal` in token, un admin e trimis la verificare — nu inauntru.
+    for (const value of [undefined, null, '', 'aal9', 42]) {
+      const result = sessionFromClaims(officeClaims({ aal: value }));
+      expect(result.ok && result.session.aal).toBe('aal1');
+    }
   });
 });

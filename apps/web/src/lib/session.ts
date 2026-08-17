@@ -50,6 +50,12 @@ function devFallbackSession(): Session {
     subcontractorId: null,
     clientId: null,
     mustChangePassword: false,
+    // `aal2` din acelasi motiv pentru care `mustChangePassword` e `false`:
+    // sesiunea de dezvoltare n-are cont in spate, deci n-are nici parola de
+    // schimbat, nici al doilea factor de dovedit. Rolul ei e `admin`, care CERE
+    // verificare in doi pasi — pe `aal1` ar fi trimisa la un ecran care ar
+    // incerca sa inroleze un factor pentru un utilizator care nu exista.
+    aal: 'aal2',
   };
 }
 

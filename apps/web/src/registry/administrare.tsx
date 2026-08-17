@@ -1,4 +1,11 @@
-import { can, OFFICE_ROLES, PERMISSION_MATRIX, type Session } from '@damina/auth';
+import {
+  can,
+  MFA_REQUIRED_ROLES,
+  OFFICE_ROLES,
+  PERMISSION_MATRIX,
+  rolesRequireMfa,
+  type Session,
+} from '@damina/auth';
 import {
   OFFICE_ROLE_LABELS,
   PERSONA_LABELS,
@@ -14,8 +21,10 @@ import {
   listSubcontractors,
   type PersonRow,
 } from '@damina/services';
+import { roRO } from '@damina/i18n';
 import { Badge, Banner, CellMeta, CellTitle } from '@damina/ui';
-import { saveCompanyAccess, saveOfficeRoles } from '../app/(office)/admin-actions';
+import { saveCompanyAccess } from '../app/(office)/admin-actions';
+import { AccountActions } from '../components/admin/account-actions';
 import { AuditFeed } from '../components/admin/audit-feed';
 import { CheckboxSet } from '../components/admin/checkbox-set';
 import { PermissionMatrix } from '../components/admin/permission-matrix';
@@ -302,7 +311,7 @@ export const administrare = defineEntity<PersonRow>({
                   hint: company.cui ?? undefined,
                 }))}
                 selected={row.companyIds}
-                action={saveCompanyAccess}
+                target={{ kind: 'action', action: saveCompanyAccess }}
                 personId={row.id}
                 payloadKey="companyIds"
                 saveLabel="Salvează accesul"
@@ -319,7 +328,7 @@ export const administrare = defineEntity<PersonRow>({
       {
         slug: 'cont',
         label: 'Cont de login',
-        render: (row) => (
+        render: (row, ctx) => (
           <div className="max-w-2xl space-y-5">
             <DefinitionList
               items={[
@@ -338,15 +347,43 @@ export const administrare = defineEntity<PersonRow>({
                     'Nu — și-a pus parola lui'
                   ),
                 },
+                {
+                  label: 'Verificare în doi pași',
+                  value: rolesRequireMfa(row.persona, row.officeRoles) ? (
+                    // Ce se poate SPUNE de aici e ce cere rolul. Daca si-a legat
+                    // deja telefonul se afla doar de la GoTrue, cu cheia de
+                    // service — adica dintr-o ruta, nu la randarea fisei.
+                    'Obligatorie — o cere rolul lui'
+                  ) : (
+                    'Nu e obligatorie pentru rolurile lui'
+                  ),
+                },
               ]}
             />
 
             {row.hasAccount ? (
-              <Banner
-                tone="info"
-                title="Contul există deja"
-                body="Parola nu se poate reciti și nu se poate reseta de aici, dinadins. Persoana folosește „Am uitat parola” de pe ecranul de login și primește un link pe email."
-              />
+              <>
+                <Banner
+                  tone="info"
+                  title="Contul există deja"
+                  body="Parola nu se poate reciti și nu se poate reseta de aici, dinadins. Persoana folosește „Am uitat parola” de pe ecranul de login și primește un link pe email."
+                />
+
+                <section>
+                  <h2 className="mb-1 text-base font-semibold text-ink">Când merge ceva prost</h2>
+                  <p className="mb-3 max-w-prose text-sm text-ink-muted">
+                    Închiderea sesiunilor îl scoate din aplicație acum, pe toate dispozitivele — a
+                    plecat din firmă, și-a pierdut laptopul. Resetarea verificării în doi pași e
+                    pentru telefonul schimbat: fără ea, cine și-a pierdut aplicația de autentificare
+                    rămâne blocat definitiv în afara contului.
+                  </p>
+                  <AccountActions
+                    personId={row.id}
+                    personName={row.fullName}
+                    isSelf={ctx.session.personId === row.id}
+                  />
+                </section>
+              </>
             ) : (
               <section>
                 <h2 className="mb-1 text-base font-semibold text-ink">Provizionează contul</h2>
@@ -502,16 +539,24 @@ export const administrare = defineEntity<PersonRow>({
   },
 });
 
-/** Casutele de rol, cu etichetele din `@damina/contracts`. */
+/**
+ * Casutele de rol, cu etichetele din `@damina/contracts`.
+ *
+ * Salvarea merge pe ruta, nu pe un server action: retragerea accesului la
+ * preturi ii taie sesiunea celui vizat pe loc (verificarea #18), iar taierea
+ * cere Admin API-ul GoTrue. Rolurile care CER verificare in doi pasi sunt
+ * marcate, ca sa se vada ca bifa are si consecinta asta.
+ */
 function RoleEditor({ row }: { row: PersonRow }) {
   return (
     <CheckboxSet
       options={OFFICE_ROLES.map((role) => ({
         value: role,
         label: OFFICE_ROLE_LABELS[role],
+        ...(MFA_REQUIRED_ROLES.includes(role) ? { hint: roRO.mfa.adminRequired } : {}),
       }))}
       selected={row.officeRoles}
-      action={saveOfficeRoles}
+      target={{ kind: 'endpoint', url: '/api/admin/roles' }}
       personId={row.id}
       payloadKey="roles"
       saveLabel="Salvează rolurile"

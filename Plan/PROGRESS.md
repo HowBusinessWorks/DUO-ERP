@@ -41,9 +41,11 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | **Hook-ul de token e activat** în proiectul Supabase `cspjtesltraiaveypuya` | Authentication → Hooks → *Customize Access Token (JWT) Claims* → `app.custom_access_token_hook`. **Nu e versionat.** Un proiect Supabase nou pornește fără el, iar login-ul pică atunci cu „hook neactivat” — mesaj deliberat distinct de „contul nu e configurat”. |
 | `.env.local` (rădăcină, gitignored) are `SUPABASE_SERVICE_ROLE_KEY` și `SEED_USER_PASSWORD` | Fără prima, `pnpm db:seed:users` nu pornește. A doua ține parola conturilor de test stabilă între rulări. Ambele lipsesc pe o mașină nouă. |
 | Cheia de service a trecut printr-o fereastră de chat pe 17 august 2026 | **De rotit** din Project Settings → API. |
+| `pnpm db:generate` **nu mai rulează** din 02c | `drizzle-kit` refuză: „0012, 0013, 0014 snapshots are pointing to a parent snapshot … which is a collision”. Migrările `0013`–`0015` sunt scrise de mână, iar snapshot-urile lor sunt copii. Din 02c′, `0015_snapshot.json` conține totuși coloana nouă, deci nu minte despre schemă. Ca să reînvie `db:generate`, cineva trebuie să refacă lanțul de `id`/`prevId` din `meta/`. |
+| Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași**, ceea ce e chiar comportamentul cerut de #16. |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **225** | 96 unitare (`shared` 39 · `domain` 29 · `auth` 19 · `storage` 6 · `i18n` 3) + 91 `packages/db` + 38 `packages/services`. Confirmate în CI `32009107114`, pe `d0d5d39`. Testele de bază de date rulează **doar în CI** — mașina de dezvoltare n-are Docker. Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **242** | 110 unitare (`shared` 39 · `domain` 29 · **`auth` 33** · `storage` 6 · `i18n` 3) + 91 `packages/db` + 41 `packages/services`. Baza de 225 e confirmată în CI `32009107114`, pe `d0d5d39`; 02c′ adaugă 14 unitare (rulate local) și 3 de bază de date (**nerulate local**, mașina n-are Docker). Testele de bază de date rulează **doar în CI** — mașina de dezvoltare n-are Docker. Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | Docker nu există pe mașina de dezvoltare | Testele de bază de date rulează **doar în CI**. Verificările pe date reale se fac pe Supabase dev, în blocuri anulate la final. |
 
 ---
@@ -174,7 +176,7 @@ utilizatorului, 15 august 2026). Motivul: dacă schema de organizație e greșit
 | **02a** | Organizație, perioade, serii, audit (migrările `0004`–`0007`) | 5–11 | 🟩 gata |
 | **02b** | RLS + izolarea prețului (`0011`–`0012`) | 1–4 | 🟩 gata |
 | **02c** | Supabase Auth, JWT hook, `packages/auth`, rutare pe personas | 12–15 | 🟩 gata |
-| **02c′** | MFA TOTP, rate limit pe login, revocare de sesiune | 16, 18 | ⬜ |
+| **02c′** | MFA TOTP, rate limit pe login, revocare de sesiune | 16, 18 | 🟩 gata |
 | **02d** | Ecran de administrare | 17, 19 | 🟩 gata |
 
 > **02d e mai mic decât scria inițial.** Sub-etapa avea trei livrabile — ecran, seed determinist,
@@ -594,10 +596,107 @@ doilea, apoi în al treilea.
 **Ce rămâne pentru sesiunea următoare:**
 1. ~~Push → CI.~~ **Făcut**, run `32009107114` verde pe `d0d5d39`. Serviciile au urcat 27 → **38**
    (nu 37 — `admin.test.ts` are 11 teste, nu 10, cum estimasem), totalul **225**.
-2. **02c′** — MFA TOTP pentru `admin` și `financiar`, rate limit pe login, revocarea sesiunii prin
-   Admin API la retragerea accesului la prețuri (#16, #18). Cu 02d gata, pasul 02 se închide acolo.
+2. ~~**02c′**~~ — **făcut**, vezi intrarea următoare. Cu el, pasul 02 e închis.
 3. Playwright — încă neinstalat; blochează #13 din pasul 03 și clicul pe hartă din 04b.
 4. Decizia despre **#8** (Realtime vs. `authenticated`), rămasă deschisă din pasul 03.
+
+### 2026-08-17 — [status: gata] — 02c′, al doilea factor, revocarea și limita la login
+
+Cu asta **pasul 02 se închide**: toate cele 19 verificări au trecut.
+
+**Ce s-a livrat**
+
+- **#16 — TOTP obligatoriu pentru `admin` și `financiar`.** `aal` intră în `Session` (claim nativ
+  GoTrue, nu al hook-ului nostru), politica stă lângă matricea de drepturi în
+  `packages/auth/src/permissions.ts` (`MFA_REQUIRED_ROLES`, `requiresMfa`, `mfaSatisfied`,
+  `requireMfa`), middleware-ul oprește un `aal1` obligat pe **orice** rută, iar ecranul
+  `/doi-pasi` face și înrolarea, și provocarea. Ecranul e proiectat de agentul de design.
+- **#18 — revocarea sesiunii la retragerea accesului la prețuri.** `/api/admin/roles` compară
+  dreptul `financials.read` **înainte și după** salvare, întrebând matricea de două ori, și taie
+  sesiunea doar la pierdere.
+- **Rate limit pe login**, 10 încercări / 10 minute, pe cheia IP + email.
+- **Bonus, nu din plan:** `/api/admin/account` cu `revoke` (scoate-l afară acum) și `mfa-reset`
+  (telefon schimbat). Fără a doua, un `admin` care-și schimbă telefonul e blocat definitiv, iar
+  dacă e singurul administrator, aplicația e blocată cu el. Un mecanism obligatoriu fără cale de
+  ieșire nu e o măsură de securitate, e o capcană.
+
+**Planul spunea „prin Admin API”. Admin API-ul nu poate.**
+
+`auth.admin.signOut(jwt)` cere **access token-ul** omului, nu id-ul lui — pe ecranul de
+administrare n-ai token-ul altcuiva. Prima versiune chema `signOut(userId, 'global')` și primea
+`invalid JWT: token contains an invalid number of segments`, adică exact ce trebuia. Endpoint-urile
+care ar fi făcut-o după id (`DELETE /admin/users/{id}/sessions`, `POST .../logout`, `.../sign_out`)
+răspund toate **404**. Nu există.
+
+Ce există e mai direct: sesiunile stau în `auth.sessions`, iar GoTrue verifică la fiecare
+`GET /user` dacă sesiunea din claim-ul `session_id` mai există. Șters rândul, următorul apel
+întoarce **403 `session_not_found`**, iar refresh token-ul cade în cascadă. Verificat pe proiectul
+real înainte de a scrie o linie de migrare. Și pentru că `apps/web` cheamă `getUser()` la fiecare
+cerere prin middleware, „imediat” nu e o promisiune, e o consecință.
+
+De aici migrarea **`0015`**: `app.revoke_sessions(uuid)`, `security definer`, cu guard propriu
+(`app.has_office_role('admin')` — o funcție care șterge sesiuni și se încrede în apelant ar fi o
+unealtă de deconectare a oricui), tolerantă la lipsa schemei `auth` din CI prin `to_regclass`.
+
+**Consecință asupra deciziei de la începutul sesiunii:** revocarea nu mai are nevoie de cheia de
+service, deci ruta `/api` nu mai e o necesitate tehnică. A rămas fiindcă e o singură ușă — acolo se
+calculează ce drept s-a pierdut și tot acolo se taie sesiunea. `saveOfficeRoles` a fost **șters**,
+nu lăsat lângă: două uși către aceeași operație, din care una nu revocă nimic, ar fi însemnat că
+securitatea depinde de care din ele nimerește următorul ecran.
+
+**Coloana `persons.sessions_revoked_at`** nu e decor. `audit.entries` se scrie **numai** din
+trigger-ul de pe o tabelă auditată (0007), deci o revocare care n-ar atinge nicio coloană n-ar lăsa
+urmă nicăieri. Verificat în jurnal: trei rânduri, cu actor și cu motivul din care se vede pe ce ușă
+a intrat („modificare roluri de birou” / „închidere de sesiuni” / „resetare verificare în doi pași”).
+
+**Trei lucruri găsite testând, nu citind**
+
+1. **`mfa.listFactors()` minte.** Citește lista din utilizatorul aflat în sesiune, adică **din
+   cookie** — iar cookie-ul se scrie la login și nu se rescrie când se înrolează un factor. A doua
+   deschidere a ecranului vedea lista goală, încerca `enroll` și primea 422 „friendly name already
+   exists”; omul primea „nu am putut porni configurarea” la **fiecare refresh**. Acum se citește din
+   `getUser()`, care întreabă serverul — aceeași regulă ca peste tot unde se ia o decizie.
+2. **Middleware-ul redirecta și cererile `/api`.** Comentariul meu din rută spunea că nu o face;
+   testul a arătat 307 în loc de 403. Un `fetch` urmează redirect-ul, primește 200 și încearcă să
+   citească JSON dintr-o pagină HTML. Acum `/api` e scutit explicit, iar rutele răspund 403 cu mesaj.
+3. **`@damina/auth` nu poate fi importat din middleware.** Bariera reexportă `@damina/db`, deci
+   driverul de Postgres, deci `node:fs` — care nu există pe Edge. Build-ul a căzut cu
+   „Reading from node:fs is not handled by plugins”. `actorFor` s-a mutat în `actor.ts`, iar
+   `@damina/auth/edge` e jumătatea care poate rula oriunde. **Regula: middleware-ul importă din
+   `@damina/auth/edge`, restul din `@damina/auth`.**
+
+**Verificat pe conturi reale** (server pe 3310, cu un generator TOTP scris pentru ocazie)
+
+- #16: admin pe `aal1` → 307 către `/doi-pasi` de pe `/panou`, `/administrare` și `/`; ecranul dă QR
+  + cheie și **rezistă la reîncărcări**; cod TOTP corect → `aal2` → `/panou` și `/administrare` 200,
+  iar `/doi-pasi` redirectează înapoi; cod greșit → 422.
+- #18: victima cu `pm` vede `/panou` și `/contracte`; administratorul îi scoate rolul → `revoked=1`;
+  **următoarea ei cerere → 307 către `/login`**; refresh token → 400. Rol dat înapoi → `revoked=0`;
+  rol adăugat în plus → `revoked=0`. Se taie doar la pierdere.
+- Porți: fără sesiune 401 · teren 403 · **admin fără `aal2` 403** pe ambele rute · cerere invalidă
+  400 · pe sine, refuz cu mesaj propriu pentru fiecare acțiune.
+- Rate limit, prin formularul de login trimis ca de la un browser fără JS: primele 10 „parolă
+  greșită”, a 11-a și a 12-a „prea multe încercări”; alt IP trece; alt cont de pe același IP trece;
+  un login **reușit** șterge contorul.
+- Gate-uri: `typecheck` 12/12 · `lint` · 110 teste unitare · `build` (19 rute: +`/doi-pasi`,
+  +`/api/admin/roles`, +`/api/admin/account`) · `scan:secrets` curat.
+
+**Observații**
+
+- Formularele pe `useActionState` **au** progressive enhancement (React 19 emite `$ACTION_REF_`), și
+  de aia limitatorul a putut fi testat prin HTTP, fără browser. Merită ținut minte: e o cale de
+  testare pentru orice server action din formular, cât timp Playwright lipsește.
+- Terenul de test a fost curățat: contul și persoana de test șterse, factorul TOTP de pe contul lui
+  Andrei șters.
+
+**Ce rămâne pentru sesiunea următoare:**
+
+1. Push → CI. Testele de servicii ar trebui să urce 38 → **41**, totalul **242**. E singura
+   verificare a lui 02c′ nerulată local.
+2. **Cheia de service tot n-a fost rotită** (a trecut printr-un chat pe 17 august). Cu 02c′,
+   singurul cod care o mai folosește e `resetMfaFactors` — rotația e ieftină acum.
+3. Pasul 02 e închis. Următorul pas de conținut e cel din plan după 04; Playwright (#13, clicul pe
+   hartă din 04b) și decizia despre **#8** (Realtime vs. `authenticated`) rămân deschise.
 
 ---
 

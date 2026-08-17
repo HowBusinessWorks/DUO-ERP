@@ -18,6 +18,34 @@ import type { Persona } from '@damina/shared';
 export const LOGIN_PATH = '/login';
 export const CHANGE_PASSWORD_PATH = '/parola-noua';
 export const RESET_PATH = '/resetare';
+/** Configurarea si dovedirea celui de-al doilea factor (§3.5, verificarea #16). */
+export const MFA_PATH = '/doi-pasi';
+
+/**
+ * Ecranele care apartin autentificarii, nu unui spatiu de lucru.
+ *
+ * Cer sesiune — deci nu sunt publice — dar nu se supun rutarii pe persone: un om
+ * de teren trimis la schimbarea parolei n-are ce cauta pe `/field` pana n-o
+ * schimba. Sunt singurele rute din aplicatie care servesc toate cele patru
+ * persone, si de aia sunt enumerate aici, o singura data.
+ */
+export const GATE_PATHS: readonly string[] = [CHANGE_PASSWORD_PATH, MFA_PATH];
+
+export function isGatePath(pathname: string): boolean {
+  return GATE_PATHS.includes(pathname);
+}
+
+/**
+ * E o ruta de program, nu de om?
+ *
+ * Conteaza pentru ca porțile se aplica diferit: pe un ecran, refuzul e un
+ * redirect; pentru un `fetch`, un redirect e mai rau decat un refuz — clientul
+ * il urmeaza, primeste HTML cu status 200 si incearca sa-l citeasca drept JSON.
+ * Rutele `/api` isi cer singure drepturile si raspund cu cod si mesaj.
+ */
+export function isApiPath(pathname: string): boolean {
+  return pathname.startsWith('/api/');
+}
 
 /** Rutele care nu cer sesiune. Tot ce nu e aici o cere. */
 const PUBLIC_PREFIXES = [

@@ -1,7 +1,20 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+// `@damina/auth/edge`, nu `@damina/auth`: bariera obisnuita reexporta si
+// `@damina/db`, adica driverul de Postgres, adica `node:fs` — care nu exista in
+// runtime-ul Edge pe care ruleaza middleware-ul. Vezi `packages/auth/src/edge.ts`.
+import { mfaSatisfied, sessionFromClaims } from '@damina/auth/edge';
 import { isPersona } from '@damina/shared';
 import { NextResponse, type NextRequest } from 'next/server';
-import { CHANGE_PASSWORD_PATH, canEnter, homeFor, isPublicPath, LOGIN_PATH } from './lib/personas';
+import {
+  CHANGE_PASSWORD_PATH,
+  canEnter,
+  homeFor,
+  isApiPath,
+  isGatePath,
+  isPublicPath,
+  LOGIN_PATH,
+  MFA_PATH,
+} from './lib/personas';
 import { decodeAccessTokenClaims } from './lib/supabase/claims';
 import { devSessionAllowed, supabaseConfig } from './lib/supabase/config';
 
@@ -88,11 +101,34 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(CHANGE_PASSWORD_PATH, request.url));
   }
 
+  /*
+   * Al doilea factor (verificarea #16), imediat DUPA parola temporara si
+   * inaintea rutarii pe persone. Ordinea nu e intamplatoare: un admin proaspat
+   * provizionat isi schimba intai parola pe care au vazut-o doi oameni, si abia
+   * apoi isi leaga telefonul. Invers, ar fi legat al doilea factor de un cont a
+   * carui parola inca circula.
+   *
+   * `/api` e scutit dinadins, si asta am aflat-o testand: un `fetch` care
+   * primeste 307 catre un ecran HTML il urmeaza, primeste 200 si incearca sa
+   * citeasca JSON din pagina de configurare. Rutele administrative isi cer
+   * singure `requireMfa` si raspund 403 cu mesaj — un refuz pe care apelantul
+   * il poate arata omului.
+   */
+  const claimed = sessionFromClaims(claims);
+  if (
+    claimed.ok &&
+    !mfaSatisfied(claimed.session) &&
+    pathname !== MFA_PATH &&
+    !isApiPath(pathname)
+  ) {
+    return NextResponse.redirect(new URL(MFA_PATH, request.url));
+  }
+
   if (pathname === LOGIN_PATH || pathname === '/') {
     return NextResponse.redirect(new URL(homeFor(persona), request.url));
   }
 
-  if (!isPublicPath(pathname) && pathname !== CHANGE_PASSWORD_PATH && !canEnter(persona, pathname)) {
+  if (!isPublicPath(pathname) && !isGatePath(pathname) && !canEnter(persona, pathname)) {
     return NextResponse.redirect(new URL(homeFor(persona), request.url));
   }
 

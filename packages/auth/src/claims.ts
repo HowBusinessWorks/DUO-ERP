@@ -1,5 +1,11 @@
 import { isPersona } from '@damina/shared';
-import { isOfficeRole, type OfficeRole, type Session } from './session';
+import {
+  isAuthenticatorLevel,
+  isOfficeRole,
+  type AuthenticatorLevel,
+  type OfficeRole,
+  type Session,
+} from './session';
 
 /**
  * JWT-ul emis de GoTrue → `Session`.
@@ -79,6 +85,19 @@ export function sessionFromClaims(claims: unknown): ClaimsResult {
       subcontractorId: asString(raw['subcontractor_id']),
       clientId: asString(raw['client_id']),
       mustChangePassword: raw['must_change_password'] === true,
+      aal: authenticatorLevel(raw['aal']),
     },
   };
+}
+
+/**
+ * `aal` lipsa sau necunoscut se citeste ca `aal1`, adica „nu s-a dovedit al
+ * doilea factor”.
+ *
+ * Directia contează: un claim deteriorat trebuie sa te faca sa ceri mai mult, nu
+ * mai putin. Daca maine GoTrue scoate un `aal3`, un admin va fi trimis o data
+ * degeaba la ecranul de verificare — enervant, dar nu deschis.
+ */
+function authenticatorLevel(value: unknown): AuthenticatorLevel {
+  return typeof value === 'string' && isAuthenticatorLevel(value) ? value : 'aal1';
 }

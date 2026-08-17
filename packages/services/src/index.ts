@@ -142,6 +142,7 @@ export {
   linkAuthUser,
   listPersonOptions,
   listPersons,
+  revokeSessions,
   setCompanyAccess,
   setOfficeRoles,
   updatePerson,

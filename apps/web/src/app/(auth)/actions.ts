@@ -1,10 +1,11 @@
 'use server';
 
-import { actorFor, sessionFromClaims } from '@damina/auth';
+import { actorFor, createRateLimiter, mfaSatisfied, sessionFromClaims } from '@damina/auth';
 import { roRO } from '@damina/i18n';
 import { clearMustChangePassword } from '@damina/services';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { CHANGE_PASSWORD_PATH, homeFor, LOGIN_PATH } from '../../lib/personas';
+import { CHANGE_PASSWORD_PATH, homeFor, LOGIN_PATH, MFA_PATH } from '../../lib/personas';
 import type { AuthFormState } from './form-state';
 import { decodeAccessTokenClaims } from '../../lib/supabase/claims';
 import { supabaseServer } from '../../lib/supabase/server';
@@ -20,6 +21,33 @@ import { supabaseServer } from '../../lib/supabase/server';
 
 /** Parola minima ceruta de politica din §3.5. Supabase o verifica si el. */
 const MIN_PASSWORD_LENGTH = 12;
+
+/**
+ * Limita de incercari la login (§5: „simplu, pe IP”).
+ *
+ * Zece incercari la zece minute e larg pentru un om care greseste parola si
+ * strans pentru un program care le incearca pe rand. Contorul e in memoria
+ * procesului: se pierde la repornire si nu se imparte intre instante. E o
+ * franare, nu un zid — zidul e limita proprie a lui GoTrue, care vede toate
+ * instantele si raspunde 429 (tradus mai jos).
+ */
+const loginLimiter = createRateLimiter({ limit: 10, windowMs: 10 * 60 * 1000 });
+
+/**
+ * De unde vine cererea.
+ *
+ * In spatele unui proxy, `x-forwarded-for` e o lista, iar prima adresa e a
+ * clientului. E un antet pe care clientul il poate minti daca ajunge direct la
+ * aplicatie — inca un motiv pentru care limitatorul asta e o franare, nu o
+ * aparare. Cheia include si emailul, ca sa nu blocheze un birou intreg iesit
+ * prin acelasi NAT doar pentru ca unul dintre ei si-a uitat parola.
+ */
+async function limiterKey(email: string): Promise<string> {
+  const store = await headers();
+  const forwarded = store.get('x-forwarded-for') ?? '';
+  const ip = forwarded.split(',')[0]?.trim() ?? '';
+  return `${ip === '' ? 'necunoscut' : ip}|${email.toLowerCase()}`;
+}
 
 function field(data: FormData, name: string): string {
   const value = data.get(name);
@@ -61,6 +89,12 @@ async function landingPath(accessToken: string | undefined, requested: string): 
   if (result.session.mustChangePassword) {
     return CHANGE_PASSWORD_PATH;
   }
+  // Al doilea factor vine dupa parola, si inaintea oricarui ecran de lucru.
+  // Middleware-ul face acelasi calcul la fiecare cerere; aici il facem ca omul
+  // sa nu vada o clipa dashboard-ul din care e scos imediat.
+  if (!mfaSatisfied(result.session)) {
+    return MFA_PATH;
+  }
   // `next` se accepta doar ca ruta interna. Un `next` absolut ar face din
   // ecranul de login un redirector catre orice site.
   const safeNext = requested.startsWith('/') && !requested.startsWith('//') ? requested : '';
@@ -75,12 +109,23 @@ export async function signIn(_state: AuthFormState, data: FormData): Promise<Aut
     return { error: roRO.auth.invalidCredentials };
   }
 
+  const key = await limiterKey(email);
+  if (!loginLimiter.hit(key).allowed) {
+    // Acelasi mesaj ca la 429-ul lui GoTrue: pentru omul din fata ecranului,
+    // cele doua limite sunt acelasi lucru.
+    return { error: roRO.auth.rateLimited };
+  }
+
   const supabase = await supabaseServer();
   const { data: signed, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error !== null) {
     return { error: authMessage(error) };
   }
+
+  // Cine a nimerit parola nu mai are de ce sa fie numarat: contorul e pentru
+  // ghicit, nu pentru cat de des te loghezi.
+  loginLimiter.reset(key);
 
   redirect(await landingPath(signed.session?.access_token, field(data, 'next')));
 }
@@ -151,5 +196,40 @@ export async function changePassword(
   await clearMustChangePassword(actorFor(result.session, 'schimbare de parola'));
   const { data: refreshed } = await supabase.auth.refreshSession();
 
+  redirect(await landingPath(refreshed.session?.access_token, ''));
+}
+
+/**
+ * Confirma codul din aplicatia de autentificare.
+ *
+ * Acopera amandoua cazurile — primul cod, care CONFIRMA factorul proaspat
+ * inrolat, si codul de la fiecare login ulterior — pentru ca GoTrue le face la
+ * fel: `challengeAndVerify` cere o provocare si o rezolva dintr-o miscare, iar
+ * un factor `unverified` devine `verified` la prima reusita.
+ *
+ * Efectul secundar e cel care conteaza: raspunsul aduce o pereche noua de
+ * token-uri, cu `aal2`, iar clientul de server le scrie in cookie-uri. De acolo
+ * incolo middleware-ul nu-l mai opreste.
+ */
+export async function verifyMfaCode(
+  _state: AuthFormState,
+  data: FormData,
+): Promise<AuthFormState> {
+  const factorId = field(data, 'factorId');
+  const code = field(data, 'code').replace(/\s+/g, '');
+
+  if (factorId === '' || code === '') {
+    return { error: roRO.mfa.invalidCode };
+  }
+
+  const supabase = await supabaseServer();
+  const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId, code });
+  if (error !== null) {
+    // Un cod gresit si un cod expirat sunt acelasi lucru pentru om: mai
+    // incearca. GoTrue le distinge, dar distinctia nu-l ajuta cu nimic.
+    return { error: error.status === 429 ? roRO.auth.rateLimited : roRO.mfa.invalidCode };
+  }
+
+  const { data: refreshed } = await supabase.auth.getSession();
   redirect(await landingPath(refreshed.session?.access_token, ''));
 }
