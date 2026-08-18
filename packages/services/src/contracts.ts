@@ -783,11 +783,15 @@ export async function listContractsForObjective(
 ): Promise<
   {
     readonly contractId: string;
+    /** Legatura insasi: de ea atarna profilul de inspectie si fisele (pasul 09). */
+    readonly contractObjectiveId: string;
+    readonly companyId: string;
     readonly code: string;
     readonly companyName: string;
     readonly clientName: string;
     readonly validFrom: string;
     readonly validTo: string | null;
+    readonly hasInspectionProfile: boolean;
     readonly isCurrent: boolean;
   }[]
 > {
@@ -795,11 +799,14 @@ export async function listContractsForObjective(
     const rows = await tx
       .select({
         contractId: schema.contracts.id,
+        contractObjectiveId: schema.contractObjectives.id,
+        companyId: schema.contracts.companyId,
         code: schema.contracts.code,
         companyName: schema.companies.name,
         clientName: schema.clients.name,
         validFrom: schema.contractObjectives.validFrom,
         validTo: schema.contractObjectives.validTo,
+        inspectionProfileId: schema.contractObjectives.inspectionProfileId,
       })
       .from(schema.contractObjectives)
       .innerJoin(schema.contracts, eq(schema.contractObjectives.contractId, schema.contracts.id))
@@ -809,8 +816,9 @@ export async function listContractsForObjective(
       .orderBy(asc(schema.contractObjectives.validFrom));
 
     const today = new Date().toISOString().slice(0, 10);
-    return rows.map((row) => ({
+    return rows.map(({ inspectionProfileId, ...row }) => ({
       ...row,
+      hasInspectionProfile: inspectionProfileId !== null,
       isCurrent: row.validFrom <= today && (row.validTo === null || row.validTo > today),
     }));
   });

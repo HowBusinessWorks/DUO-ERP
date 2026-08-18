@@ -322,6 +322,19 @@ export function canTriageRequests(session: Session): boolean {
   return can(session, 'requests.triage');
 }
 
+/** Poate completa o fisa (inspectie, interventie, pontaj)? Si terenul poate. */
+export function canWriteSheets(session: Session): boolean {
+  return can(session, 'sheets.write');
+}
+
+/**
+ * Poate VALIDA o fisa? Alt drept, si mai greu: validarea seteaza luna de
+ * raportare, scrie in registrul de cost si misca stocul.
+ */
+export function canValidateSheets(session: Session): boolean {
+  return can(session, 'sheets.validate');
+}
+
 /** Ce vede si ce NU vede rolul curent. Ecranul de administrare cere ambele liste. */
 export function capabilitiesOf(session: Session): {
   readonly granted: readonly CapabilitySpec[];

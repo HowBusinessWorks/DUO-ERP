@@ -1,11 +1,14 @@
-import { canEditNomenclature } from '@damina/auth';
+import { canEditNomenclature, canWriteSheets } from '@damina/auth';
 import { OBJECTIVE_KIND_LABELS, OBJECTIVE_KINDS } from '@damina/contracts';
 import {
+  checklistsForContractObjective,
   getObjective,
   listContracts,
   listContractsForObjective,
+  listDocumentSeries,
   listInspectionProfiles,
   listObjectives,
+  listWorkUnits,
   objectiveCostHistory,
   type ObjectiveCostYear,
   type ObjectiveRow,
@@ -14,10 +17,13 @@ import { Badge, CellMeta, CellTitle, EmptyState, Money, Table } from '@damina/ui
 import { Folder, FolderX, History, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { DefinitionList, Empty } from '../components/detail/definition-list';
-import { PhasePlaceholder } from '../components/detail/phase-placeholder';
 import { EntityDocuments } from '../components/files/entity-documents';
+import {
+  NewInspectionDialog,
+  type InspectionLink,
+} from '../components/objective/new-inspection-dialog';
 import { ObjectiveMap, type MapPin as Pin } from '../components/objective/objective-map';
-import { defineEntity } from './types';
+import { defineEntity, type EntityContext } from './types';
 
 /**
  * OBIECTIVUL — nomenclator COMUN celor 5 firme.
@@ -396,16 +402,7 @@ export const obiective = defineEntity<ObjectiveRow>({
       {
         slug: 'inspectii',
         label: 'Inspecții',
-        render: () => (
-          <div className="space-y-3">
-            <p className="max-w-prose text-sm text-ink-muted">
-              Frecvențele sunt date de profilul de inspecție al fiecărei legături cu un contract —
-              se editează acolo, nu aici. Acoperirea pe lună se citește din tab-ul{' '}
-              <strong>Obiective</strong> al contractului.
-            </p>
-            <PhasePlaceholder phase={1} what="Fișele de inspecție completate la obiectiv" />
-          </div>
-        ),
+        render: async (row, ctx) => <ObjectiveInspections row={row} ctx={ctx} />,
       },
       /*
        * Documentele obiectivului stau pe LEGATURA obiectiv x contract, nu pe
@@ -828,6 +825,98 @@ function ContractPicker({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+// ── Inspectiile obiectivului ─────────────────────────────────────────────────
+
+/**
+ * Tab-ul Inspectii: fisele deschise la obiectiv si butonul care deschide una noua.
+ *
+ * Legaturile se citesc INTREGI, cu fisele profilului fiecareia, ca dialogul sa
+ * poata schimba lista de fise cand se schimba contractul — verificarea #2 e
+ * exact asta: acelasi obiectiv, alt contract, alt checklist.
+ */
+async function ObjectiveInspections({
+  row,
+  ctx,
+}: {
+  readonly row: ObjectiveRow;
+  readonly ctx: EntityContext;
+}) {
+  const [contracts, inspections] = await Promise.all([
+    listContractsForObjective(ctx.actor, row.id),
+    listWorkUnits(ctx.actor, {
+      companyIds: ctx.app.selectedCompanyIds,
+      objectiveId: row.id,
+      types: ['inspectie'],
+      limit: 200,
+    }),
+  ]);
+
+  const eligible = contracts.filter((contract) => contract.hasInspectionProfile);
+
+  const links: InspectionLink[] = await Promise.all(
+    eligible.map(async (contract) => {
+      const [checklists, series] = await Promise.all([
+        checklistsForContractObjective(ctx.actor, contract.contractObjectiveId),
+        listDocumentSeries(ctx.actor, contract.companyId, 'inspectie'),
+      ]);
+
+      return {
+        contractObjectiveId: contract.contractObjectiveId,
+        companyId: contract.companyId,
+        label: `${contract.code} · ${contract.clientName} (${contract.companyName})`,
+        checklists: checklists.map((checklist) => ({
+          id: checklist.checklistId,
+          label: `${checklist.code} · ${checklist.name} (v${String(checklist.version)})`,
+        })),
+        series: series.map((entry) => entry.series),
+      };
+    }),
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="max-w-prose text-sm text-ink-muted">
+          Frecvențele sunt date de profilul de inspecție al fiecărei legături cu un contract — se
+          editează acolo, nu aici. Acoperirea pe lună se citește din tab-ul{' '}
+          <strong>Obiective</strong> al contractului.
+        </p>
+        {canWriteSheets(ctx.session) ? (
+          <NewInspectionDialog objectiveId={row.id} objectiveName={row.name} links={links} />
+        ) : null}
+      </div>
+
+      {inspections.length === 0 ? (
+        <EmptyState
+          title="Nicio inspecție la obiectivul ăsta"
+          body="O inspecție e o fișă completată la fața locului, pe checklist-ul cerut de contract. Punctele NOK nu se închid fără ieșire: ori s-au rezolvat pe loc, ori nasc o cerere, ori intră în backlog."
+        />
+      ) : (
+        <ul className="space-y-2">
+          {inspections.map((inspection) => (
+            <li key={inspection.id}>
+              <Link
+                href={`/activitate/${inspection.id}`}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3 hover:border-brand"
+              >
+                <span>
+                  <CellTitle>{inspection.name}</CellTitle>
+                  <CellMeta>
+                    {inspection.code} · {formatDate(inspection.startsOn)}
+                  </CellMeta>
+                </span>
+                <Badge tone={inspection.status === 'finalizata' ? 'success' : 'neutral'}>
+                  {inspection.status === 'finalizata' ? 'Validată' : 'În lucru'}
+                </Badge>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

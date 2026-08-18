@@ -169,6 +169,7 @@ export {
   getStageOverview,
   getWorkUnit,
   listAllocations,
+  listDocumentSeries,
   listAssignments,
   listReallocationDocuments,
   listStages,

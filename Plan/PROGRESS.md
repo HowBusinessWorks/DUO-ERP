@@ -13,14 +13,97 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Scris la finalul lui 09a, 18 august 2026. Citește-l primul; restul fișierului e istoric.*
+*Scris la finalul lui 09b-1, 18 august 2026. Citește-l primul; restul fișierului e istoric.*
 
 ### Unde s-a ajuns
 
 Pașii **01, 02, 04, 05, 06 și 07 sunt gata**. Pasul **08** e gata pe 08a + 08b; **08c e sărit
-dinadins** (vezi secțiunea lui mai jos). Pasul **09 e tăiat în două**, ca 07 și 08:
-**09a — fundația (schemă, triggere, domain pur, servicii) e GATA**; **09b — ecranele (§3.5 și
-§3.6) e următorul lucru de făcut.**
+dinadins** (vezi secțiunea lui mai jos). Pasul **09** e tăiat în trei, nu în două:
+
+- **09a — fundația** (schemă, triggere, domain pur, servicii): GATA.
+- **09b-1 — fișa de INSPECȚIE** (creare de la obiectiv, tab-urile Fișă și Constatări): GATA.
+- **09b-2 — fișa de INTERVENȚIE** (Materiale, Ore, bara așteptat vs real): **următorul lucru.**
+- **09b-3 — pontaj, stoc și gestiuni, bon de consum**, apoi validarea de birou în masă,
+  acoperirea inspecțiilor, istoricul obiectivului, jobul nocturn de stoc și seed-ul de „gata".
+
+Tăierea în bucăți mai mici a fost cerută explicit de utilizator, ca o sesiune să nu se termine
+la jumătatea unui pas.
+
+---
+
+## 09b-1 — fișa de inspecție, pe ecran (18 august 2026)
+
+### Ce a intrat
+
+- **Un drum unic de creare.** `createWorkUnitFromForm` **refuză** acum `type='inspectie'`:
+  formularul generic de Activitate n-are legătura contract–obiectiv, deci pe drumul lui ar fi ieșit
+  o inspecție fără checklist, îndreptabilă doar din bază. Inspecția se deschide din
+  **Obiectiv › Inspecții › „Inspecție nouă"** (`NewInspectionDialog`), unde prima întrebare e
+  **pe ce contract** — de acolo vine profilul, deci fișa.
+- **Tab-ul „Fișă"** pe unitatea de lucru, în locul „Prezentare" când tipul e inspecție. Două tab-uri
+  cu **același slug `''`**, despărțite de `visible(session, row)`: pagina de detaliu ia primul tab
+  vizibil, iar o inspecție se deschide direct pe fișa ei.
+- **Tab-ul „Constatări"** — punctele NOK cu ieșirea lor și linkuri către cererea/propunerea născute.
+- `sheet-actions.ts` cu trei acțiuni și **două drepturi**: `sheets.write` completează,
+  `sheets.validate` închide. Helperii `canWriteSheets` / `canValidateSheets` în `@damina/auth`.
+- `listDocumentSeries(actor, companyId, documentType)` — ecranele **aleg** seria, n-o mai tastează.
+- `listContractsForObjective` întoarce acum și `contractObjectiveId`, `companyId`,
+  `hasInspectionProfile`.
+
+### Patru defecte reale găsite cablând ecranul — toate din 09a, toate reparate
+
+Niciunul n-ar fi ieșit la iveală fără un ecran care chiar cheamă serviciile. Merită citite ca listă,
+pentru că 09b-2 (intervenția) are exact aceleași forme de risc:
+
+1. **`saveInspection` n-a funcționat NICIODATĂ.** `for update` peste un `left join`
+   → `FOR UPDATE cannot be applied to the nullable side of an outer join`. E a treia oară când
+   `for update` cere aceeași reparație (după `lockOpenIntervention` și `validateOneTimesheet`):
+   **lock-ul într-o interogare, join-ul în alta.** Verificările #4–#6 nu fuseseră rulate la 09a, de
+   asta a trecut nevăzut. **Rulează fiecare use-case măcar o dată pe date reale înainte de commit.**
+2. **Fiecare salvare re-crea cererea/propunerea.** Salvarea rescrie răspunsurile, deci a doua
+   salvare a aceleiași fișe ar fi făcut a doua cerere pentru fiecare NOK rămas NOK. Acum legăturile
+   existente se citesc **înainte de ștergere** și se reiau, pe cheia `punct + ieșire`: un punct trecut
+   din „intervenție" în „propunere" chiar are nevoie de document nou, cel vechi rămâne și se anulează
+   din Cereri.
+3. **`createRequestTx` primea `''`** pentru `slaDueAt`, `contractId`, `estimatedValue` — exact capcana
+   scrisă la 09a despre `recordCostTx`, repetată. `new Date('')` → „Invalid time value". TypeScript
+   nu apără: tipul e `z.infer`, deci acceptă șirul gol. **Funcțiile `…Tx` primesc valori DEJA parsate.**
+4. **`requests.source_inspection_finding_id` nu se completa niciodată** — coloana există din 08a, dar
+   drumul cerere → punctul de fișă era gol, deși verificarea #4 cere legătura **în ambele sensuri**.
+
+### Verificat pe Supabase dev, cu harness aruncabil (șters după)
+
+`A` seria există · `B` fișa vine din profil · `B2` checklist-ul înghețat e cel din profil ·
+`D` `check`-ul blochează validarea și spune ce punct · `D2` trigger-ul o refuză și el ·
+`E` NOK → intervenție naște o cerere (#4) · `F` **a doua salvare nu mai naște nimic** ·
+`F2` legătura se păstrează · `F3` cererea arată înapoi spre constatare · `G` punctul trecut pe OK
+lasă cererea în viață.
+
+**Verificarea #2 confirmată separat**: obiectivul `…07000001` e pe două contracte, iar profilele lor
+dau **checklist-uri diferite** — `INSP-SP` pe unul, `INSP-BZ` pe celălalt.
+
+### Ce trebuie să știi ca să nu retrăiești
+
+- **Butonul Validează ascultă de `check`-ul de la SERVER, nu de starea din ecran.** Cât timp există
+  modificări nesalvate, validarea e oprită cu „salvează întâi". Alternativa — o a treia copie a
+  regulii „fiecare NOK are ieșire", în browser — ar fi fost copia care se desincronizează.
+- **`withMoney=false` scoate și ieșirea „propunere"**, nu doar cifra: propunerea CERE o valoare
+  estimată, iar un câmp de lei pe ecranul terenului e exact scăparea căutată de verificarea #23.
+- **Pozele se aleg, nu se încarcă din fișă**: selectorul listează fișierele din folderul `photos` al
+  unității (`folderForEntity` + `listChildren`), iar încărcarea rămâne în tab-ul Poze. Zero cod nou
+  de upload.
+- **Datele de probă nu se pot șterge din rolurile aplicației.** Cererile nu se șterg niciodată (se
+  anulează), iar folderul unei unități e `is_system` și trigger-ul refuză ștergerea. Harness-ul a
+  lăsat 5 unități „SMOKE 09b" în dev, **anulate**, nu șterse — asta e curățenia pe care o poate face
+  și un om. Dacă deranjează, `pnpm db:seed --force`.
+
+### Ce urmează la 09b-2 (intervenția)
+
+`getInterventionSheet`, `listInterventionMaterials`, `listInterventionHours`, `saveIntervention`,
+`validateIntervention` există toate. **Verifică-le pe date reale înainte să construiești ecranul** —
+`saveIntervention` folosește `lockOpenIntervention` (deja reparat), dar `validateIntervention` e cea
+mai lungă tranzacție din pas și n-a fost chemată din aplicație niciodată. Aceleași patru forme de
+risc din lista de mai sus.
 
 ---
 

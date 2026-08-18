@@ -44,6 +44,8 @@ export {
   canEditNomenclature,
   canSeeFinancials,
   canTriageRequests,
+  canValidateSheets,
+  canWriteSheets,
   capabilitiesOf,
   CAPABILITIES,
   grantsCapability,

@@ -339,6 +339,25 @@ export async function saveInspection(
 
   try {
     return await withActor(actor, async (tx) => {
+      /*
+       * Lock-ul si join-ul stau in DOUA interogari, nu intr-una — aceeasi lectie
+       * ca la `lockOpenIntervention`, invatata a doua oara: Postgres refuza
+       * `for update` pe latura care poate lipsi dintr-un `left join`
+       * („FOR UPDATE cannot be applied to the nullable side of an outer join"),
+       * iar legatura contract–obiectiv chiar POATE lipsi. Se blocheaza randul
+       * fisei, singurul pe care il si scriem, si se citeste restul separat.
+       */
+      const [locked] = await tx
+        .select({ validatedAt: schema.inspections.validatedAt })
+        .from(schema.inspections)
+        .where(eq(schema.inspections.workUnitId, values.workUnitId))
+        .for('update')
+        .limit(1);
+
+      if (locked === undefined) {
+        throw new AppError('NOT_FOUND', 'Fișa de inspecție nu există sau nu e vizibilă.');
+      }
+
       const [context] = await tx
         .select({
           companyId: schema.workUnits.companyId,
@@ -355,7 +374,6 @@ export async function saveInspection(
           eq(schema.contractObjectives.id, schema.workUnits.contractObjectiveId),
         )
         .where(eq(schema.inspections.workUnitId, values.workUnitId))
-        .for('update')
         .limit(1);
 
       if (context === undefined) {
@@ -364,6 +382,33 @@ export async function saveInspection(
       if (context.validatedAt !== null) {
         throw new AppError('CONFLICT', 'Fișa e validată — nu se mai completează.');
       }
+
+      /*
+       * Legaturile deja nascute, citite INAINTE de stergere si reluate mai jos.
+       *
+       * Fara pasul asta, a doua salvare a aceleiasi fise ar mai fi facut o
+       * cerere pentru fiecare NOK ramas NOK — si nimeni nu salveaza o fisa o
+       * singura data. Cheia e punctul PLUS iesirea lui: un punct trecut din
+       * „intervenție" in „propunere" chiar are nevoie de un document nou, iar
+       * cel vechi ramane si se anuleaza din modulul Cereri, ca pana acum.
+       */
+      const existingLinks = await tx
+        .select({
+          checklistItemId: schema.inspectionAnswers.checklistItemId,
+          outcome: schema.inspectionFindings.outcome,
+          createdRequestId: schema.inspectionFindings.createdRequestId,
+          backlogProposalId: schema.inspectionFindings.backlogProposalId,
+        })
+        .from(schema.inspectionFindings)
+        .innerJoin(
+          schema.inspectionAnswers,
+          eq(schema.inspectionAnswers.id, schema.inspectionFindings.answerId),
+        )
+        .where(eq(schema.inspectionFindings.workUnitId, values.workUnitId));
+
+      const carried = new Map(
+        existingLinks.map((link) => [`${link.checklistItemId}:${link.outcome}`, link]),
+      );
 
       await tx
         .delete(schema.inspectionAnswers)
@@ -388,27 +433,35 @@ export async function saveInspection(
         }
 
         const finding = answer.finding;
-        let createdRequestId: string | null = null;
-        let backlogProposalId: string | null = null;
+        const carriedOver = carried.get(`${answer.checklistItemId}:${finding.outcome}`);
+        let createdRequestId: string | null = carriedOver?.createdRequestId ?? null;
+        let backlogProposalId: string | null = carriedOver?.backlogProposalId ?? null;
 
-        if (finding.outcome === 'interventie') {
+        if (finding.outcome === 'interventie' && createdRequestId === null) {
+          /*
+           * `createRequestTx` primeste valori DEJA parsate: transformarile
+           * schemei („'' → null") nu se mai aplica aici. Un `slaDueAt: ''` ajunge
+           * `new Date('')` si cade cu „Invalid time value", iar un `contractId: ''`
+           * cade in Postgres pe uuid. TypeScript nu apara — tipul e `z.infer`,
+           * deci accepta sirul gol.
+           */
           const request = await createRequestTx(tx, actor, {
             companyId: context.companyId,
             type: 'constatare_inspectie',
             source: 'fisa_inspectie',
             objectiveId: context.objectiveId,
-            contractId: context.contractId ?? '',
-            contractObjectiveId: context.contractObjectiveId ?? '',
+            contractId: context.contractId,
+            contractObjectiveId: context.contractObjectiveId,
             title: `Constatare — ${context.title}`,
             description: finding.resolutionNote ?? undefined,
-            estimatedValue: finding.estimatedValue ?? '',
-            slaDueAt: '',
+            estimatedValue: finding.estimatedValue,
+            slaDueAt: null,
           });
           createdRequestId = request.id;
           createdRequestIds.push(request.id);
         }
 
-        if (finding.outcome === 'propunere') {
+        if (finding.outcome === 'propunere' && backlogProposalId === null) {
           if (context.contractId === null) {
             throw new AppError(
               'VALIDATION_FAILED',
@@ -428,11 +481,11 @@ export async function saveInspection(
             source: 'fisa_inspectie',
             objectiveId: context.objectiveId,
             contractId: context.contractId,
-            contractObjectiveId: context.contractObjectiveId ?? '',
+            contractObjectiveId: context.contractObjectiveId,
             title: `Propunere — ${context.title}`,
             description: finding.resolutionNote ?? undefined,
-            estimatedValue: finding.estimatedValue ?? '',
-            slaDueAt: '',
+            estimatedValue: finding.estimatedValue,
+            slaDueAt: null,
           });
           await tx
             .update(schema.requests)
@@ -456,8 +509,23 @@ export async function saveInspection(
           createdProposalIds.push(backlogProposalId);
         }
 
+        const findingId = uuidv7();
+
+        /*
+         * Legatura in AMBELE sensuri (§6, verificarea #4). Din constatare se
+         * ajungea deja la cerere prin `created_request_id`; fara randul de mai
+         * jos, drumul invers — din cerere spre punctul de fisa care a nascut-o —
+         * ramanea gol, desi coloana exista de la 08a.
+         */
+        if (createdRequestId !== null) {
+          await tx
+            .update(schema.requests)
+            .set({ sourceInspectionFindingId: findingId })
+            .where(eq(schema.requests.id, createdRequestId));
+        }
+
         await tx.insert(schema.inspectionFindings).values({
-          id: uuidv7(),
+          id: findingId,
           workUnitId: values.workUnitId,
           answerId,
           outcome: finding.outcome,

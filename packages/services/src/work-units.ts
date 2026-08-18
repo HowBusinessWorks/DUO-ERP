@@ -493,6 +493,35 @@ export async function allocateCode(
   return code;
 }
 
+/**
+ * Seriile definite la o firma pentru un tip de document.
+ *
+ * Exista ca ecranele sa poata ALEGE seria, nu s-o ghiceasca: mesajul schemelor
+ * („Alege seria de numerotare") promitea de la 09a o lista, iar un camp liber in
+ * care se tasteaza „i" in loc de „I" da un 404 despre o serie inexistenta.
+ */
+export async function listDocumentSeries(
+  actor: Actor,
+  companyId: string,
+  documentType: string,
+): Promise<{ readonly series: string; readonly nextNumber: number }[]> {
+  return withActor(actor, async (tx) =>
+    tx
+      .select({
+        series: schema.documentSeries.series,
+        nextNumber: schema.documentSeries.nextNumber,
+      })
+      .from(schema.documentSeries)
+      .where(
+        and(
+          eq(schema.documentSeries.companyId, companyId),
+          sql`${schema.documentSeries.documentType} = ${documentType}::app.numbered_document_type`,
+        ),
+      )
+      .orderBy(asc(schema.documentSeries.series)),
+  );
+}
+
 /** Valorile deja validate — apelantii care au parsat o data nu parseaza iar. */
 type CreateWorkUnitValues = ReturnType<typeof createWorkUnitInputSchema.parse>;
 
@@ -643,6 +672,23 @@ export async function createWorkUnitFromForm(
   input: WorkUnitFormInput,
 ): Promise<{ readonly id: string; readonly code: string }> {
   const values = workUnitFormSchema.parse(input);
+
+  /*
+   * Inspectia NU se deschide de aici, si nu e o restrictie de forma.
+   *
+   * O inspectie fara rand in `app.inspections` n-are checklist, iar checklist-ul
+   * nu se alege liber: vine din profilul legaturii contract-obiectiv (pasul 09,
+   * verificarile #1 si #2). Formularul asta n-are legatura, are doar obiectivul —
+   * deci pe drumul lui ar iesi o „inspectie" cu fisa goala, indreptabila numai
+   * din baza. `createInspection` e drumul care stie sa aleaga fisa.
+   */
+  if (values.type === 'inspectie') {
+    throw new AppError(
+      'VALIDATION_FAILED',
+      'O inspecție se deschide din butonul „Inspecție nouă” de la obiectiv, ca să primească ' +
+        'fișa din profilul contractului. Aici se deschid lucrări și intervenții.',
+    );
+  }
 
   const funded =
     values.fundingContractId !== null &&

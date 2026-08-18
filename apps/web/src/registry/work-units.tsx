@@ -1,16 +1,21 @@
-import { canSeeFinancials } from '@damina/auth';
+import { canSeeFinancials, canValidateSheets, canWriteSheets } from '@damina/auth';
 import {
   EXECUTOR_TYPE_LABELS,
+  FINDING_OUTCOME_LABELS,
   WORK_UNIT_STATUS_LABELS,
   WORK_UNIT_TYPE_LABELS,
 } from '@damina/contracts';
 import {
+  describeInspectionBlocker,
+  folderForEntity,
   getClosingChecklist,
+  getInspectionSheet,
   getStage,
   getStageOverview,
   getWorkUnit,
   listAllocations,
   listAssignments,
+  listChildren,
   listComponentsForContracts,
   listContracts,
   listPeriodOptions,
@@ -38,6 +43,7 @@ import { AuditTrail } from '../components/detail/audit-trail';
 import { PhasePlaceholder } from '../components/detail/phase-placeholder';
 import { EntityDocuments } from '../components/files/entity-documents';
 import { ClosingChecklist } from '../components/work-unit/closing-checklist';
+import { InspectionSheet } from '../components/work-unit/inspection-sheet';
 import { FundingPanel, fundingSummary, monthLabel } from '../components/work-unit/funding-panel';
 import { StageTimeline } from '../components/work-unit/stage-timeline';
 import {
@@ -496,10 +502,24 @@ export const activitate = defineEntity<WorkUnitRow>({
     },
 
     tabs: [
-      // ── Tab-ul implicit: Fisa (inspectie/interventie) sau Prezentare (lucrare) ──
+      /*
+       * Tab-ul implicit, in doua variante pe acelasi slug.
+       *
+       * Pagina de detaliu ia PRIMUL tab vizibil cu slugul cerut, iar `visible`
+       * le tine despartite pe tip. O inspectie se deschide direct pe fisa ei —
+       * nu pe un rezumat de sub care mai trebuie apasat o data, cand fisa E tot
+       * ce are inspectia de aratat.
+       */
+      {
+        slug: '',
+        label: 'Fișă',
+        visible: (_session, row) => row.type === 'inspectie',
+        render: async (row, ctx) => <InspectionTab row={row} ctx={ctx} />,
+      },
       {
         slug: '',
         label: 'Prezentare',
+        visible: (_session, row) => row.type !== 'inspectie',
         render: async (row, ctx) => <Overview row={row} ctx={ctx} />,
       },
 
@@ -530,9 +550,7 @@ export const activitate = defineEntity<WorkUnitRow>({
         slug: 'constatari',
         label: 'Constatări',
         visible: (_session, row) => row.type === 'inspectie',
-        render: () => (
-          <PhasePlaceholder phase={1} what="Constatările inspecției, pe punctele fișei" />
-        ),
+        render: async (row, ctx) => <FindingsTab row={row} ctx={ctx} />,
       },
 
       // ── Comune executiei ───────────────────────────────────────────────────
@@ -1445,5 +1463,130 @@ async function GeneralGantt({ ctx }: { readonly ctx: EntityContext }) {
         }))}
       />
     </div>
+  );
+}
+
+// ── Fisa de inspectie ────────────────────────────────────────────────────────
+
+/**
+ * Tab-ul Fisa. Citirea are `withMoney`, si asta NU e o ascundere de ecran:
+ * pe `false`, coloana de bani nu se CERE din SQL. Ceruta, un `select` din
+ * contextul `field` ar cadea cu „permission denied for column" si ecranul ar
+ * parea stricat — rolul de Postgres nu i-o acorda (verificarea #23).
+ */
+async function InspectionTab({
+  row,
+  ctx,
+}: {
+  readonly row: WorkUnitRow;
+  readonly ctx: EntityContext;
+}) {
+  const withMoney = canSeeFinancials(ctx.session);
+  const sheet = await getInspectionSheet(ctx.actor, row.id, { withMoney });
+
+  // Pozele se aleg dintre cele deja urcate in folderul unitatii. Fara folder
+  // (fisa deschisa inainte de 07), lista e goala si banda din ecran o spune.
+  const photoFolder = await folderForEntity(ctx.actor, { workUnitId: row.id }, 'photos');
+  const photos =
+    photoFolder === null
+      ? []
+      : (await listChildren(ctx.actor, photoFolder)).filter((node) => node.kind === 'file');
+
+  return (
+    <InspectionSheet
+      workUnitId={row.id}
+      checklistName={sheet.checklistName}
+      checklistVersion={sheet.checklistVersion}
+      performedOn={sheet.performedOn}
+      effectDate={sheet.effectDate}
+      validated={sheet.validatedAt !== null}
+      points={sheet.points.map((point) => ({
+        ...point,
+        estimatedValue: point.estimatedValue === null ? null : point.estimatedValue.toDbString(),
+      }))}
+      answered={sheet.check.answered}
+      total={sheet.check.total}
+      canValidate={sheet.check.canValidate}
+      blockers={sheet.check.blockers.map((blocker) => ({
+        itemId: blocker.itemId,
+        message: describeInspectionBlocker(blocker),
+      }))}
+      photos={photos.map((node) => ({ id: node.id, name: node.name }))}
+      photosHref={`/activitate/${row.id}/poze`}
+      canWrite={canWriteSheets(ctx.session)}
+      canValidateSheet={canValidateSheets(ctx.session)}
+      withMoney={withMoney}
+      suggestedEffectDate={new Date().toISOString().slice(0, 10)}
+    />
+  );
+}
+
+/**
+ * Tab-ul Constatari: doar punctele NOK, cu iesirea si documentele lor.
+ *
+ * Regula de aur din §6 (legatura navigabila in AMBELE sensuri) se vede aici:
+ * din constatare se ajunge la cererea nascuta din ea, iar cererea arata inapoi
+ * spre inspectie prin `source_inspection_id`.
+ */
+async function FindingsTab({
+  row,
+  ctx,
+}: {
+  readonly row: WorkUnitRow;
+  readonly ctx: EntityContext;
+}) {
+  const withMoney = canSeeFinancials(ctx.session);
+  const sheet = await getInspectionSheet(ctx.actor, row.id, { withMoney });
+  const findings = sheet.points.filter((point) => point.answer === 'nok');
+
+  if (findings.length === 0) {
+    return (
+      <EmptyState
+        title="Nicio constatare"
+        body="Constatările sunt punctele marcate NOK pe fișă. Fiecare are o ieșire obligatorie — rezolvat pe loc, cerere, sau propunere în backlog — și de aici se ajunge la documentul pe care l-a născut."
+      />
+    );
+  }
+
+  return (
+    <ul className="space-y-3">
+      {findings.map((point) => (
+        <li key={point.itemId} className="rounded-lg border border-border bg-surface p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <p className="text-sm font-medium text-ink">
+              <span className="mr-2 text-ink-subtle">{point.position}.</span>
+              {point.text}
+            </p>
+            <Badge tone={point.outcome === null ? 'danger' : 'neutral'}>
+              {point.outcome === null
+                ? 'Fără ieșire'
+                : FINDING_OUTCOME_LABELS[point.outcome]}
+            </Badge>
+          </div>
+
+          {point.resolutionNote === null ? null : (
+            <p className="mt-2 text-sm text-ink-muted">{point.resolutionNote}</p>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
+            {point.estimatedValue === null ? null : (
+              <span className="text-ink-muted">
+                Valoare estimată <Money value={point.estimatedValue} />
+              </span>
+            )}
+            {point.createdRequestId === null ? null : (
+              <Link href={`/cereri/${point.createdRequestId}`} className="text-brand underline">
+                Cererea născută din constatare
+              </Link>
+            )}
+            {point.backlogProposalId === null ? null : (
+              <Link href="/cereri?view=backlog" className="text-brand underline">
+                Propunerea din backlog
+              </Link>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
