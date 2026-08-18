@@ -42,6 +42,12 @@ export async function EntityDocuments({
   readonly notice?: string;
 }) {
   const rootId = await folderForEntity(ctx.actor, scope, role);
+  // Ultimul segment poate fi vederea: `.../documente/galerie` sau
+  // `.../documente/{nod}/galerie`. Nodul e un uuid, deci cele doua nu se confunda.
+  const showAll = sub.includes('tot');
+  const rest = sub.filter((segment) => segment !== 'tot');
+  const view = rest.at(-1) === 'galerie' ? 'galerie' : undefined;
+  const nodeId = rest[0] === 'galerie' ? undefined : rest[0];
 
   if (rootId === null) {
     return (
@@ -56,9 +62,20 @@ export async function EntityDocuments({
   return (
     <FileExplorer
       actor={ctx.actor}
+      session={ctx.session}
       rootId={rootId}
-      nodeId={sub[0]}
-      href={(id) => (id === rootId ? basePath : `${basePath}/${id}`)}
+      nodeId={nodeId}
+      href={(id) => {
+        const base = id === rootId ? basePath : `${basePath}/${id}`;
+        return view === undefined ? base : `${base}/galerie`;
+      }}
+      view={view}
+      viewHref={(next) => {
+        const base = nodeId === undefined ? basePath : `${basePath}/${nodeId}`;
+        return next === '' ? base : `${base}/${next}`;
+      }}
+      showAll={showAll}
+      showAllHref={[basePath, nodeId, view, 'tot'].filter(Boolean).join('/')}
       canWrite={can(ctx.session, 'files.write')}
       notice={notice}
     />

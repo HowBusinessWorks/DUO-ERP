@@ -45,8 +45,7 @@ const formatDate = (value: string | null): string =>
 const kindLabel = (kind: string): string =>
   OBJECTIVE_KIND_LABELS[kind as keyof typeof OBJECTIVE_KIND_LABELS] ?? kind;
 
-const hasCoordinates = (row: ObjectiveRow): boolean =>
-  row.geoLat !== null && row.geoLng !== null;
+const hasCoordinates = (row: ObjectiveRow): boolean => row.geoLat !== null && row.geoLng !== null;
 
 export const obiective = defineEntity<ObjectiveRow>({
   slug: 'obiective',
@@ -137,8 +136,7 @@ export const obiective = defineEntity<ObjectiveRow>({
         align: 'right',
         width: '8rem',
         hideBelow: 'lg',
-        cell: (row) =>
-          row.areaSqm === null ? <Empty /> : <CellMeta>{row.areaSqm} m²</CellMeta>,
+        cell: (row) => (row.areaSqm === null ? <Empty /> : <CellMeta>{row.areaSqm} m²</CellMeta>),
       },
       {
         key: 'geo',
@@ -243,7 +241,8 @@ export const obiective = defineEntity<ObjectiveRow>({
               <div className="rounded-lg border border-border bg-surface-sunken px-4 py-3">
                 <p className="text-sm text-ink">
                   Istoricul e <strong>transversal peste contracte și peste ani</strong>: tot ce s-a
-                  întâmplat la {row.name}, indiferent din ce contract a fost finanțat și la ce firmă.
+                  întâmplat la {row.name}, indiferent din ce contract a fost finanțat și la ce
+                  firmă.
                 </p>
                 <p className="mt-1.5 text-sm text-ink-muted">
                   Construit pe analitica <strong className="text-ink">folosit</strong> — nu pe
@@ -424,44 +423,18 @@ export const obiective = defineEntity<ObjectiveRow>({
         label: 'Documente',
         render: async (row, ctx, sub) => {
           const contracts = await listContractsForObjective(ctx.actor, row.id);
-          if (contracts.length === 0) {
-            return (
-              <EmptyState
-                icon={<FolderX className="size-5" aria-hidden="true" />}
-                title="Obiectivul nu e legat de niciun contract"
-                body="Dosarul unui obiectiv trăiește pe legătura lui cu un contract. Leagă-l dintr-un contract și folderul apare singur, în aceeași tranzacție."
-              />
-            );
-          }
-
           const chosen =
             contracts.find((entry) => entry.contractId === sub[0]) ??
             (contracts.length === 1 ? contracts[0] : undefined);
 
           if (chosen === undefined) {
             return (
-              <div className="space-y-3">
-                <p className="max-w-prose text-sm text-ink-muted">
-                  Obiectivul e pe {String(contracts.length)} contracte. Fiecare are dosarul lui —
-                  alege-l pe cel pe care îl deschizi.
-                </p>
-                <ul className="grid gap-2 sm:grid-cols-2">
-                  {contracts.map((entry) => (
-                    <li key={entry.contractId}>
-                      <Link
-                        href={`/obiective/${row.id}/documente/${entry.contractId}`}
-                        className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm hover:bg-surface-hover"
-                      >
-                        <Folder className="size-4 text-brand-600" aria-hidden="true" />
-                        <span>
-                          {entry.code} · {entry.companyName}
-                        </span>
-                        {entry.isCurrent ? null : <CellMeta>încheiat</CellMeta>}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <ContractPicker
+                objectiveId={row.id}
+                contracts={contracts}
+                tab="documente"
+                empty="Dosarul unui obiectiv trăiește pe legătura lui cu un contract. Leagă-l dintr-un contract și folderul apare singur, în aceeași tranzacție."
+              />
             );
           }
 
@@ -489,10 +462,43 @@ export const obiective = defineEntity<ObjectiveRow>({
           );
         },
       },
+      /*
+       * Pozele obiectivului stau tot pe legatura cu contractul, ca documentele:
+       * `Poze obiectiv` e subfolder al dosarului obiectiv x contract. Aceeasi
+       * alegere de contract, acelasi motiv — doua contracte, doua dosare.
+       */
       {
         slug: 'poze',
         label: 'Poze',
-        render: () => <PhasePlaceholder phase={1} what="Pozele de la obiectiv" />,
+        render: async (row, ctx, sub) => {
+          const contracts = await listContractsForObjective(ctx.actor, row.id);
+          const chosen =
+            contracts.find((entry) => entry.contractId === sub[0]) ??
+            (contracts.length === 1 ? contracts[0] : undefined);
+
+          if (chosen === undefined) {
+            return (
+              <ContractPicker
+                objectiveId={row.id}
+                contracts={contracts}
+                tab="poze"
+                empty="Pozele unui obiectiv trăiesc pe legătura lui cu un contract. Leagă-l dintr-un contract și folderul apare singur."
+              />
+            );
+          }
+
+          const rest = sub.slice(1);
+          return (
+            <EntityDocuments
+              ctx={ctx}
+              scope={{ objectiveId: row.id, contractId: chosen.contractId }}
+              role="objective_photos"
+              basePath={`/obiective/${row.id}/poze/${chosen.contractId}`}
+              sub={rest.length === 0 ? ['galerie'] : rest}
+              notice={`Pozele de la obiectiv, pe contractul ${chosen.code}. Fiecare arată ora și locul.`}
+            />
+          );
+        },
       },
     ],
 
@@ -711,11 +717,7 @@ function ProfilesView({
  * legatura contract↔obiectiv. Un tabel global ar fi trebuit sa aleaga una din
  * frecventele aceluiasi obiectiv si sa le ascunda pe celelalte.
  */
-function CoveragePicker({
-  contracts,
-}: {
-  contracts: Awaited<ReturnType<typeof listContracts>>;
-}) {
+function CoveragePicker({ contracts }: { contracts: Awaited<ReturnType<typeof listContracts>> }) {
   if (contracts.length === 0) {
     return (
       <EmptyState
@@ -766,6 +768,66 @@ function CoveragePicker({
           },
         ]}
       />
+    </div>
+  );
+}
+
+/**
+ * Alegerea contractului, pentru tab-urile care traiesc pe legatura obiectiv x
+ * contract: `Documente` si `Poze`.
+ *
+ * Cand obiectivul e pe un singur contract, apelantul alege singur si ecranul asta
+ * nu se vede niciodata. Se vede doar cand exista chiar o intrebare — acelasi
+ * bazin pe doua contracte, la doua firme, cu doua dosare care nu se amesteca.
+ */
+function ContractPicker({
+  objectiveId,
+  contracts,
+  tab,
+  empty,
+}: {
+  readonly objectiveId: string;
+  readonly contracts: readonly {
+    readonly contractId: string;
+    readonly code: string;
+    readonly companyName: string;
+    readonly isCurrent: boolean;
+  }[];
+  readonly tab: 'documente' | 'poze';
+  readonly empty: string;
+}) {
+  if (contracts.length === 0) {
+    return (
+      <EmptyState
+        icon={<FolderX className="size-5" aria-hidden="true" />}
+        title="Obiectivul nu e legat de niciun contract"
+        body={empty}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="max-w-prose text-sm text-ink-muted">
+        Obiectivul e pe {String(contracts.length)} contracte. Fiecare are dosarul lui — alege-l pe
+        cel pe care îl deschizi.
+      </p>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {contracts.map((entry) => (
+          <li key={entry.contractId}>
+            <Link
+              href={`/obiective/${objectiveId}/${tab}/${entry.contractId}`}
+              className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm hover:bg-surface-hover"
+            >
+              <Folder className="size-4 text-brand-600" aria-hidden="true" />
+              <span>
+                {entry.code} · {entry.companyName}
+              </span>
+              {entry.isCurrent ? null : <CellMeta>încheiat</CellMeta>}
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

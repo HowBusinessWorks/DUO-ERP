@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   breadcrumb,
   cleanupFiles,
+  countChildren,
   createFolder,
   folderForEntity,
   listChildren,
@@ -149,6 +150,31 @@ describe('organizarea arborelui', () => {
     const error = await rejection(moveNode(actor(), { nodeId: userFolder, parentId: fileId }));
     expect(error).toBeInstanceOf(AppError);
     expect((error as AppError).message).toContain('nu e un folder');
+  });
+});
+
+describe('plafonul listei', () => {
+  /*
+   * `listChildren` n-avea niciun plafon pana la 07c-2: un folder cu 3.000 de
+   * poze — cazul pe care il numeste pasul — ar fi intors 3.000 de randuri catre
+   * un ecran care le randeaza pe toate. Interogarea le duce (index scan de 2 ms);
+   * randarea, nu.
+   */
+  it('taie lista la plafon, dar numaratoarea spune adevarul', async () => {
+    const folder = await createFolder(actor(), { parentId: contractFolder, name: 'Plafon' });
+    await withActor(actor(), async (tx) => {
+      for (let index = 0; index < 12; index += 1) {
+        await tx.execute(sql`
+          insert into app.nodes (id, parent_id, company_id, kind, name, node_role, created_by)
+          values (${uuidv7()}, ${folder.id}, ${companyId}, 'folder',
+                  ${`f-${String(index).padStart(2, '0')}`}, 'user', ${TEST_PERSON_ID})`);
+      }
+    });
+
+    const capped = await listChildren(actor(), folder.id, { limit: 5 });
+    expect(capped).toHaveLength(5);
+    // Plafonul e al ECRANULUI, nu al datelor: contorul le vede pe toate.
+    expect(await countChildren(actor(), folder.id)).toBe(12);
   });
 });
 

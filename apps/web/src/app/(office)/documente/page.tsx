@@ -100,6 +100,10 @@ export default async function DocumentsPage({
   }
 
   const inTrash = one('view') === 'cos';
+  // Coșul e tot o „vedere", dar una care înlocuiește explorerul; galeria e una
+  // dintre vederile LUI. De aceea se citesc din același `?view=`, dar se ramifică
+  // în locuri diferite.
+  const vederea = one('view') === 'galerie' ? 'galerie' : undefined;
   const link = (extra?: Readonly<Record<string, string>>): string => {
     const query = new URLSearchParams({
       ...(requested === undefined ? {} : { firma: requested }),
@@ -127,9 +131,28 @@ export default async function DocumentsPage({
       ) : (
         <FileExplorer
           actor={ctx.actor}
+          session={ctx.session}
           rootId={rootId}
           nodeId={one('node')}
-          href={(id) => (id === rootId ? link() : link({ node: id }))}
+          href={(id) =>
+            id === rootId
+              ? link(vederea === undefined ? undefined : { view: vederea })
+              : link(vederea === undefined ? { node: id } : { node: id, view: vederea })
+          }
+          view={vederea}
+          showAll={one('tot') === '1'}
+          showAllHref={link({
+            ...(one('node') === undefined ? {} : { node: one('node') as string }),
+            ...(vederea === undefined ? {} : { view: vederea }),
+            tot: '1',
+          })}
+          viewHref={(next) => {
+            const node = one('node');
+            return link({
+              ...(node === undefined ? {} : { node }),
+              ...(next === '' ? {} : { view: next }),
+            });
+          }}
           canWrite={canWrite}
         />
       )}

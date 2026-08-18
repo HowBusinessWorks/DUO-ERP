@@ -178,7 +178,9 @@ export const activitate = defineEntity<WorkUnitRow>({
         key: 'type',
         header: 'Tip',
         width: '7rem',
-        cell: (row) => <Badge tone={TYPE_TONES[row.type] ?? 'neutral'}>{typeLabel(row.type)}</Badge>,
+        cell: (row) => (
+          <Badge tone={TYPE_TONES[row.type] ?? 'neutral'}>{typeLabel(row.type)}</Badge>
+        ),
       },
       {
         key: 'name',
@@ -300,7 +302,13 @@ export const activitate = defineEntity<WorkUnitRow>({
       };
     },
     fields: (lookups) => [
-      { name: 'companyId', label: 'Firma', control: 'select', required: true, options: lookups.companies },
+      {
+        name: 'companyId',
+        label: 'Firma',
+        control: 'select',
+        required: true,
+        options: lookups.companies,
+      },
       { name: 'type', label: 'Tip', control: 'select', required: true, options: lookups.types },
       {
         name: 'name',
@@ -445,7 +453,10 @@ export const activitate = defineEntity<WorkUnitRow>({
           {
             label: 'Obiectiv',
             value: (
-              <Link href={`/obiective/${row.objectiveId}`} className="text-brand-700 hover:underline">
+              <Link
+                href={`/obiective/${row.objectiveId}`}
+                className="text-brand-700 hover:underline"
+              >
                 {row.objectiveCode} · {row.objectiveName}
               </Link>
             ),
@@ -496,7 +507,9 @@ export const activitate = defineEntity<WorkUnitRow>({
         slug: 'deviz',
         label: 'Deviz',
         visible: (_session, row) => row.type === 'lucrare',
-        render: () => <PhasePlaceholder phase={2} what="Devizul lucrării, cu pachete și articole" />,
+        render: () => (
+          <PhasePlaceholder phase={2} what="Devizul lucrării, cu pachete și articole" />
+        ),
       },
       {
         slug: 'etape',
@@ -569,11 +582,29 @@ export const activitate = defineEntity<WorkUnitRow>({
       },
 
       // ── Documente si inchidere ─────────────────────────────────────────────
+      /*
+       * Pozele deschid GALERIA, nu tabelul: e acelasi explorer, cu vederea deja
+       * aleasa. Un folder de poze randat ca tabel de nume de fisiere e cea mai
+       * proasta reprezentare posibila a lui.
+       *
+       * Doar pe inspectii si interventii: lucrarea are `Poze/{Inainte, Etapa
+       * 1..N, Dupa}`, deci pozele ei se rasfoiesc din tab-ul Documente, unde se
+       * vede si faza — informatia care conteaza acolo.
+       */
       {
         slug: 'poze',
         label: 'Poze',
         visible: (_session, row) => row.type !== 'lucrare',
-        render: () => <PhasePlaceholder phase={1} what="Pozele de pe teren, cu geo și dată" />,
+        render: (row, ctx, sub) => (
+          <EntityDocuments
+            ctx={ctx}
+            scope={{ workUnitId: row.id }}
+            role="photos"
+            basePath={`/activitate/${row.id}/poze`}
+            sub={sub.length === 0 ? ['galerie'] : sub}
+            notice="Fiecare poză arată ora și locul. Coordonatele culese de aparat la fața locului cântăresc mai mult decât cele scoase din fișier."
+          />
+        ),
       },
       {
         slug: 'documente',
@@ -696,7 +727,13 @@ export const activitate = defineEntity<WorkUnitRow>({
 
       return [
         ...(promotion.allowed
-          ? [{ label: 'Promovează în lucrare', href: `/activitate/${row.id}`, tone: 'primary' as const }]
+          ? [
+              {
+                label: 'Promovează în lucrare',
+                href: `/activitate/${row.id}`,
+                tone: 'primary' as const,
+              },
+            ]
           : []),
         ...(canSeeFinancials(ctx.session)
           ? [{ label: 'Mută finanțarea', href: `/activitate/${row.id}/finantare` }]
@@ -725,8 +762,7 @@ export const etape = defineEntity<StageWithWorkUnitRow>({
   usesPeriod: false,
 
   list: {
-    load: (ctx) =>
-      listStagesForCompanies(ctx.actor, { companyIds: ctx.app.selectedCompanyIds }),
+    load: (ctx) => listStagesForCompanies(ctx.actor, { companyIds: ctx.app.selectedCompanyIds }),
     rowKey: (row) => row.id,
     rowHref: (row) => `/etape/${row.id}`,
     rowFlagged: (row) => row.actualStart !== null && row.actualEnd === null,
@@ -842,9 +878,7 @@ export const etape = defineEntity<StageWithWorkUnitRow>({
               <Stat
                 label="Cât cântărește"
                 value={
-                  stage.pctOfWork === null
-                    ? '—'
-                    : `${(Number(stage.pctOfWork) * 100).toFixed(0)}%`
+                  stage.pctOfWork === null ? '—' : `${(Number(stage.pctOfWork) * 100).toFixed(0)}%`
                 }
                 context={
                   stage.pctOfWork === null
@@ -921,7 +955,9 @@ export const etape = defineEntity<StageWithWorkUnitRow>({
       {
         slug: 'istoric',
         label: 'Istoric',
-        render: (stage, ctx) => <AuditTrail ctx={ctx} tableName="app.work_stages" recordId={stage.id} />,
+        render: (stage, ctx) => (
+          <AuditTrail ctx={ctx} tableName="app.work_stages" recordId={stage.id} />
+        ),
       },
     ],
 
@@ -952,7 +988,11 @@ export const etape = defineEntity<StageWithWorkUnitRow>({
       ]),
 
     quickActions: (stage) => [
-      { label: 'Înapoi la lucrare', href: `/activitate/${stage.workUnitId}/etape`, tone: 'primary' },
+      {
+        label: 'Înapoi la lucrare',
+        href: `/activitate/${stage.workUnitId}/etape`,
+        tone: 'primary',
+      },
     ],
   },
 });

@@ -13,16 +13,16 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Scris la finalul lui 07c-1 (18 august 2026). Citește-l primul; restul fișierului e istoric.*
+*Scris la finalul lui 07c-2 (18 august 2026). Citește-l primul; restul fișierului e istoric.*
 
 ### Unde s-a ajuns
 
-Pașii **01, 02, 04, 05 și 06 sunt gata**. Pasul **03** e complet ca implementare, cu 4 verificări
-nerulate. Pasul **07**: 07a, 07b și **07c-1** sunt gata. **Următorul lucru de făcut e 07c-2 —
-galeria de poze, previzualizările și partajarea din interfață.**
+Pașii **01, 02, 04, 05, 06 și 07 sunt gata**. Pasul **03** e complet ca implementare, cu 4
+verificări nerulate. **Următorul pas e 08 — cereri, rutare, backlog** (`Plan/08_Cereri_Rutare_Backlog.md`),
+care n-a fost atins de nicio sesiune.
 
-Explorerul de fișiere, uploadul cu retry per parte și tab-ul *Documente* pe cele patru entități
-funcționează și sunt verificate pe dev.
+Din pasul 07 rămâne o singură verificare deschisă, #7: reluarea per parte funcționează și e
+verificată, dar **întreruperea reală de rețea** în timpul unui upload cere Playwright.
 
 ### Ce trebuie să știi despre pasul 07, ca să nu recitești tot
 
@@ -31,7 +31,7 @@ funcționează și sunt verificate pe dev.
 | **07a** | `0021_files` — `nodes`, `file_versions`, `derived_assets`, `node_shares`; arborele din Anexa E.3 construit de **triggere**, în aceeași tranzacție cu entitatea; `app.can_access_node()`; backfill cu plasă |
 | **07b** | presign/complete cu retry per parte, descărcare prin `/api/files/[versionId]`, cozile `files.derive` (EXIF + 3 miniaturi WebP) și `files.cleanup`; `0022` + `0023` (reparații, vezi mai jos) |
 | **07c-1** | `/documente` (explorer + coș), tab *Documente* prin registry pe contract/obiectiv/UL/etapă, uploaderul cu retry per parte, video până la 4 GB; migrarea `0024` (dosare de obiectiv suprapuse) |
-| **07c-2** | **neînceput** — galeria cu geotag și oră, previzualizare imagine/PDF, partajarea (`node_shares`) din interfață, istoricul de versiuni |
+| **07c-2** | galeria (vedere a explorerului) cu geotag și oră, tab-ul *Poze*, previzualizare `inline` pentru poze și PDF, partajarea din interfață, istoricul de versiuni |
 
 **Patru reguli ale arborelui, dacă nu citești altceva:**
 
@@ -47,45 +47,22 @@ funcționează și sunt verificate pe dev.
 
 Detaliile sunt în `docs/files.md` (≤ 80 de linii).
 
-### Ce urmează concret — 07c-2
+### Ce urmează concret — pasul 08
 
-Rămâne **verificarea #20** (galerie cu 300 de poze, pe miniaturi, cu geotag și oră vizibile pe
-fiecare) și jumătatea din **#7** — reluarea per parte există și merge, dar întreruperea reală de
-rețea cere Playwright.
+`Plan/08_Cereri_Rutare_Backlog.md`, neatins. Citește-l întâi: e primul pas care nu mai construiește
+pe ceva pe jumătate.
 
-Ce e deja gata și te așteaptă:
+Ce ți-a lăsat pasul 07 și îți va folosi:
 
-- **`FileExplorer`** (`components/files/file-explorer.tsx`) — o componentă, două locuri. Primește
-  `rootId`, `nodeId` și `href` ca **funcție**, fiindcă `/documente` pune nodul în query, iar
-  tab-urile în segmente. Galeria e a treia montură a aceleiași idei: aceleași `listChildren`, altă
-  reprezentare — exact ca harta obiectivelor față de tabel.
-- **`thumbnailUrl(actor, versionId, variant)`** și ruta `/api/files/[versionId]/thumb/[variant]`,
-  cu TTL de 15 minute. Galeria **nu** cere originale, și nu importă `sharp`/`exifr` — alea trăiesc
-  doar în worker, dinadins.
-- **`NodeRow` poartă deja `capturedAt`, `geoLat`, `geoLng`, `geoSource`** din `listChildren`. Nu mai
-  e nevoie de nicio interogare nouă pentru geotag.
-- **`shareNode` / `unshareNode` / `listShares`** există în servicii, cu dreptul `files.share`.
-  Ecranul lipsește.
-
-**Capcana de care să te ferești la galerie:** 300 de poze înseamnă 300 de semnături. Miniaturile au
-TTL lung exact pentru asta, dar semnarea se face pe server, la randare — nu cere o semnătură per
-derulare.
-
-### Trei bug-uri vechi reparate la 07b — nu le reintroduce
-
-Toate trei erau vii de dinainte, și toate trei erau **tăcute**:
-
-1. **`defineJob` respingea `contracts.expiryScan`** (cerea segmente `[a-z0-9]`, numele are `S` mare).
-   Verificarea rulează la încărcarea modulului, deci `import '@damina/jobs'` arunca și **worker-ul nu
-   mai pornea deloc**. Nimic din CI nu importa pachetul, așa că nu se vedea.
-2. **`jobs.grant_queue_access()` nu dădea `usage` pe schema `jobs`** — deci enqueue-ul dintr-un rol
-   de aplicație n-a funcționat niciodată. Toate cozile de până acum porneau din cron, cu rolul
-   proprietar. Reparat în `0022`, prin rescrierea funcției (se aplică și pe bazele existente, fiindcă
-   worker-ul o cheamă la fiecare pornire).
-3. **`app.file_versions` n-avea politică de `update`.** Cu `force row level security`, un update fără
-   politică **nu dă eroare — atinge zero rânduri**. Fișierele rămâneau `uploading`, cu tipul și
-   mărimea *declarate de client*. Reparat în `0023`, care se termină cu o plasă: migrarea cade dacă
-   vreo tabelă de fișiere rămâne fără politică de scriere pentru birou.
+- **Un modul nou = o intrare în `entityRegistry`.** Cererile sunt o entitate ca oricare alta; lista
+  și detaliul există deja, fractale. Vezi `docs/entity-registry.md`.
+- **Tab-ul `Documente` se activează dintr-o singură linie** pe orice entitate nouă:
+  `<EntityDocuments ctx scope role basePath sub />`. Are nevoie doar de un `node_role` propriu și de
+  o `build_*_tree` în migrare — rețeta e în `docs/files.md`, în ≤ 15 linii.
+- **Arborele se construiește din triggere.** O entitate nouă își capătă folderul fără ca ruta care o
+  creează să știe că există foldere. Dar atenție la lecția din `0024`: dacă noul rol se repetă sub
+  același părinte, **cheia lui trebuie să intre în căutarea din `ensure_folder`**, altfel a doua
+  entitate primește folderul primeia, în tăcere.
 
 ### Două bug-uri vechi reparate la 07c-1 — nu le reintroduce
 
@@ -105,8 +82,7 @@ Toate trei erau vii de dinainte, și toate trei erau **tăcute**:
 | 06 | **11** | Drill-down-ul merge până la identitatea documentului. Documentele-sursă apar la 09–10. |
 | 06 | **19** | Comutatorul brut/net merge, dar **`overhead_snapshots` nu e populat de nimeni periodic**. Vezi datoria 2. |
 | 06 | **21** | Indexul de cursor măsurat la 10.000 de linii, nu la 100.000. Planul e însă independent de volum. |
-| 07 | **7** | Reluarea per parte există în client și merge; **întreruperea reală de rețea** cere Playwright. |
-| 07 | **20** | Galeria de poze — 07c-2. |
+| 07 | **7** | Reluarea per parte există în client și merge; **întreruperea reală de rețea** cere Playwright. Singura verificare deschisă din pasul 07. |
 
 ### Datorii deschise, în ordinea în care le-aș lua
 
@@ -115,11 +91,10 @@ Toate trei erau vii de dinainte, și toate trei erau **tăcute**:
 | 1 | **Rotește `SUPABASE_SERVICE_ROLE_KEY`** (Project Settings → API) | A trecut printr-o fereastră de chat pe 17 august. Singurul cod care o folosește e `resetMfaFactors` din `apps/web/src/app/api/admin/service.ts`. |
 | 2 | **Jobul lunar de regie** | `recomputeOverheadSnapshot` există și e acordată doar lui `app_service`, dar n-o cheamă nimeni. Fără ea, marja netă e marjă brută cu altă etichetă. |
 | 3 | **CORS pe bucket-ul R2 `docs`** | Uploadul din browser NU merge fără el: `PUT` de pe originea aplicației și **`ExposeHeaders: ETag`**. Fără ETag expus, clientul se oprește la prima parte — cu mesaj explicit, dar se oprește. Verificat până acum doar din Node, unde CORS nu se aplică. |
-| 4 | **`pnpm install` n-a mai rulat local de la 07b** | `sharp` și `exifr` lipsesc din `apps/worker/node_modules`, deci `pnpm typecheck` cade pe worker pe mașina asta. În CI, care instalează de la zero, nu se vede. |
-| 5 | **Playwright** | Neinstalat. Blochează #13 din pasul 03, clicul pe hartă din 04b (#14) și partea de client din #7 și #20. |
-| 6 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Ori `grant select` pe `work_queue_items`/`notifications` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
-| 7 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
-| 8 | **Previzualizări pentru PDF și video** | `files.derive` produce miniaturi doar pentru imagini; pentru restul iese tăcut, dinadins. Se adaugă când apare nevoia reală (fișe la 09, raport la 10). |
+| 4 | **Playwright** | Neinstalat. Blochează #13 din pasul 03, clicul pe hartă din 04b (#14) și partea de client din #7 și #20. |
+| 5 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Ori `grant select` pe `work_queue_items`/`notifications` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
+| 6 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
+| 7 | **Miniaturi pentru video** | `files.derive` produce miniaturi doar pentru imagini; pentru restul iese tăcut, dinadins. PDF-ul se rezolvă acum prin previzualizarea `inline`, deci rămâne doar video. Se adaugă când apare nevoia reală (raportul lunar, pasul 10). |
 
 **Datoria `pnpm db:generate` rămâne plătită.** Migrările `0016`–`0021` au fost **generate**. `0022` și
 `0023` sunt scrise de mână **pentru că nu schimbă schema** — doar funcții, politici și grant-uri;
@@ -135,6 +110,9 @@ migrări de mână când schimbi tabele** — scrie schema Drizzle, generează, 
 - Seed: 10.000 de linii de cost pe lunile deschise din 03–05/2026, plus arborele de fișiere
   backfillat. Seed-ul leagă acum unitățile de lucru de contract (`contractObjectiveId`), deci
   folderele lor stau sub `Activitate` al contractului, nu al firmei.
+- **300 de poze cu EXIF** (`teren-001.jpg` … `teren-300.jpg`) în folderul `Poze` al lucrării
+  `01950000-…-000008000001`, urcate pentru verificarea #20, cu miniaturile lor în `derived`. Se pot
+  șterge oricând; sunt un fișier de 9 KB, repetat.
 - **Resturi de la harness-uri**: firme cu nume `Smoke06b …`, `Damina Fisiere …`, plus câteva foldere
   și fișiere de probă în R2 (bucket-ul `docs`) și miniaturi în `derived`. Nu deranjează.
 - Bază curată: `pnpm db:reset`. `--force` nu mai poate reface seed-ul.
@@ -211,6 +189,10 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 - **`defineJob` rulează la ÎNCĂRCAREA modulului.** O validare care cade acolo nu strică un job, ci
   întregul `import '@damina/jobs'` — deci worker-ul nu mai pornește deloc, iar simptomul nu seamănă
   cu cauza. Merită ținut minte pentru orice validare pusă la nivel de modul.
+- **`next dev` nu e o măsurătoare.** La 300 de rânduri arăta 9 s; aceeași pagină, pe build de
+  producție, 2,2 s — din care 1,5 s e overheadul oricărei pagini (shell + drumurile la Supabase din
+  eu-west-1). Diferența e de zece ori, și e exact genul de cifră după care cineva rescrie un ecran
+  care nu avea nimic. **Dacă vrei o cifră de randare, fă build.**
 - **Într-o funcție „ensure", căutarea trebuie să compare EXACT valoarea pe care ar insera-o.**
   `ensure_folder` inserează analitica moștenită din părinte (`coalesce(argument, părinte)`), dar
   căuta după argument. Prima variantă a reparației din `0024` a picat imediat pe `Fișă`: se cheamă
@@ -286,7 +268,7 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
-| 07 — File management (R2) | 🟨 în lucru (07a + 07b + 07c-1 gata; rămâne 07c-2: galerie, previzualizări, partajare) | 2026-08-18 |
+| 07 — File management (R2) | 🟩 **gata** (07a–07c-2; 20/21 — #7 cere Playwright pentru întreruperea reală de rețea) | 2026-08-18 |
 | 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
 | 09 — Fișe de lucru | ⬜ neînceput | — |
 | 10 — Teren offline, raport lunar | ⬜ neînceput | — |
@@ -2179,6 +2161,80 @@ teren, care cere ecranul).
 **Verificări acoperite:** 19, 21, 8 (reparată). Rămân pentru 07c-2: **20**
 (galeria), partea de client a lui **7** (întreruperea reală de rețea cere
 Playwright), și partajarea din interfață.
+
+### 2026-08-18 — [status: gata] — 07c-2, galeria, previzualizarea, partajarea, versiunile
+
+**Ce a intrat**
+
+- **Galeria** (`photo-gallery.tsx`) — vedere a explorerului, nu al doilea ecran:
+  citește ACELEAȘI rânduri ca tabelul, deci nu pot arăta lucruri diferite.
+  `thumb160` în grilă, `thumb1200` în lightbox, `loading="lazy"`, ora și geotagul
+  pe fiecare poză, cu sursa coordonatelor. Săgeți și Escape de la tastatură.
+- **Tab-ul `Poze`** pe inspecție/intervenție și pe obiectiv — deschide direct
+  galeria. Pe lucrare rămâne ascuns dinadins: acolo pozele au faze
+  (`Înainte`/`Etapa N`/`După`), iar faza e informația care contează, deci se
+  răsfoiesc din `Documente`.
+- **Previzualizarea** — rută nouă `/api/files/[versionId]/preview`, `inline`, TTL
+  de 15 minute. Dispoziția **nu** e parametru: `previewUrl` o acordă doar pozelor
+  și PDF-urilor, comparând cu tipul din magic bytes.
+- **Partajarea din interfață** — dialog pe folderul curent: cu cine, ce
+  permisiune, cine are deja acces, retragere. Drept propriu (`files.share`), nu
+  cel de scriere.
+- **Istoricul de versiuni** — deschizi un fișier în explorer și vezi versiunile,
+  fiecare descărcabilă. `uploading` și `failed` se arată, nu se ascund.
+- **`listShares` întoarce acum și numele** (join pe persoane/subcontractanți). O
+  listă de partajări cu id-uri e o listă pe care nimeni n-o poate audita.
+- **`nodeSummary`** — un nod, singur. Explorerul află din `kind` dacă arată copiii
+  sau versiunile; „lista de copii a ieșit goală" ar fi confundat un folder gol cu
+  un fișier.
+- **`listChildren` are acum plafon** (200 de rânduri) și `countChildren` lângă el.
+  Până acum n-avea niciunul: un folder cu 3.000 de poze — cazul din plan — ar fi
+  randat 3.000 de rânduri. Sub listă scrie „se văd primele N din M", cu link care
+  ridică plafonul.
+
+**Decizii luate**
+
+- **`<img>`, nu `next/image`, în toată galeria.** Optimizatorul lui Next ar
+  descărca fișierul **pe server** ca să-l reprelucreze — exact ce nu face pasul
+  ăsta. În plus, miniaturile sunt deja WebP redimensionat, făcut o dată de worker.
+- **Nodul curent în URL și pentru fișiere.** `?node={idFișier}` arată versiunile.
+  Alternativa (dialog client) ar fi însemnat o a doua cale de citire, neverificabilă
+  fără browser.
+- **`ContractPicker` extras** — `Documente` și `Poze` ale obiectivului aleg
+  contractul la fel, fiindcă amândouă trăiesc pe legătura obiectiv×contract.
+
+**Cum a fost verificat**
+
+- **Verificarea #20, pe date reale**: 300 de poze cu EXIF (dată + GPS București),
+  urcate prin API-ul real, derivate de worker. Galeria cere **doar** `thumb160` —
+  harness-ul verifică explicit că nu există niciun `src` către original — plus
+  `loading="lazy"`, ora și coordonatele pe fiecare.
+- 17 verificări pe ecrane, fără browser: comutatorul de vedere, tab-ul `Poze` pe
+  inspecție (și **absența** lui pe lucrare), previzualizarea (302), versiunile cu
+  versiunea curentă marcată, butonul de partajare, zero URL-uri R2 în HTML.
+- Lanțul EXIF → worker confirmat cap-coadă: `geo_source='exif'`, coordonatele
+  44.4268 / 26.1025, 3 miniaturi per poză.
+
+**Cifrele de scară, măsurate pe build de PRODUCȚIE** (dev-ul minte urât aici — la
+300 de rânduri arăta 9 s, adică de zece ori peste realitate):
+
+| | randare | peste referință |
+|---|---|---|
+| `/panou` (referință) | 1550 ms | — |
+| tabel, 200 de rânduri | 2177 ms | +630 ms |
+| tabel, 317 de rânduri | 2246 ms | +700 ms |
+| galerie, 304 poze | 2127 ms | +580 ms |
+
+Deci ~2 ms pe rând, iar interogarea e 1,8 ms cu totul (`nodes_parent_idx`, index
+scan). **Nu era o problemă de performanță** — dar plafonul rămâne, fiindcă la
+3.000 de poze aceleași 2 ms/rând înseamnă 6 s și 6 MB de HTML.
+
+**Datorie plătită:** `pnpm install` rulat, deci `sharp`/`exifr` există local și
+`pnpm typecheck` trece complet pe mașina asta, nu doar în CI.
+
+**Verificări acoperite:** 20. Pasul 07 e închis, cu o singură excepție: partea de
+client a lui **#7** — întreruperea reală de rețea în timpul unui upload — care
+cere Playwright.
 
 ---
 

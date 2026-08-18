@@ -86,6 +86,37 @@ poate servi ca HTML. Miniaturile au ruta lor, cu `inline` și TTL de 15 minute.
 **Un fișier cu același nume** în același folder nu e conflict, e o versiune nouă
 a aceluiași nod.
 
+## Cum se văd fișierele
+
+Trei rute, cu trei dispoziții diferite, și fiecare diferență e deliberată:
+
+| Rută                                     | Antet        | TTL    | Pentru ce                       |
+| ---------------------------------------- | ------------ | ------ | ------------------------------- |
+| `/api/files/{versionId}`                 | `attachment` | 60 s   | descărcare                      |
+| `/api/files/{versionId}/preview`         | `inline`     | 15 min | poze și PDF, deschise în pagină |
+| `/api/files/{versionId}/thumb/{variant}` | `inline`     | 15 min | miniaturi                       |
+
+**`inline` nu e o opțiune a apelantului.** `previewUrl` îl acordă doar pozelor și
+PDF-urilor, comparând cu tipul dedus din magic bytes la ingest — cel acoperit de
+semnătură, nu cel declarat de client. Dacă ar fi fost un parametru al rutei,
+orice ecran viitor l-ar fi putut cere pentru orice tip, iar un HTML servit inline
+ar rula pe domeniul aplicației.
+
+**Galeria** e o vedere a explorerului (`?view=galerie`), nu un al doilea ecran:
+citește exact aceleași rânduri ca tabelul, deci nu pot arăta lucruri diferite. Se
+sprijină pe `thumb160` în grilă și `thumb1200` în previzualizare, cu
+`loading="lazy"` — originalele nu se cer niciodată. Ora capturii și coordonatele,
+cu sursa lor, se afișează pe fiecare poză.
+
+**Lista e plafonată la 200 de rânduri**, cu „se văd primele N din M" și un link
+care ridică plafonul. Interogarea nu e problema — un folder cu 300 de copii se
+citește în 2 ms, prin `nodes_parent_idx` — ci randarea lor deodată. Plafonul e o
+limită a ecranului, nu a datelor.
+
+**Versiunile** se văd deschizând un fișier în explorer (`?node={idFișier}`): un
+upload cu același nume în același folder e o versiune nouă, iar ecranul e locul
+unde te întorci după ce ai urcat din greșeală peste un deviz semnat.
+
 ## Ce face worker-ul
 
 `files.derive`, la fiecare `complete`: EXIF (dată, GPS, aparat) și trei

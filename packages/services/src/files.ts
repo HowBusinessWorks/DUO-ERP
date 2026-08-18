@@ -99,10 +99,19 @@ export interface NodeRow {
  * ce persona vine cererea. De aceea nu exista niciun `where` de drepturi aici —
  * unul scris de mana s-ar putea abate de la politici.
  */
+/**
+ * Cate randuri cere ecranul, cand nu spune altfel.
+ *
+ * Exista pentru ca un folder de poze de santier ajunge la mii de fisiere — pasul
+ * insusi vorbeste de „un folder cu 3.000 de poze". Interogarea le-ar duce (e un
+ * index scan de 2 ms), dar ecranul care le randeaza pe toate deodata nu.
+ */
+const CHILDREN_LIMIT = 200;
+
 export async function listChildren(
   actor: Actor,
   parentId: string,
-  options: { readonly includeDeleted?: boolean } = {},
+  options: { readonly includeDeleted?: boolean; readonly limit?: number } = {},
 ): Promise<NodeRow[]> {
   return withActor(actor, async (tx) => {
     const rows = await tx
@@ -130,9 +139,51 @@ export async function listChildren(
           options.includeDeleted === true ? undefined : isNull(schema.nodes.deletedAt),
         ),
       )
-      .orderBy(desc(schema.nodes.kind), asc(schema.nodes.name));
+      .orderBy(desc(schema.nodes.kind), asc(schema.nodes.name))
+      .limit(options.limit ?? CHILDREN_LIMIT);
 
     return rows as NodeRow[];
+  });
+}
+
+/** Cate randuri are folderul cu totul. Pentru „mai sunt N" de sub lista. */
+export async function countChildren(actor: Actor, parentId: string): Promise<number> {
+  return withActor(actor, async (tx) => {
+    const rows = await tx.execute<{ total: number }>(sql`
+      select count(*)::int as total from app.nodes
+       where parent_id = ${parentId} and deleted_at is null`);
+    return rows.rows[0]?.total ?? 0;
+  });
+}
+
+/**
+ * Un nod, singur. Cat trebuie ca sa stii CE ai deschis.
+ *
+ * Exista pentru ecranul de versiuni: cand URL-ul poarta un nod, explorerul
+ * trebuie sa afle daca e folder (arata copiii) sau fisier (arata versiunile)
+ * fara sa ghiceasca din faptul ca lista de copii a iesit goala — un folder gol
+ * si un fisier ar arata la fel.
+ */
+export interface NodeSummaryRow {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: 'folder' | 'file';
+  readonly currentVersionId: string | null;
+}
+
+export async function nodeSummary(actor: Actor, nodeId: string): Promise<NodeSummaryRow | null> {
+  return withActor(actor, async (tx) => {
+    const rows = await tx
+      .select({
+        id: schema.nodes.id,
+        name: schema.nodes.name,
+        kind: schema.nodes.kind,
+        currentVersionId: schema.nodes.currentVersionId,
+      })
+      .from(schema.nodes)
+      .where(and(eq(schema.nodes.id, nodeId), isNull(schema.nodes.deletedAt)))
+      .limit(1);
+    return (rows[0] as NodeSummaryRow | undefined) ?? null;
   });
 }
 
@@ -451,20 +502,46 @@ export async function unshareNode(
   });
 }
 
-export async function listShares(
-  actor: Actor,
-  nodeId: string,
-): Promise<{ subjectType: string; subjectId: string; permission: string }[]> {
-  return withActor(actor, async (tx) =>
-    tx
-      .select({
-        subjectType: schema.nodeShares.subjectType,
-        subjectId: schema.nodeShares.subjectId,
-        permission: schema.nodeShares.permission,
-      })
-      .from(schema.nodeShares)
-      .where(eq(schema.nodeShares.nodeId, nodeId)),
-  );
+export interface ShareRow {
+  readonly subjectType: string;
+  readonly subjectId: string;
+  readonly permission: string;
+  /**
+   * Numele celui cu care s-a partajat.
+   *
+   * Se citeste aici, nu in ecran: o lista de partajari care arata id-uri e o
+   * lista pe care nimeni n-o poate audita. `null` inseamna ca subiectul nu mai e
+   * vizibil apelantului — se afiseaza ca atare, nu se ascunde randul: partajarea
+   * exista si trebuie sa se poata retrage.
+   */
+  readonly subjectName: string | null;
+}
+
+export async function listShares(actor: Actor, nodeId: string): Promise<ShareRow[]> {
+  return withActor(actor, async (tx) => {
+    const rows = await tx.execute<{
+      subject_type: string;
+      subject_id: string;
+      permission: string;
+      subject_name: string | null;
+    }>(sql`
+      select s.subject_type, s.subject_id, s.permission,
+             coalesce(p.full_name, sc.name) as subject_name
+        from app.node_shares s
+        left join app.persons p
+               on s.subject_type = 'person' and p.id = s.subject_id
+        left join app.subcontractors sc
+               on s.subject_type = 'subcontractor' and sc.id = s.subject_id
+       where s.node_id = ${nodeId}
+       order by coalesce(p.full_name, sc.name)`);
+
+    return rows.rows.map((row) => ({
+      subjectType: row.subject_type,
+      subjectId: row.subject_id,
+      permission: row.permission,
+      subjectName: row.subject_name,
+    }));
+  });
 }
 
 // ── Upload ───────────────────────────────────────────────────────────────────
@@ -773,6 +850,66 @@ export async function downloadUrl(actor: Actor, versionId: string): Promise<Down
       disposition: 'attachment',
     }),
     ttlSeconds: DOWNLOAD_TTL_SECONDS,
+  };
+}
+
+/**
+ * Tipurile care se pot deschide IN PAGINA.
+ *
+ * Lista e scurta si inchisa dinadins. `inline` inseamna ca browserul randeaza
+ * continutul pe un URL care, desi e al lui R2, ajunge in pagina noastra — deci
+ * intra aici doar ce nu poate executa nimic. Pozele si PDF-ul se randeaza in
+ * vizualizatoare izolate; un HTML sau un SVG, nu.
+ *
+ * Tipul cu care se compara vine din magic bytes, scris la `complete`, nu din ce
+ * a declarat clientul — si e acoperit de semnatura, deci nici nu poate fi
+ * schimbat pe drum. Un HTML urcat ca „aviz.pdf" a fost deja respins la ingest;
+ * daca ar fi trecut, tot n-ar ajunge aici.
+ */
+const PREVIEWABLE_MIMES = new Set(['application/pdf']);
+
+/**
+ * URL de previzualizare: acelasi fisier ca la descarcare, dar `inline`.
+ *
+ * Exista separat de `downloadUrl` fiindca dispozitia NU e o optiune a
+ * apelantului: `attachment` e implicit peste tot, iar `inline` se acorda doar
+ * tipurilor din lista de mai sus. Daca ar fi fost un parametru, orice ecran
+ * viitor l-ar fi putut cere pentru orice tip.
+ */
+export async function previewUrl(actor: Actor, versionId: string): Promise<DownloadTarget> {
+  const row = await withActor(actor, async (tx) => {
+    const rows = await tx
+      .select({
+        blobKey: schema.fileVersions.blobKey,
+        mime: schema.fileVersions.mime,
+        state: schema.fileVersions.state,
+        name: schema.nodes.name,
+      })
+      .from(schema.fileVersions)
+      .innerJoin(schema.nodes, eq(schema.nodes.id, schema.fileVersions.nodeId))
+      .where(and(eq(schema.fileVersions.id, versionId), isNull(schema.nodes.deletedAt)))
+      .limit(1);
+    return rows[0];
+  });
+
+  if (row === undefined) {
+    throw AppError.notFound('Fișierul', versionId);
+  }
+  if (row.state !== 'ready') {
+    throw new AppError('VALIDATION_FAILED', 'Fișierul nu e gata: încărcarea nu s-a finalizat.');
+  }
+  if (!isImageMime(row.mime) && !PREVIEWABLE_MIMES.has(row.mime)) {
+    throw new AppError('VALIDATION_FAILED', 'Tipul ăsta de fișier nu se poate vedea în pagină.');
+  }
+
+  return {
+    url: await presignGet('docs', row.blobKey, {
+      ttlSeconds: THUMBNAIL_TTL_SECONDS,
+      contentType: row.mime,
+      downloadName: row.name,
+      disposition: 'inline',
+    }),
+    ttlSeconds: THUMBNAIL_TTL_SECONDS,
   };
 }
 
