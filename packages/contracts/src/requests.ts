@@ -113,6 +113,13 @@ const routingBacklogSchema = z.object({
  * salveaza pe `request_decisions`, iar pentru `amanata_backlog` NU exista
  * fundingAllocationInputSchema (care cere motiv propriu), deci `reason` de aici
  * e singurul.
+ *
+ * `contract_individual_nou` cere si el `creation`, si asta NU e o scapare:
+ * contractul individual se creeaza INAINTE de decizie, prin fluxul de contracte
+ * din pasul 04, iar decizia doar leaga unitatea de lucru de componenta lui.
+ * Alegerea din ecran e „lucrarea se plateste dintr-un contract individual", nu
+ * „creeaza-mi acum un contract" — altfel decizia de rutare ar ajunge sa scrie
+ * contracte, si atunci ar exista doua drumuri de creare de contract.
  */
 export const decideRoutingInputSchema = z
   .object({
@@ -139,6 +146,15 @@ export const promoteBacklogInputSchema = z.object({
   componentId: uuidSchema,
   periodId: uuidSchema,
   reason: requiredText(500, 'Scrie de ce promovezi acum.'),
+  /**
+   * Confirmarea constienta a depasirii de plafon (verificarea #16).
+   *
+   * Implicit `false`: promovarea care nu incape in plafonul lunii cade cu
+   * `CONFLICT` si spune CU CAT se depaseste. Cu `true` trece — pentru ca uneori
+   * depasirea e decizia corecta, dar atunci trebuie sa fie o decizie luata, nu
+   * un plafon depasit tacut.
+   */
+  acceptOverCeiling: z.boolean().default(false),
 });
 
 export type CreateRequestInput = z.input<typeof createRequestInputSchema>;

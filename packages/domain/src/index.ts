@@ -72,11 +72,13 @@ export {
   ROUTING_CHOICES,
   routeRequest,
   selectBacklogToFill,
+  splitDeltaAcrossPeriods,
 } from './requests';
 export type {
   BacklogProposalLike,
   BacklogSelection,
   DeltaPeriodFree,
+  DeltaSplitPart,
   EstimateLineInput,
   EstimateResult,
   RouteRequestInput,

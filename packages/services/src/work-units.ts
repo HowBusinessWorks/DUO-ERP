@@ -493,22 +493,38 @@ export async function allocateCode(
   return code;
 }
 
+/** Valorile deja validate — apelantii care au parsat o data nu parseaza iar. */
+type CreateWorkUnitValues = ReturnType<typeof createWorkUnitInputSchema.parse>;
+
+export interface CreateWorkUnitTxOptions {
+  /** Cererea din care s-a decis unitatea (pasul 08). */
+  readonly sourceRequestId?: string;
+}
+
 /**
- * Creeaza unitatea, codul, finantarea si asignarile — **o singura tranzactie**.
+ * Creeaza unitatea, codul, finantarea si asignarile — pe o tranzactie DEJA
+ * deschisa.
+ *
+ * Exista separat de `createWorkUnit` dintr-un singur motiv: decizia de rutare
+ * (pasul 08) scrie unitatea in ACEEASI tranzactie cu decizia, si un al doilea
+ * `withActor` ar rupe rollback-ul. Alternativa — sa reimplementeze insert-urile
+ * la ea — s-a si intamplat o data, si a pierdut pe drum regula „o interventie
+ * cere cel putin o alocare". Un singur drum de creare, cu toate regulile pe el.
  *
  * Ordinea nu e intamplatoare: codul se cere cat mai TARZIU posibil, ca lock-ul de
  * pe randul de serie sa fie tinut cat mai putin. Alocarea de finantare vine dupa
  * unitate pentru ca trigger-ul ei citeste firma de pe unitate.
  *
- * Verificarea #16 a pasului trece pe aici: o luna inchisa nu opreste unitatea, ci
- * ALOCAREA — iar cum totul e o tranzactie, nu ramane nimic.
+ * Verificarea #16 a pasului 05 trece pe aici: o luna inchisa nu opreste unitatea,
+ * ci ALOCAREA — iar cum totul e o tranzactie, nu ramane nimic.
  */
-export async function createWorkUnit(
+export async function createWorkUnitTx(
+  tx: ActorTx,
   actor: Actor,
-  input: CreateWorkUnitInput,
+  values: CreateWorkUnitValues,
   id?: string,
+  options: CreateWorkUnitTxOptions = {},
 ): Promise<{ readonly id: string; readonly code: string }> {
-  const values = createWorkUnitInputSchema.parse(input);
   const workUnitId = id ?? uuidv7();
 
   /*
@@ -526,69 +542,91 @@ export async function createWorkUnit(
     );
   }
 
-  try {
-    return await withActor(actor, async (tx) => {
-      const code = await allocateCode(
-        tx,
-        values.workUnit.companyId,
-        values.workUnit.type,
-        values.series,
-      );
+  const code = await allocateCode(
+    tx,
+    values.workUnit.companyId,
+    values.workUnit.type,
+    values.series,
+  );
 
-      await tx.insert(schema.workUnits).values({ id: workUnitId, code, ...values.workUnit });
+  await tx.insert(schema.workUnits).values({
+    id: workUnitId,
+    code,
+    ...values.workUnit,
+    ...(options.sourceRequestId === undefined ? {} : { sourceRequestId: options.sourceRequestId }),
+  });
 
-      for (const allocation of values.allocations) {
-        await tx.insert(schema.fundingAllocations).values({
-          id: uuidv7(),
-          workUnitId,
-          contractId: allocation.contractId,
-          componentId: allocation.componentId,
-          periodId: allocation.periodId,
-          allocatedAmount: allocation.allocatedAmount,
-          allocatedPct: allocation.allocatedPct,
-          reason: allocation.reason,
-          createdBy: actor.personId,
-        });
-      }
-
-      if (values.assignments.length > 0) {
-        await tx.insert(schema.workUnitAssignments).values(
-          values.assignments.map((assignment) => ({
-            id: uuidv7(),
-            workUnitId,
-            personId: assignment.personId,
-            role: assignment.role,
-            validFrom: assignment.validFrom,
-            validTo: assignment.validTo,
-          })),
-        );
-      }
-
-      return { id: workUnitId, code };
+  for (const allocation of values.allocations) {
+    await tx.insert(schema.fundingAllocations).values({
+      id: uuidv7(),
+      workUnitId,
+      contractId: allocation.contractId,
+      componentId: allocation.componentId,
+      periodId: allocation.periodId,
+      allocatedAmount: allocation.allocatedAmount,
+      allocatedPct: allocation.allocatedPct,
+      reason: allocation.reason,
+      createdBy: actor.personId,
     });
+  }
+
+  if (values.assignments.length > 0) {
+    await tx.insert(schema.workUnitAssignments).values(
+      values.assignments.map((assignment) => ({
+        id: uuidv7(),
+        workUnitId,
+        personId: assignment.personId,
+        role: assignment.role,
+        validFrom: assignment.validFrom,
+        validTo: assignment.validTo,
+      })),
+    );
+  }
+
+  return { id: workUnitId, code };
+}
+
+/**
+ * Traducerea erorilor de creare de unitate. Sta langa `createWorkUnitTx` ca sa
+ * fie aceleasi mesaje pe toate drumurile care creeaza o unitate.
+ */
+export function translateWorkUnitCreationError(error: unknown, series: string): never {
+  if (sqlstate(error) === SQLSTATE.EXCLUSION_VIOLATION) {
+    throw new AppError(
+      'CONFLICT',
+      'Persoana are deja același rol pe unitatea asta, în perioada aleasă.',
+    );
+  }
+  /*
+   * Codul e unic pe (firma, cod), dar contorul de serie e per (firma, TIP,
+   * serie). Doua tipuri configurate cu acelasi text de serie produc deci
+   * amandoua `X-000001`, si al doilea cade — descoperit la primul CI.
+   *
+   * Mesajul spune cauza, nu simptomul: „cod duplicat" l-ar trimite pe om sa
+   * caute unitatea care are deja codul, iar ea e de alt tip si arata nevinovata.
+   */
+  if (sqlstate(error) === SQLSTATE.UNIQUE_VIOLATION) {
+    throw new AppError(
+      'CONFLICT',
+      `Seria „${series}" e folosită și de alt tip de unitate la firma asta, ` +
+        'deci codurile se suprapun. Dă-i fiecărui tip seria lui.',
+    );
+  }
+  return translateDbError(error);
+}
+
+/** Crearea de unitate ca use-case de sine statator: o tranzactie a ei. */
+export async function createWorkUnit(
+  actor: Actor,
+  input: CreateWorkUnitInput,
+  id?: string,
+): Promise<{ readonly id: string; readonly code: string }> {
+  const values = createWorkUnitInputSchema.parse(input);
+
+  try {
+    return await withActor(actor, async (tx) => createWorkUnitTx(tx, actor, values, id));
   } catch (error) {
-    if (sqlstate(error) === SQLSTATE.EXCLUSION_VIOLATION) {
-      throw new AppError(
-        'CONFLICT',
-        'Persoana are deja același rol pe unitatea asta, în perioada aleasă.',
-      );
-    }
-    /*
-     * Codul e unic pe (firma, cod), dar contorul de serie e per (firma, TIP,
-     * serie). Doua tipuri configurate cu acelasi text de serie produc deci
-     * amandoua `X-000001`, si al doilea cade — descoperit la primul CI.
-     *
-     * Mesajul spune cauza, nu simptomul: „cod duplicat" l-ar trimite pe om sa
-     * caute unitatea care are deja codul, iar ea e de alt tip si arata nevinovata.
-     */
-    if (sqlstate(error) === SQLSTATE.UNIQUE_VIOLATION) {
-      throw new AppError(
-        'CONFLICT',
-        `Seria „${values.series}" e folosită și de alt tip de unitate la firma asta, ` +
-          'deci codurile se suprapun. Dă-i fiecărui tip seria lui.',
-      );
-    }
-    return translateDbError(error);
+    return translateWorkUnitCreationError(error, values.series);
   }
 }
 

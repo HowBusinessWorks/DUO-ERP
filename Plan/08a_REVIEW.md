@@ -4,6 +4,13 @@
 > **I4** — era **greșită** și a fost retrasă; vezi tabelul „Importante". Restul constatărilor rămân
 > în picioare. Numărătoarea reală: **6 blocante, 7 importante** (nu 8).
 
+> **Stare (18 august 2026): TOATE constatările valide sunt REZOLVATE.** Cele 6 blocante și cele
+> 7 importante au fost reparate, cu teste de regresie în `packages/domain/src/requests/backlog.test.ts`,
+> `routing.test.ts` (domain: 104 teste) și `packages/services/tests/requests.test.ts` (14 teste,
+> toate verzi pe Supabase dev). Rezumatul reparațiilor și capcanele de evitat sunt în
+> `Plan/PROGRESS.md`, secțiunea „08a′". Minorele și datoria tehnică de la finalul fișierului au
+> rămas dinadins neatinse — decizia utilizatorului.
+
 ## Verdict
 
 Fundația e solidă structural și reparabilă punctual: schema, migrarea, RLS-ul și tiparul de

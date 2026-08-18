@@ -34,6 +34,12 @@ export interface RoutingOption {
   readonly reason: string;
   /** Doar pentru optiunile de Delta. */
   readonly targetPeriods?: readonly string[];
+  /**
+   * Doar pentru optiunile de Delta: cati lei din fiecare luna. Ecranul de
+   * decizie scrie exact astea in alocari — fara el ar trebui sa reimparta
+   * singur suma, si atunci ar exista doua adevaruri despre aceleasi alocari.
+   */
+  readonly split?: readonly DeltaSplitPart[];
   /** Doar pentru optiunile de Delta: cat la suta din plafonul liber ocupa. */
   readonly fillPercent?: number;
 }
@@ -66,6 +72,47 @@ export interface RouteRequestInput {
   readonly ceilings: RoutingCeilings;
   /** Pragul de mentenanta. Implicit 2.000 lei (§0). */
   readonly threshold?: Money;
+}
+
+/** O felie din impartirea pe luni: cati lei se aloca din luna asta. */
+export interface DeltaSplitPart {
+  readonly periodId: string;
+  readonly amount: Money;
+}
+
+/**
+ * Imparte o valoare pe lunile de Delta, §3.3: fiecare luna primeste cat are
+ * liber, in ordine, iar restul cade pe ULTIMA.
+ *
+ * Restul pe ultima, nu proportional (cum face `splitAcrossPeriods` din
+ * `funding`): aici lunile nu sunt egale intre ele, fiecare are plafonul ei, iar
+ * o impartire proportionala ar depasi liberul lunii intai ca sa lase loc gol in
+ * a treia. Cand valoarea incape in suma liberelor, ultima luna primeste doar
+ * ce a ramas — deci nicio luna nu-si depaseste plafonul.
+ *
+ * Nu se pierde niciun ban la rotunjire: feliile se scad din valoare cu `Money`,
+ * iar ultima primeste exact diferenta, nu o cifra recalculata.
+ */
+export function splitDeltaAcrossPeriods(
+  value: Money,
+  periods: readonly DeltaPeriodFree[],
+): readonly DeltaSplitPart[] {
+  if (periods.length === 0) {
+    return [];
+  }
+
+  const parts: DeltaSplitPart[] = [];
+  let remaining = value;
+  for (let i = 0; i < periods.length; i += 1) {
+    const period = periods[i]!;
+    const isLast = i === periods.length - 1;
+    // Ultima ia tot restul — si cand e mai mult decat liberul ei. Depasirea se
+    // vede atunci in `available: false`, nu se ascunde intr-o felie taiata.
+    const amount = isLast ? remaining : remaining.min(period.free).max(Money.ZERO);
+    parts.push({ periodId: period.periodId, amount });
+    remaining = remaining.sub(amount);
+  }
+  return parts;
 }
 
 const DEFAULT_THRESHOLD = Money.of(2000);
@@ -101,6 +148,7 @@ function deltaOption(
     available: true,
     reason: `${fmt(value)} ≤ ${fmt(free)} disponibil · umple Delta la ${fillPercent}%`,
     targetPeriods: periods.map((p) => p.periodId),
+    split: splitDeltaAcrossPeriods(value, periods),
     fillPercent,
   };
 }

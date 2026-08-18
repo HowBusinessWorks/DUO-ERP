@@ -77,7 +77,31 @@ luni: august, septembrie, octombrie", cifra vine deja formatată de-acolo.
   apel — a chema `createWorkUnit` din interiorul altui `withActor` ar fi folosit o conexiune
   DIFERITĂ din pool, deci n-ar mai fi fost atomic). Orice use-case viitor care trebuie să compună
   „creează UL" cu altceva, în aceeași tranzacție, ar trebui să facă la fel — nu să cheme
-  `createWorkUnit` direct.
+  `createWorkUnit` direct. **De la 08a′ soluția e alta și mai bună: `createWorkUnitTx(tx, actor,
+  values, id, opts)`**, corpul lui `createWorkUnit` extras pe o tranzacție dată. Compune „creează
+  UL" cu orice altceva FĂRĂ să pierzi regulile lui. Nu mai reimplementa insert-urile.
+
+### 08a′ — reparațiile din `Plan/08a_REVIEW.md` (18 august 2026)
+
+Review-ul lui 08a a găsit 6 blocante și 7 importante. **Toate rezolvate**, cu teste de regresie.
+Ce trebuie să știi ca să nu le reintroduci:
+
+- **`selectBacklogToFill` face DP pe LEI, nu pe cenți.** Pe cenți, un plafon de 100.000 lei aloca
+  ~10 MB de `choice` **per propunere** — ~660 MB la cincizeci, iar ecranul cheamă funcția la fiecare
+  bifă. Rotunjirea e asimetrică dinadins (capacitatea în jos, valorile în sus): selecția poate rămâne
+  sub plafon cu bănuți, dar nu-l poate depăși. Peste bugetul de celule (`MAX_CELLS`) cade pe greedy
+  și spune asta prin `BacklogSelection.exact`.
+- **`promoteBacklog` verifică plafonul** (`freeRoom`: plafon de venit/cost minus
+  `component_period_rollup.allocated_revenue`). Peste plafon → `CONFLICT` cu suma depășită în
+  `payload.over`; trece doar cu `acceptOverCeiling: true`. Asta e verificarea #16.
+- **`decideRouting` cere precondiții**: cererea se citește cu `for update` (`lockOpenRequest`), stare
+  în `neprocesata`/`in_evaluare`, și firma UL-ului **trebuie** să fie firma cererii. Fără ele, aceeași
+  cerere putea fi decisă de două ori — adică același plafon cheltuit de două ori.
+- **`splitDeltaAcrossPeriods(value, periods)`** e în `@damina/domain` și e sursa de adevăr a
+  împărțirii pe luni (verificarea #12). `RoutingOption.split` o poartă deja spre ecran. **Nu e**
+  `splitAcrossPeriods` din `funding/` — aceea taie proporțional, asta umple fiecare lună până la
+  liberul ei. Ecranul de decizie din 08b o folosește; nu recalcula feliile în UI.
+- Accesul terenului la cereri e documentat acum în `docs/security.md` („Ce vede terenul din cereri").
 
 ### Ce urmează concret — 08b
 
@@ -366,7 +390,7 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași** — ceea ce e chiar comportamentul cerut de #16 — **dacă `MFA_ENFORCED` nu e `0`** (vezi rândul de mai jos). |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **~462** (neconfirmat încă în CI) | La 08a: `domain` 82 → **95** (+13, `requests/`), `packages/services` 102 → **106** (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **~481** (neconfirmat încă în CI) | La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
 | **Martie 2026 e ÎNCHISĂ la firma A pe Supabase dev**, din 05c | Închisă dinadins, ca ecranul de re-alocări să aibă ce arăta: mutarea finanțării intervenției `IV-000001` de acolo a emis `NRA-000001` în august. Dacă un ecran refuză o scriere pe martie, ăsta e motivul — nu un bug. |
 | **Aplicația e deployată pe Vercel**, pe același proiect Supabase (`cspjtesltraiaveypuya`) | Deci datele de pe dev sunt aceleași care se văd în aplicația deployată — inclusiv seed-ul și luna închisă de mai sus. `next.config.ts` încarcă `.env.local` din rădăcina repo-ului, fișier care pe Vercel **nu există**: toate variabilele trebuie puse în Project Settings. |

@@ -157,3 +157,19 @@ login, adică exact suprafața pe care vrea s-o obosească un atacator.
   `definer`; dacă un script nu trece, îi lipsește rolul potrivit, nu politica.
 - Coloană de bani acordată „temporar”. Regexul din `0012` și testul #1 o găsesc la următoarea
   migrare, iar migrarea cade.
+
+## Ce vede terenul din cereri (pasul 08)
+
+`app_field` are pe lanțul de cereri **exact o singură ușă**: `select` pe `app.requests`, prin
+politica `assigned` și `app.request_assigned_to_me`, pe o listă **enumerată** de coloane care nu
+include `estimated_value` (`0025_requests_and_catalog.sql:304-308`, verificat de
+`assert_no_money_leak`).
+
+`app.request_estimate_lines` și `app.request_decisions` **nu au nicio politică pentru
+`app_field`**, și nici grant. E intenționat: liniile de evaluare sunt tarifele firmei, iar decizia
+e raționamentul de business din spatele banilor — nimic din ce are nevoie omul de pe teren.
+
+Consecința pentru ecranele viitoare: dacă un ecran de teren ajunge vreodată să ceară liniile de
+evaluare sau decizia, **nu adăuga grantul fără politică**. O tabelă cu RLS pornit și fără politică
+nu dă eroare — dă **zero rânduri, tăcut**, iar ecranul arată o cerere fără evaluare ca și cum
+n-ar avea una. Rețeta din capul fișierului se aplică integral și acolo.

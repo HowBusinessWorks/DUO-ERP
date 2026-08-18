@@ -2,7 +2,9 @@ export { estimateFromCatalog, type EstimateLineInput, type EstimateResult } from
 export {
   ROUTING_CHOICES,
   routeRequest,
+  splitDeltaAcrossPeriods,
   type DeltaPeriodFree,
+  type DeltaSplitPart,
   type RoutingCeilings,
   type RoutingChoice,
   type RoutingOption,

@@ -1,6 +1,6 @@
 import { Money } from '@damina/shared';
 import { describe, expect, it } from 'vitest';
-import { routeRequest, type RoutingCeilings } from './routing';
+import { routeRequest, splitDeltaAcrossPeriods, type RoutingCeilings } from './routing';
 
 const noLucrari: RoutingCeilings['lucrariCeilingFree'] = null;
 
@@ -107,5 +107,68 @@ describe('routeRequest', () => {
     expect(result.options.find((o) => o.choice === 'lucrare_delta_multi_luna')?.available).toBe(
       false,
     );
+  });
+});
+
+describe('splitDeltaAcrossPeriods', () => {
+  // Verificarea #12: „3 alocari, sumele corecte". Cifrele de aici sunt sursa de
+  // adevar a ecranului de decizie — daca ecranul si-ar calcula singur feliile,
+  // ar exista doua adevaruri despre aceleasi alocari.
+  it('umple fiecare luna pana la liberul ei, in ordine', () => {
+    const parts = splitDeltaAcrossPeriods(Money.of(10000), [
+      { periodId: '2026-08', free: Money.of(4000) },
+      { periodId: '2026-09', free: Money.of(4000) },
+      { periodId: '2026-10', free: Money.of(5000) },
+    ]);
+
+    expect(parts.map((p) => p.amount.toString())).toEqual(['4000.00', '4000.00', '2000.00']);
+    expect(Money.sum(parts.map((p) => p.amount)).equals(Money.of(10000))).toBe(true);
+  });
+
+  it('nu pierde niciun ban la rotunjire', () => {
+    const parts = splitDeltaAcrossPeriods(Money.of('1000.01'), [
+      { periodId: 'a', free: Money.of('333.33') },
+      { periodId: 'b', free: Money.of('333.33') },
+      { periodId: 'c', free: Money.of('333.33') },
+    ]);
+    expect(Money.sum(parts.map((p) => p.amount)).toString()).toBe('1000.01');
+  });
+
+  it('valoarea peste suma liberelor cade toata pe ultima luna', () => {
+    const parts = splitDeltaAcrossPeriods(Money.of(9000), [
+      { periodId: 'a', free: Money.of(1000) },
+      { periodId: 'b', free: Money.of(1000) },
+    ]);
+    expect(parts.map((p) => p.amount.toString())).toEqual(['1000.00', '8000.00']);
+  });
+
+  it('o luna cu liber zero nu primeste nimic', () => {
+    const parts = splitDeltaAcrossPeriods(Money.of(500), [
+      { periodId: 'a', free: Money.ZERO },
+      { periodId: 'b', free: Money.of(900) },
+    ]);
+    expect(parts.map((p) => p.amount.toString())).toEqual(['0.00', '500.00']);
+  });
+
+  it('fara luni nu intoarce nimic', () => {
+    expect(splitDeltaAcrossPeriods(Money.of(100), [])).toEqual([]);
+  });
+});
+
+describe('routeRequest — impartirea pe luni', () => {
+  it('optiunea de Delta disponibila poarta si feliile pe luni', () => {
+    const result = routeRequest({
+      value: Money.of(6000),
+      ceilings: ceilings({
+        deltaFreeByPeriod: [
+          { periodId: '2026-08', free: Money.of(4000) },
+          { periodId: '2026-09', free: Money.of(4000) },
+        ],
+      }),
+    });
+
+    const multi = result.options.find((o) => o.choice === 'lucrare_delta_multi_luna');
+    expect(multi?.available).toBe(true);
+    expect(multi?.split?.map((p) => p.amount.toString())).toEqual(['4000.00', '2000.00']);
   });
 });
