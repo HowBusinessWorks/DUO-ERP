@@ -32,9 +32,10 @@ s-a umplut singur când `apply_intervention_actuals` a primit prima fișă valid
 **Pasul 10 e tăiat în cinci**, iar **10a e gata**:
 
 - **10a — fundația sincronizării** (jurnal de idempotență, `/api/field/sync`, retenție): GATA.
-- **10b — PWA-ul offline**: Dexie (snapshot · outbox · media), service worker, contorul care
-  numără separat datele și pozele, ecranul de conflicte cu diff. **Următorul lucru.**
+- **10b — PWA-ul offline** (felia de date, Dexie, service worker, banda cu două contoare,
+  ecranul de conflicte): GATA.
 - **10c — cele 8 ecrane de teren** + bugetul de tapuri (blocat pe Playwright, datoria 3).
+  **Următorul lucru.**
 - **10d — raportul lunar** către client: migrare, coadă cu progres real, versionare și îngheț.
 - **10e — panoul PM** cu gauge-ul Delta.
 
@@ -57,6 +58,72 @@ tăcute, niciunul prins de typecheck sau de testele existente. Harness-ul se scr
 2. **Extensiile 1:1 pe `work_units` se nasc din trigger**, nu din serviciu (0028). Dacă adaugi
    alta, urmează tiparul: `after insert … when (new.type = …)`, `on conflict do nothing`, backfill
    cu același cod, plasă la final.
+
+---
+
+## 10b — PWA-ul offline (18 august 2026)
+
+### Ce a intrat
+
+- **Felia de date** (`pullFieldSnapshot`): unitățile mele active din ultimele 30
+  de zile, etapele lor, **doar** checklist-urile înghețate pe inspecțiile mele,
+  stocul **doar din gestiuni de echipă**, oamenii de pontat și seriile firmei.
+  Măsurată pe dev: **2,4 KB comprimat** — pragul din plan e 2 MB.
+- **IndexedDB, trei magazii cu roluri care nu se amestecă** (`lib/field/db.ts`):
+  `snapshot` (copie, se rescrie întreagă), `outbox` (**munca omului**), `media`
+  (pozele, cu progresul lor). Pull-ul nu atinge niciodată ultimele două.
+- **Motorul de client** (`lib/field/sync.ts`): ciclul e **push → pull → media**.
+  Pull-ul vine după push dinadins — altfel felia proaspătă ar arăta o stare din
+  care lipsește exact ce tocmai a scris omul, și ecranul ar clipi înapoi la vechi.
+- **Banda de sincronizare numără separat fișele și pozele.** „2 fișe și 5 poze",
+  nu „7": dacă omul vede „4 de sincronizat" și sunt doar poze, intră în panică
+  degeaba — fișa lui e deja la birou.
+- **Ecranul de conflicte** (`/field/conflicte`), cu starea goală proiectată — cea
+  pe care o vede în 99% din zile.
+- **Service worker scris de mână** (~70 de linii): cache-first pe assets cu hash,
+  network-first în rest, `/api/**` **niciodată** în cache. `scope: '/field'` —
+  biroul n-are voie servit din cache.
+- **`Azi` citește din IndexedDB**, nu de pe server. Ăsta e testul întregii
+  arhitecturi: cu rețeaua închisă de tot, ecranul se încarcă din felia locală.
+
+### Al treilea grant lipsă la rând
+
+**Terenul nu-și putea citi seriile de numerotare.** `app.document_series` intrase
+în 0006 ca nomenclator de birou, iar felia pleca fără ele — deci prima fișă
+scrisă în subsol nu s-ar fi putut salva nici când revenea rețeaua. Reparat în
+`0030`, pe coloane enumerate: **`next_number` NU se acordă**, e contorul gapless
+și singurul care are voie să-l miște e funcția `security definer`.
+
+E a treia oară în proiect când un drum de teren pică pe un grant lipsă — după
+catalogul de operațiuni (09b-2) și liniile de pontaj (09b-3) — și toate trei au
+avut aceeași formă: **partea de jos era corectă, dar o persona n-avea drum până
+la ea.** Se vede numai chemând use-case-ul din rolul restrâns.
+
+### Un test care mințea, reparat înainte să apuce să mintă
+
+Prima variantă a verificării #16 („zero lei") căuta cuvintele de bani în tot
+JSON-ul feliei și a picat pe **„Ulei hidraulic"**, care conține „lei". Regula e
+însă despre **câmpuri**, nu despre orice șir: verificarea scanează acum **cheile**,
+recursiv. Un test care dă alarme false pe numele produselor e un test pe care îl
+dezactivează cineva peste două luni.
+
+### De ce outbox propriu și nu PowerSync
+
+Cele patru motive din plan, confirmate de implementare: felia e mică și bine
+delimitată (2,4 KB), scrierile sunt oricum custom, izolarea prețului ar fi cerut
+reguli de sincronizare care exclud coloane — protecție în două locuri, care pot
+diverge — și ar fi fost un vendor în plus pentru ~20 de utilizatori. Escape
+hatch-ul rămâne documentat, nu implementat.
+
+### Cum a fost verificat
+
+Harness pe dev (7 verificări) plus **5 teste de servicii** în CI: felia n-are
+niciun câmp de bani, nu confundă „Ulei hidraulic" cu un preț, stocul vine fără
+CMP, rămâne sub 2 MB comprimat, și aduce seriile fără de care fișa n-ar avea din
+ce lua numărul.
+
+**Verificări din pasul 10 acoperite aici:** 10 și 16. Verificările #1–#4 (offline
+real, cu rețeaua oprită) cer ecranele și un browser — vin la 10c.
 
 ---
 
@@ -1018,7 +1085,7 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
 | 07 — File management (R2) | 🟩 **gata** (07a–07c-2; 20/21 — #7 cere Playwright pentru întreruperea reală de rețea) | 2026-08-18 |
 | 08 — Cereri, rutare, backlog | 🟨 în lucru (08a + 08b gata: schemă, domain, servicii, ecrane; **08c** email+cronuri neatins) | 2026-08-18 |
-| 10 — Teren offline și raport lunar | 🟨 în lucru (**10a** fundația sincronizării: gata; 10b–10e: neatinse) | 2026-08-18 |
+| 10 — Teren offline și raport lunar | 🟨 în lucru (**10a** sincronizarea și **10b** PWA-ul offline: gata; 10c–10e: neatinse) | 2026-08-18 |
 | 09 — Fișe de lucru | ✅ gata (09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon · 09b-4 acoperire, istoric, validare în masă, seed) | 2026-08-18 |
 | 10 — Teren offline, raport lunar | ⬜ neînceput | — |
 
@@ -1043,7 +1110,7 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași** — ceea ce e chiar comportamentul cerut de #16 — **dacă `MFA_ENFORCED` nu e `0`** (vezi rândul de mai jos). |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **~550** (10a confirmat în CI `32172883280`) | La 10a: `packages/services` **+8** (`field-sync.test.ts`, fișier nou). La 09b-4: `packages/services` **+3** (acoperire cu date reale, istoricul obiectivului). La 09b-3: `packages/services` **+14** (`timesheets.test.ts` și `inventory.test.ts`, fișiere noi). La 09b-2: `packages/services` **+7** (`interventions.test.ts`, fișier nou). La 09a: `domain` 106 → **126** (+20, `sheets/` — inspecție, abatere, pontaj). La 08b: `domain` 104 → **106** (+2, `isCommercialOpportunity`), `packages/services` 116 → **131** (+8 în `requests.test.ts`, +7 în `operations.test.ts` — fișier nou). La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **~555** (10b neconfirmat încă în CI) | La 10b: `packages/services` **+5** (`field-snapshot.test.ts`, fișier nou). La 10a: `packages/services` **+8** (`field-sync.test.ts`, fișier nou). La 09b-4: `packages/services` **+3** (acoperire cu date reale, istoricul obiectivului). La 09b-3: `packages/services` **+14** (`timesheets.test.ts` și `inventory.test.ts`, fișiere noi). La 09b-2: `packages/services` **+7** (`interventions.test.ts`, fișier nou). La 09a: `domain` 106 → **126** (+20, `sheets/` — inspecție, abatere, pontaj). La 08b: `domain` 104 → **106** (+2, `isCommercialOpportunity`), `packages/services` 116 → **131** (+8 în `requests.test.ts`, +7 în `operations.test.ts` — fișier nou). La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
 | **Martie 2026 e ÎNCHISĂ la firma A pe Supabase dev**, din 05c | Închisă dinadins, ca ecranul de re-alocări să aibă ce arăta: mutarea finanțării intervenției `IV-000001` de acolo a emis `NRA-000001` în august. Dacă un ecran refuză o scriere pe martie, ăsta e motivul — nu un bug. |
 | **Aplicația e deployată pe Vercel**, pe același proiect Supabase (`cspjtesltraiaveypuya`) | Deci datele de pe dev sunt aceleași care se văd în aplicația deployată — inclusiv seed-ul și luna închisă de mai sus. `next.config.ts` încarcă `.env.local` din rădăcina repo-ului, fișier care pe Vercel **nu există**: toate variabilele trebuie puse în Project Settings. |

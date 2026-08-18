@@ -107,6 +107,20 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
 
+  /*
+   * Service worker-ul aplicatiei de teren.
+   *
+   * Nu se ignora, se declara: e cod real, care ruleaza pe telefonul unui om
+   * fara semnal, si merita aceleasi reguli ca restul. Ce-i lipsea erau doar
+   * globalele — `self`, `caches`, `fetch` — care nu exista in `browser`.
+   */
+  {
+    files: ['apps/*/public/sw.js'],
+    languageOptions: {
+      globals: { ...globals.serviceworker, ...globals.browser },
+    },
+  },
+
   {
     files: ['**/*.{ts,tsx,mts,cts}'],
     languageOptions: {

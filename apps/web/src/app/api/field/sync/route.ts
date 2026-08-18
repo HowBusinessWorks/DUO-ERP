@@ -1,6 +1,6 @@
 import { canWriteSheets } from '@damina/auth';
 import { pullSyncInputSchema, pushMutationsInputSchema } from '@damina/contracts';
-import { markPulled, pushMutations, readCursor } from '@damina/services';
+import { markPulled, pullFieldSnapshot, pushMutations, readCursor } from '@damina/services';
 import { NextResponse, type NextRequest } from 'next/server';
 import { apiError } from '../../../../lib/api-errors';
 import { fieldSyncLimiter } from '../../../../lib/field-sync-limits';
@@ -90,14 +90,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const actor = await requireActor();
     const current = await readCursor(actor, parsed.data.deviceId);
+    const snapshot = await pullFieldSnapshot(actor);
     const next = await markPulled(actor, parsed.data.deviceId);
 
     return NextResponse.json({
       /** Cursorul de DINAINTE: el spune de unde s-a cerut felia. */
       since: current?.cursor ?? null,
       cursor: next.cursor,
-      /** Felia propriu-zisă sosește cu 10b, odată cu snapshot-ul din Dexie. */
+      /** `true` la primul pull al dispozitivului, sau după ce cursorul s-a uitat. */
       full: current === null,
+      snapshot,
     });
   } catch (error) {
     return apiError(error);

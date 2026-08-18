@@ -398,6 +398,18 @@ export type {
 
 export { INVENTORY_ALERT_KINDS, verifyStockJob } from './inventory-integrity';
 
+export { pullFieldSnapshot } from './field-snapshot';
+export type {
+  FieldChecklist,
+  FieldChecklistItem,
+  FieldPerson,
+  FieldSeries,
+  FieldSnapshot,
+  FieldStage,
+  FieldStockLine,
+  FieldWorkUnit,
+} from './field-snapshot';
+
 export { markPulled, pruneAppliedMutations, pushMutations, readCursor } from './field-sync';
 export type { PushResult, SyncCursor } from './field-sync';
 

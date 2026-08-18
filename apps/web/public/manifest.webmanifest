@@ -1,0 +1,20 @@
+{
+  "name": "Damina Teren",
+  "short_name": "Teren",
+  "description": "Fișe de inspecție, intervenții și pontaj, cu sau fără semnal.",
+  "start_url": "/field",
+  "scope": "/field",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "lang": "ro",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -17,6 +17,47 @@ sunt consecințe.
    după pot depinde de cea care a picat. Erorile de *rețea* nu intră aici: ele nu
    ajung să fie înregistrate, deci se reiau de la sine.
 
+## Ce ține telefonul
+
+Trei magazii în IndexedDB (`apps/web/src/lib/field/db.ts`), cu roluri care nu se
+amestecă:
+
+| Magazie | Ce e | Ce se întâmplă dacă se pierde |
+|---|---|---|
+| `snapshot` | felia mea de date, **doar cantități** | se ia din nou la primul pull |
+| `outbox` | mutațiile care așteaptă | **s-a pierdut o zi de teren** |
+| `media` | pozele care așteaptă, cu progresul lor | pozele nu mai ajung niciodată |
+
+Felia se **rescrie întreagă** la fiecare pull, nu se îmbină: e mică (câteva KB
+comprimat), iar o îmbinare ar fi cerut tombstones pe șase tabele ca să se vadă ce
+a dispărut de la birou. Outbox-ul și media **nu se ating** niciodată la pull —
+ele sunt munca omului, felia e doar o copie a ce știe serverul.
+
+**Ordinea unui ciclu: push → pull → media.** Pull-ul vine după push dinadins,
+altfel felia proaspătă ar arăta o stare din care lipsește exact ce tocmai a
+scris omul. Pozele merg ultimele: o fișă ajunsă fără poze e o fișă pe care cineva
+poate lucra, o poză fără fișă nu e nimic.
+
+**Contorul numără separat fișele și pozele.** Dacă omul vede „4 de sincronizat"
+și sunt doar poze, intră în panică degeaba — fișa lui e deja la birou.
+
+## Ce face service worker-ul
+
+Scris de mână (`apps/web/public/sw.js`), ~70 de linii, în loc de Workbox printr-un
+plugin de build: un plugin care rescrie ieșirea lui Next se strică la fiecare
+minor al framework-ului, iar ce ne trebuie încape în două strategii.
+
+- assets cu hash (`/_next/static/`): **cache-first** — sunt imutabile prin nume;
+- restul: **network-first**, cu cache-ul ca plasă. În subsol rețeaua nu răspunde
+  cu eroare, ci *atârnă* — de aia contează ordinea;
+- `/api/**`: **niciodată în cache.** Un răspuns de `/api/field/sync` servit din
+  cache ar spune telefonului că a primit felia, fără s-o fi primit.
+
+**Fără logică de business.** Service worker-ul nu știe ce e o fișă; tot ce ține de
+mutații trăiește în IndexedDB și în `lib/field/sync.ts`, unde poate fi citit și
+testat. `scope` e `/field`: aplicația de birou n-are voie servită din cache — ea
+arată bani și stări care se schimbă sub tine.
+
 ## Cum se adaugă un tip nou de mutație
 
 Două locuri. Nu există un al treilea:
@@ -57,8 +98,13 @@ Ce se face mai departe **nu e o operație de bază de date**, ci una de aplicaț
 omul rezolvă cauza (deschide luna, completează stocul, corectează cantitatea) și
 retrimite. Retrimiterea aceleiași mutații va da același răspuns memorat — deci,
 dacă datele s-au schimbat, telefonul trebuie să genereze o **mutație nouă**, cu
-`id` nou. Asta e și motivul pentru care ecranul de conflicte oferă „duplică ce
-fișă nouă", nu „încearcă din nou".
+`id` nou.
+
+De asta ecranul de conflicte (`/field/conflicte`) n-are buton „încearcă din nou":
+ar fi aceeași respingere cu alt nume. Are **„renunță la ea"** și **„deblochează
+coada"**, iar reîncercarea adevărată înseamnă redeschiderea fișei — atunci pleacă
+una nouă. Butonul „duplică drept fișă nouă" din §3.3 sosește cu ecranele, la 10c:
+el are nevoie de ecranul fișei ca să deschidă o copie editabilă.
 
 Ștergerea unui rând din jurnal ca să se „deblocheze" coada e ultima soluție și se
 face doar cu rolul de serviciu — un rol de aplicație n-are `delete` acolo,

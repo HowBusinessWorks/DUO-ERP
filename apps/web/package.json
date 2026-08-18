@@ -21,6 +21,7 @@
     "@damina/ui": "workspace:*",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.49.8",
+    "dexie": "^4.4.5",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.511.0",
     "next": "^15.3.3",
