@@ -16,6 +16,7 @@ import {
   unlinkObjective,
 } from '../src/objectives';
 import { listContractsForObjective } from '../src/contracts';
+import { createInspection } from '../src/inspections';
 import { officeActor, rejection } from './helpers';
 
 afterAll(async () => {
@@ -231,12 +232,82 @@ describe('acoperire inspectii', () => {
     expect(due.rows).toHaveLength(20);
     expect(due.dueTotal).toBe(20);
     expect(due.doneTotal).toBe(0);
-    expect(due.basis).toBe('profil de inspectie · fara date de teren');
+    expect(due.basis).toBe('profil de inspectie · fise de teren, dupa data executiei');
 
     // Mai nu e multiplu de 3: nimic datorat, deci nicio restanta falsa.
     const quiet = await getInspectionCoverage(officeActor(), contractId, 2026, 5);
     expect(quiet.dueTotal).toBe(0);
     expect(quiet.objectiveCount).toBe(20);
+  });
+
+  /*
+   * Pana la 09b-4, `done` era zero pe sarma. Testul asta e cel care nu mai lasa
+   * sa se intoarca acolo: o inspectie chiar executata trebuie sa se vada, iar
+   * data care conteaza e cea a EXECUTIEI, nu luna de raportare.
+   */
+  it('o inspecție executată se vede în acoperire, după data execuției', async () => {
+    const { contractId, companyId } = await makeContract('EE');
+
+    const { id: checklistId } = await createChecklist(officeActor(), {
+      code: `CHK-${uuidv7().slice(-6)}`,
+      name: 'Inspecție lunară',
+      objectiveKind: 'statie_pompare',
+      isActive: true,
+    });
+    await withActor(officeActor(), async (tx) => {
+      await tx.execute(sql`
+        insert into app.checklist_items (id, checklist_id, position, text)
+        values (${uuidv7()}, ${checklistId}, 1, 'Punctul unic')`);
+      await tx.execute(sql`
+        insert into app.document_series (id, company_id, document_type, series, next_number)
+        values (${uuidv7()}, ${companyId}, 'inspectie', 'I', 1)`);
+    });
+
+    const { id: profileId } = await createInspectionProfile(officeActor(), {
+      name: `Lunar ${uuidv7().slice(-6)}`,
+      description: '',
+      isActive: true,
+    });
+    await addProfileItem(officeActor(), { profileId, checklistId, frequencyMonths: '1' });
+
+    const { id: objectiveId } = await createObjective(officeActor(), objectiveInput());
+    const { id: linkId } = await linkObjective(officeActor(), {
+      contractId,
+      objectiveId,
+      validFrom: '2026-01-01',
+      validTo: '',
+      inspectionProfileId: profileId,
+    });
+
+    const before = await getInspectionCoverage(officeActor(), contractId, 2026, 4);
+    expect(before.dueTotal).toBe(1);
+    expect(before.doneTotal).toBe(0);
+    expect(before.rows[0]?.lastPerformedOn).toBeNull();
+
+    const inspection = await createInspection(officeActor(), {
+      companyId,
+      objectiveId,
+      contractObjectiveId: linkId,
+      name: 'Inspecția lunii',
+      series: 'I',
+      performedOn: '2026-04-20',
+      performedBy: '',
+      responsiblePersonId: '',
+      checklistId,
+    });
+
+    const after = await getInspectionCoverage(officeActor(), contractId, 2026, 4);
+    expect(after.doneTotal).toBe(1);
+    expect(after.rows[0]?.lastPerformedOn).toBe('2026-04-20');
+    expect(after.rows[0]?.lastWorkUnitId).toBe(inspection.id);
+
+    // Luna urmatoare e tot datorata, si tot restanta: fisa din aprilie nu se
+    // reporteaza. Dar „ultima inspectie" ramane vizibila, ca sa se vada cat de
+    // veche e restanta.
+    const may = await getInspectionCoverage(officeActor(), contractId, 2026, 5);
+    expect(may.dueTotal).toBe(1);
+    expect(may.doneTotal).toBe(0);
+    expect(may.rows[0]?.lastPerformedOn).toBe('2026-04-20');
   });
 
   it('un obiectiv fara profil apare in acoperire, dar fara frecventa', async () => {

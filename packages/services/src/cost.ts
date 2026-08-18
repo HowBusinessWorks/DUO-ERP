@@ -516,6 +516,94 @@ export async function objectiveCostHistory(
   });
 }
 
+export interface ObjectiveHistoryEntry {
+  readonly workUnitId: string;
+  readonly code: string;
+  readonly name: string;
+  readonly type: string;
+  readonly status: string;
+  /** Data la care s-a lucrat: executia fisei, sau inceputul lucrarii. */
+  readonly happenedOn: string | null;
+  readonly contractCode: string | null;
+  readonly companyName: string;
+  /** Costul acumulat pe unitate, pe analitica „folosit". */
+  readonly cost: Money;
+  /** `true` cand fisa e validata (inspectie sau interventie). */
+  readonly validated: boolean;
+}
+
+/**
+ * Ce s-a intamplat la un obiectiv — inspectii, interventii si lucrari, cu
+ * costul lor (§3.5).
+ *
+ * **Transversal peste contracte si peste ani, pe analitica „folosit".** Aia e
+ * intreaga miza a ecranului: intrebarea „ce s-a facut la stația asta" n-are
+ * nimic de-a face cu cine a platit. Daca ar fi construit pe „descarcat", o
+ * mutare de finantare din 2024 ar sterge din istoric o interventie care chiar a
+ * avut loc.
+ *
+ * Costul se citeste din registru, nu de pe unitate: unitatea n-are camp de cost
+ * realizat, si bine ca n-are — ar fi fost a doua sursa de adevar pentru un numar
+ * care se schimba la fiecare document nou.
+ */
+export async function objectiveWorkHistory(
+  actor: Actor,
+  objectiveId: string,
+  options: { readonly limit?: number } = {},
+): Promise<ObjectiveHistoryEntry[]> {
+  return withActor(actor, async (tx) => {
+    const rows = await tx.execute<{
+      work_unit_id: string;
+      code: string;
+      name: string;
+      type: string;
+      status: string;
+      happened_on: string | null;
+      contract_code: string | null;
+      company_name: string;
+      cost: string;
+      validated: boolean;
+    }>(sql`
+      select
+        wu.id                                   as work_unit_id,
+        wu.code,
+        wu.name,
+        wu.type::text                           as type,
+        wu.status::text                         as status,
+        coalesce(insp.performed_on, iv.performed_on, wu.starts_on)::text as happened_on,
+        c.code                                  as contract_code,
+        comp.name                               as company_name,
+        coalesce(
+          (select sum(cl.amount) from app.cost_lines cl where cl.work_unit_id = wu.id),
+          0
+        )::text                                 as cost,
+        (insp.validated_at is not null or iv.validated_at is not null) as validated
+        from app.work_units wu
+        join app.companies comp on comp.id = wu.company_id
+        left join app.inspections insp on insp.work_unit_id = wu.id
+        left join app.interventions iv on iv.work_unit_id = wu.id
+        left join app.contract_objectives co on co.id = wu.contract_objective_id
+        left join app.contracts c on c.id = co.contract_id
+       where wu.objective_id = ${objectiveId}
+       order by coalesce(insp.performed_on, iv.performed_on, wu.starts_on) desc nulls last,
+                wu.created_at desc
+       limit ${options.limit ?? 200}`);
+
+    return rows.rows.map((row) => ({
+      workUnitId: row.work_unit_id,
+      code: row.code,
+      name: row.name,
+      type: row.type,
+      status: row.status,
+      happenedOn: row.happened_on,
+      contractCode: row.contract_code,
+      companyName: row.company_name,
+      cost: Money.fromDb(row.cost),
+      validated: row.validated,
+    }));
+  });
+}
+
 // ── Marja ────────────────────────────────────────────────────────────────────
 
 export interface ContractMargin {

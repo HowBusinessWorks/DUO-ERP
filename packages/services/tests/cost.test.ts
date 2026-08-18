@@ -6,6 +6,7 @@ import {
   costBreakdown,
   listCostLines,
   listReconciliation,
+  objectiveWorkHistory,
   recordCost,
   stornoCost,
   verifyRollups,
@@ -449,6 +450,29 @@ describe('citiri', () => {
     expect(breakdown[0]?.expenseType).toBe('material');
     expect(breakdown[0]?.consumed.toDbString()).toBe('100.00');
     expect(breakdown[0]?.committed.toDbString()).toBe('250.00');
+  });
+
+  /*
+   * Istoricul obiectivului: transversal peste contracte si peste ani, pe
+   * analitica „folosit". Testul verifica exact miza — o intrare fara cost
+   * exista in lista, iar una cu cost isi poarta suma; daca ecranul ar fi
+   * construit pe „descarcat", o mutare de finantare ar sterge din istoric o
+   * interventie care chiar a avut loc.
+   */
+  it('istoricul obiectivului arata ce s-a intamplat, cu costul de pe fiecare', async () => {
+    const base = await ground();
+    const withCost = await interventionOn(base, base.mentenanta, base.openPast);
+    const withoutCost = await interventionOn(base, base.mentenanta, base.openPast);
+
+    await recordCost(officeActor(), costInput(base, withCost.workUnitId, { amount: '640.00' }));
+
+    const history = await objectiveWorkHistory(officeActor(), base.objectiveId);
+    const byId = new Map(history.map((entry) => [entry.workUnitId, entry]));
+
+    expect(byId.get(withCost.workUnitId)?.cost.toDbString()).toBe('640.00');
+    expect(byId.get(withCost.workUnitId)?.type).toBe('interventie');
+    // Zero e o informatie, nu o lipsa: fisa exista si n-a costat inca nimic.
+    expect(byId.get(withoutCost.workUnitId)?.cost.toDbString()).toBe('0.00');
   });
 
   it('pagineaza cu cursor, nu cu OFFSET', async () => {

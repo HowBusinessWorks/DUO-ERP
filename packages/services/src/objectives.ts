@@ -381,6 +381,7 @@ export async function listInspectionProfiles(actor: Actor): Promise<InspectionPr
         checklistId: schema.inspectionProfileItems.checklistId,
         checklistName: schema.checklists.name,
         frequencyMonths: schema.inspectionProfileItems.frequencyMonths,
+        contractObjectiveId: schema.contractObjectives.id,
       })
       .from(schema.inspectionProfileItems)
       .innerJoin(
@@ -468,8 +469,12 @@ export interface CoverageRow {
   readonly frequencyMonths: number | null;
   /** Cate inspectii de tipul asta ar fi trebuit facute in luna analizata. */
   readonly due: number;
-  /** Cate s-au facut. ZERO in pasul 04: fisele de lucru vin in pasul 09. */
+  /** Cate s-au facut efectiv in luna, dupa data EXECUTIEI. */
   readonly done: number;
+  /** Ultima inspectie de tipul asta, oricand. `null` = niciodata. */
+  readonly lastPerformedOn: string | null;
+  /** Unitatea ultimei inspectii, ca ecranul sa poata trimite la ea. */
+  readonly lastWorkUnitId: string | null;
 }
 
 export interface CoverageReport {
@@ -482,8 +487,13 @@ export interface CoverageReport {
   /**
    * Ce inseamna cifrele. Regula 6 a pasului: orice ecran cu cifre declara pe ce
    * analitica e construit.
+   *
+   * „Datorat" vine din profil, „facut" din fisele de teren — si se numara dupa
+   * **data executiei**, nu dupa luna de raportare. O inspectie facuta pe 31
+   * martie si validata in aprilie a fost totusi facuta in martie; acoperirea
+   * masoara terenul, nu contabilitatea.
    */
-  readonly basis: 'profil de inspectie · fara date de teren';
+  readonly basis: 'profil de inspectie · fise de teren, dupa data executiei';
 }
 
 /**
@@ -519,6 +529,7 @@ export async function getInspectionCoverage(
         checklistId: schema.inspectionProfileItems.checklistId,
         checklistName: schema.checklists.name,
         frequencyMonths: schema.inspectionProfileItems.frequencyMonths,
+        contractObjectiveId: schema.contractObjectives.id,
       })
       .from(schema.contractObjectives)
       .innerJoin(schema.objectives, eq(schema.contractObjectives.objectiveId, schema.objectives.id))
@@ -546,6 +557,53 @@ export async function getInspectionCoverage(
       .orderBy(asc(schema.objectives.name), asc(schema.checklists.name)),
   );
 
+  /*
+   * Inspectiile REALE ale contractului, o singura interogare pentru tot
+   * raportul. Alternativa — cate un `count` pe fiecare rand — ar fi insemnat
+   * cateva sute de interogari pentru un contract cu 200 de obiective, si
+   * ecranul asta se deschide o data pe luna, de toata lumea, in aceeasi zi.
+   *
+   * Se numara dupa `performed_on`, nu dupa `effect_date`: acoperirea masoara ce
+   * s-a facut pe teren in luna, iar o fisa facuta pe 31 si validata pe 3 a fost
+   * facuta tot atunci. Din acelasi motiv intra si fisele nevalidate — omul a
+   * fost acolo; ca hartia n-a ajuns inca la birou e alta problema.
+   */
+  const performed = await withActor(actor, async (tx) =>
+    tx
+      .select({
+        contractObjectiveId: schema.workUnits.contractObjectiveId,
+        checklistId: schema.inspections.checklistId,
+        workUnitId: schema.inspections.workUnitId,
+        performedOn: schema.inspections.performedOn,
+      })
+      .from(schema.inspections)
+      .innerJoin(schema.workUnits, eq(schema.workUnits.id, schema.inspections.workUnitId))
+      .where(
+        and(
+          inArray(
+            schema.workUnits.contractObjectiveId,
+            rows.map((row) => row.contractObjectiveId),
+          ),
+          sql`${schema.workUnits.status} <> 'anulata'`,
+        ),
+      )
+      .orderBy(asc(schema.inspections.performedOn)),
+  );
+
+  const key = (contractObjectiveId: string | null, checklistId: string | null): string =>
+    `${contractObjectiveId ?? '-'}|${checklistId}`;
+
+  const doneInMonth = new Map<string, number>();
+  const lastOne = new Map<string, { performedOn: string; workUnitId: string }>();
+  for (const row of performed) {
+    const cell = key(row.contractObjectiveId, row.checklistId);
+    if (row.performedOn >= monthStart && row.performedOn <= monthEnd) {
+      doneInMonth.set(cell, (doneInMonth.get(cell) ?? 0) + 1);
+    }
+    // Randurile vin crescator dupa data, deci ultima scriere e cea mai recenta.
+    lastOne.set(cell, { performedOn: row.performedOn, workUnitId: row.workUnitId });
+  }
+
   const target = Period.of(year, month);
   const coverage: CoverageRow[] = rows.map((row) => {
     if (row.frequencyMonths === null) {
@@ -559,12 +617,16 @@ export async function getInspectionCoverage(
         frequencyMonths: null,
         due: 0,
         done: 0,
+        lastPerformedOn: null,
+        lastWorkUnitId: null,
       };
     }
 
     const entry = Period.fromKey(row.validFrom.slice(0, 7));
     const elapsed = target.diff(entry);
     const due = elapsed >= 0 && elapsed % row.frequencyMonths === 0 ? 1 : 0;
+    const cell = key(row.contractObjectiveId, row.checklistId);
+    const last = lastOne.get(cell);
 
     return {
       objectiveId: row.objectiveId,
@@ -575,8 +637,9 @@ export async function getInspectionCoverage(
       checklistName: row.checklistName,
       frequencyMonths: row.frequencyMonths,
       due,
-      // Pasul 09 aduce fisele completate. Pana atunci zero, si se vede ca e zero.
-      done: 0,
+      done: doneInMonth.get(cell) ?? 0,
+      lastPerformedOn: last?.performedOn ?? null,
+      lastWorkUnitId: last?.workUnitId ?? null,
     };
   });
 
@@ -587,6 +650,6 @@ export async function getInspectionCoverage(
     dueTotal: coverage.reduce((sum, row) => sum + row.due, 0),
     doneTotal: coverage.reduce((sum, row) => sum + row.done, 0),
     rows: coverage,
-    basis: 'profil de inspectie · fara date de teren',
+    basis: 'profil de inspectie · fise de teren, dupa data executiei',
   };
 }

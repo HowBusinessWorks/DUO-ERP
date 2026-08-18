@@ -1,6 +1,6 @@
 import { closeConnections, loadEnvFiles, schema, withActor, type Actor } from '@damina/db';
 import { uuidv7 } from '@damina/shared';
-import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   createComponent,
   createContract,
@@ -10,6 +10,18 @@ import {
 import { addProfileItem, createInspectionProfile, linkObjective } from '../src/objectives';
 import { ensureOpenPeriods } from '../src/periods';
 import { createStage, createWorkUnit } from '../src/work-units';
+import {
+  createInspection,
+  getInspectionSheet,
+  saveInspection,
+  validateInspection,
+} from '../src/inspections';
+import {
+  createIntervention,
+  saveIntervention,
+  validateIntervention,
+} from '../src/interventions';
+import { saveTimesheet, validateTimesheets } from '../src/timesheets';
 import { createOperation, setOperationMaterials } from '../src/operations';
 
 /**
@@ -31,6 +43,7 @@ import { createOperation, setOperationMaterials } from '../src/operations';
  *          pnpm db:seed --force     — sterge intai datele de seed, apoi recreeaza
  *          pnpm db:seed --costs     — doar registrul de cost, peste un seed existent
  *          pnpm db:seed --requests  — doar catalogul, cererile si backlogul (pasul 08)
+ *          pnpm db:seed --sheets    — doar fisele de lucru, gestiunea si stocul (pasul 09)
  */
 
 loadEnvFiles();
@@ -76,6 +89,9 @@ const IDS = {
   request: (n: number) => id(13, n),
   requestEmail: (n: number) => id(14, n),
   proposal: (n: number) => id(15, n),
+  // Pasul 09: echipa cu gestiunea ei, din care se consuma materialele.
+  team: id(16, 1),
+  location: id(17, 1),
 };
 
 /** Seriile de numerotare, per firma. Codurile UL trec prin acelasi alocator. */
@@ -547,6 +563,7 @@ async function main(): Promise<void> {
   const force = process.argv.includes('--force');
   const onlyCosts = process.argv.includes('--costs');
   const onlyRequests = process.argv.includes('--requests');
+  const onlySheets = process.argv.includes('--sheets');
 
   await ensureDevPerson();
   await ensureDocumentSeries();
@@ -588,9 +605,27 @@ async function main(): Promise<void> {
       return;
     }
 
+    /*
+     * `--sheets` adauga DOAR fisele de lucru, gestiunea si stocul (pasul 09).
+     * Acelasi motiv ca la celelalte doua: unitatile de lucru validate produc
+     * linii de cost, iar registrul e append-only — deci `--force` nu le poate
+     * reface, si fara flagul asta ecranele pasului 09 ar ramane goale pe o baza
+     * care are tot restul.
+     */
+    if (onlySheets) {
+      const ground = await costGround();
+      if (ground === null) {
+        console.log('Contractul de seed lipseste; nu am pe ce sa pun fise de lucru.');
+        return;
+      }
+      await seedSheetsAndInventory(ground);
+      return;
+    }
+
     if (!force) {
       console.log(
-        'Seed-ul exista deja. Ruleaza cu --force ca sa-l refaci (sau --costs / --requests).',
+        'Seed-ul exista deja. Ruleaza cu --force ca sa-l refaci ' +
+          '(sau --costs / --requests / --sheets).',
       );
       return;
     }
@@ -1454,3 +1489,312 @@ main()
     process.exitCode = 1;
   })
   .finally(() => void closeConnections());
+
+/**
+ * Fisele de lucru si gestiunea de echipa (pasul 09, §7).
+ *
+ * Ce lipsea ca sa se poata umbla prin ecranele pasului fara sa completeze
+ * cineva o fisa de mana: o echipa cu gestiune si stoc, opt inspectii validate pe
+ * luni diferite, trei interventii cu materiale si ore, si o saptamana de
+ * pontaje. Toate trec prin SERVICII, ca restul seed-ului — deci trec si prin
+ * triggere, si prin regula „fiecare NOK are iesire", si prin inghetarea
+ * tarifului.
+ *
+ * **Punctele care cer poza se raspund cu `na`.** Trigger-ul cere un nod de
+ * fisier real, iar un seed care ar fabrica noduri fara continut in R2 ar produce
+ * fisiere care dau 404 la descarcare — adica date care mint. `na` cu nota
+ * spune adevarul: punctul n-a fost fotografiat, fiindca fisa nu s-a completat
+ * pe teren.
+ */
+async function seedSheetsAndInventory(base: WorkUnitGround): Promise<void> {
+  /*
+   * Lunile se ALEG dintre cele deschise, nu se fixeaza in cod.
+   *
+   * Prima varianta cerea 03-05/2026 si a picat pe dev, unde martie e inchisa de
+   * la testul de inchidere al pasului 06. Un seed care presupune ca o luna e
+   * deschisa presupune ca nimeni n-a folosit baza — adica exact invers decat e
+   * adevarat despre o baza de dezvoltare.
+   */
+  const periods = await withActor(actor(), async (tx) =>
+    tx.select().from(schema.periods).where(eq(schema.periods.companyId, IDS.companyA)),
+  );
+  const months = periods
+    .filter((row) => row.status === 'open' && row.year === 2026)
+    .sort((a, b) => a.month - b.month)
+    .slice(-3)
+    .map((row) => ({ month: row.month, id: row.id as string | undefined }));
+
+  if (months.length < 3) {
+    console.log('Nu sunt trei luni deschise in 2026; fisele de lucru se sar.');
+    return;
+  }
+  const firstMonth = months[0]?.month ?? 1;
+
+  // ── Echipa, gestiunea ei si stocul ────────────────────────────────────────
+  await withActor(actor('seed'), async (tx) => {
+    await tx
+      .insert(schema.teams)
+      .values({ id: IDS.team, companyId: IDS.companyA, name: 'Echipa instalatii' })
+      .onConflictDoNothing();
+    await tx
+      .insert(schema.teamMembers)
+      .values({ teamId: IDS.team, personId: IDS.fieldLead, validFrom: '2026-01-01' })
+      .onConflictDoNothing();
+    await tx
+      .insert(schema.locations)
+      .values({
+        id: IDS.location,
+        companyId: IDS.companyA,
+        type: 'echipa',
+        name: 'Gestiune Echipa instalatii',
+        code: 'EC-INST-1',
+        teamId: IDS.team,
+      })
+      .onConflictDoNothing();
+  });
+
+  // Intrarea de stoc, o singura data: soldul e un rollup, deci a doua rulare ar
+  // dubla marfa fara sa dubleze nimic altceva.
+  const stocked = await withActor(actor(), async (tx) =>
+    tx
+      .select({ id: schema.stockMovements.id })
+      .from(schema.stockMovements)
+      .where(eq(schema.stockMovements.toLocationId, IDS.location))
+      .limit(1),
+  );
+
+  if (stocked.length === 0) {
+    await withActor(actor('seed'), async (tx) => {
+      const documentId = uuidv7();
+      await tx.insert(schema.stockMovements).values(
+        STOCK_INTAKE.map((entry, index) => ({
+          id: uuidv7(),
+          companyId: IDS.companyA,
+          documentType: 'nir',
+          documentId,
+          fromLocationId: null,
+          toLocationId: IDS.location,
+          productId: IDS.product(index + 1),
+          quantity: entry.quantity,
+          unitCost: entry.unitCost,
+          effectDate: `2026-${String(firstMonth).padStart(2, '0')}-02`,
+          createdBy: IDS.pm,
+        })),
+      );
+    });
+  }
+
+  /*
+   * Numele fiselor sunt deterministe, deci existenta lor e criteriul de
+   * „am facut deja asta". `createInspection` nu primeste id din afara, ca
+   * `createWorkUnit` — iar fara verificarea asta a doua rulare a seed-ului
+   * producea inca opt inspectii validate, cu liniile lor de cost, care nu se
+   * mai pot sterge.
+   */
+  const seededNames = new Set(
+    (
+      await withActor(actor(), async (tx) =>
+        tx
+          .select({ name: schema.workUnits.name })
+          .from(schema.workUnits)
+          .where(eq(schema.workUnits.companyId, IDS.companyA)),
+      )
+    ).map((row) => row.name),
+  );
+
+  // ── Opt inspectii validate, pe luni diferite ──────────────────────────────
+  let inspections = 0;
+  for (let index = 0; index < 8; index += 1) {
+    const objectiveIndex = index % 20;
+    const link = base.contractObjectiveIds[objectiveIndex] ?? '';
+    if (link === '') {
+      continue;
+    }
+    const entry = months[index % months.length];
+    const day = String(4 + index).padStart(2, '0');
+    const performedOn = `2026-${String(entry?.month ?? 3).padStart(2, '0')}-${day}`;
+    const name = `Inspectie ${performedOn}`;
+    if (seededNames.has(name)) {
+      inspections += 1;
+      continue;
+    }
+
+    const created = await createInspection(actor('seed'), {
+      companyId: IDS.companyA,
+      objectiveId: base.objectiveIds[objectiveIndex] ?? IDS.objective(1),
+      contractObjectiveId: link,
+      name,
+      series: SERIES.inspectie,
+      performedOn,
+      performedBy: IDS.fieldLead,
+      responsiblePersonId: '',
+      checklistId: '',
+    }).catch(() => null);
+
+    if (created === null) {
+      continue;
+    }
+
+    const sheet = await getInspectionSheet(actor(), created.id);
+    // Doua din opt au un NOK, ca ecranul de Constatari sa aiba ce arata si ca
+    // legatura constatare → cerere sa existe pe date de seed.
+    const nokAt = index === 2 || index === 5 ? 0 : -1;
+
+    await saveInspection(actor('seed'), {
+      workUnitId: created.id,
+      answers: sheet.points.map((point, position) => {
+        if (point.requiresPhoto) {
+          return {
+            checklistItemId: point.itemId,
+            answer: 'na',
+            note: 'Fara poza: fisa de seed, nu s-a completat pe teren.',
+            photoNodeId: '',
+          };
+        }
+        if (position === nokAt) {
+          return {
+            checklistItemId: point.itemId,
+            answer: 'nok',
+            note: 'Constatat la inspectie.',
+            photoNodeId: '',
+            finding: {
+              outcome: index === 2 ? 'interventie' : 'rezolvat_pe_loc',
+              resolutionNote:
+                index === 2 ? 'Cere interventie cu piesa de schimb.' : 'Strans pe loc.',
+              estimatedValue: '',
+              validUntil: '',
+            },
+          };
+        }
+        return {
+          checklistItemId: point.itemId,
+          answer: 'ok',
+          note: '',
+          photoNodeId: '',
+        };
+      }),
+    }).catch(() => null);
+
+    const validated = await validateInspection(actor('seed'), {
+      workUnitId: created.id,
+      effectDate: performedOn,
+    }).catch(() => null);
+
+    if (validated !== null) {
+      inspections += 1;
+    }
+  }
+
+  // ── Trei interventii cu materiale si ore, validate ────────────────────────
+  let interventions = 0;
+  for (let index = 0; index < 3; index += 1) {
+    const entry = months[index];
+    const objectiveIndex = index + 10;
+    const link = base.contractObjectiveIds[objectiveIndex] ?? '';
+    if (entry?.id === undefined || link === '') {
+      continue;
+    }
+    const performedOn = `2026-${String(entry.month).padStart(2, '0')}-15`;
+    const name = `Interventie ${performedOn}`;
+    if (seededNames.has(name)) {
+      interventions += 1;
+      continue;
+    }
+
+    const created = await createIntervention(actor('seed'), {
+      companyId: IDS.companyA,
+      objectiveId: base.objectiveIds[objectiveIndex] ?? IDS.objective(1),
+      contractObjectiveId: link,
+      name,
+      series: SERIES.interventie,
+      performedOn,
+      description: 'Inlocuit garnitura de la pompa 2.',
+      operationId: IDS.operation(index + 1),
+      teamId: IDS.team,
+      sourceRequestId: '',
+      responsiblePersonId: IDS.fieldLead,
+      fundingContractId: base.contractId,
+      fundingComponentId: base.maintenance,
+      fundingPeriodId: entry.id,
+      fundingAmount: '1500',
+      fundingReason: 'Mentenanta curenta, din abonamentul lunii.',
+    }).catch(() => null);
+
+    if (created === null) {
+      continue;
+    }
+
+    await saveIntervention(actor('seed'), {
+      workUnitId: created.id,
+      description: 'Inlocuit garnitura de la pompa 2.',
+      operationId: IDS.operation(index + 1),
+      teamId: IDS.team,
+      declaredHours: '6',
+      materials: [
+        { productId: IDS.product(1), lotId: '', quantity: '2', locationId: IDS.location },
+        { productId: IDS.product(2), lotId: '', quantity: '3', locationId: IDS.location },
+      ],
+      hours: [{ personId: IDS.fieldLead, hours: '6', workDate: performedOn }],
+    }).catch(() => null);
+
+    const validated = await validateIntervention(actor('seed'), {
+      workUnitId: created.id,
+      effectDate: performedOn,
+      consumptionSeries: SERIES.bon_consum,
+    }).catch(() => null);
+
+    if (validated !== null) {
+      interventions += 1;
+    }
+  }
+
+  // ── O saptamana de pontaje, pe lucrarea de seed ───────────────────────────
+  const stages = await withActor(actor(), async (tx) =>
+    tx
+      .select({ id: schema.workStages.id })
+      .from(schema.workStages)
+      .where(eq(schema.workStages.workUnitId, IDS.workUnitLucrare))
+      .orderBy(asc(schema.workStages.createdAt))
+      .limit(1),
+  );
+
+  let timesheets = 0;
+  const stageId = stages[0]?.id;
+  if (stageId !== undefined) {
+    const ids: string[] = [];
+    // Cinci zile la rand din prima luna deschisa. Pontajul se scrie pe zi.
+    const week = String(firstMonth).padStart(2, '0');
+    for (const day of ['06', '07', '08', '09', '10']) {
+      const saved = await saveTimesheet(actor('seed'), {
+        companyId: IDS.companyA,
+        personId: IDS.fieldLead,
+        workDate: `2026-${week}-${day}`,
+        lines: [{ workUnitId: IDS.workUnitLucrare, stageId, hours: '8' }],
+      }).catch(() => null);
+      if (saved !== null) {
+        ids.push(saved.id);
+      }
+    }
+
+    if (ids.length > 0) {
+      const result = await validateTimesheets(actor('seed'), {
+        timesheetIds: ids,
+        effectDate: '',
+      }).catch(() => null);
+      timesheets = result?.validated ?? 0;
+    }
+  }
+
+  console.log(
+    `Fise de lucru: ${String(inspections)} inspectii, ${String(interventions)} interventii, ` +
+      `${String(timesheets)} zile de pontaj, o gestiune de echipa cu stoc.`,
+  );
+}
+
+/** Marfa din care se consuma: patru produse, cantitati si preturi plauzibile. */
+const STOCK_INTAKE = [
+  { quantity: '120', unitCost: '4.50' },
+  { quantity: '300', unitCost: '11.20' },
+  { quantity: '250', unitCost: '6.80' },
+  { quantity: '60', unitCost: '32.00' },
+] as const;

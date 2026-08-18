@@ -1595,7 +1595,7 @@ function CoverageSection({
         footer={
           overdue.length === 0 ? null : (
             <tr>
-              <td colSpan={5} className="border-t border-border px-3 py-2 text-sm text-warning-700">
+              <td colSpan={6} className="border-t border-border px-3 py-2 text-sm text-warning-700">
                 <AlertTriangle className="mr-1.5 inline size-4" aria-hidden="true" />
                 {overdue.length} restanțe în luna asta.
               </td>
@@ -1639,12 +1639,39 @@ function CoverageSection({
               ),
           },
           {
+            key: 'last',
+            header: 'Ultima inspecție',
+            width: '11rem',
+            // Fara ea, o restanta e o eticheta. Cu ea, e o decizie: „n-a mai
+            // fost calcata din februarie" si „a fost saptamana trecuta, dar pe
+            // alta fisa" cer lucruri diferite de la cel care se uita.
+            cell: (row) =>
+              row.lastPerformedOn === null ? (
+                <CellMeta>niciodată</CellMeta>
+              ) : row.lastWorkUnitId === null ? (
+                <CellMeta>{formatDate(row.lastPerformedOn)}</CellMeta>
+              ) : (
+                <Link
+                  href={`/activitate/${row.lastWorkUnitId}`}
+                  className="text-sm text-ink-muted hover:text-brand-700"
+                >
+                  {formatDate(row.lastPerformedOn)}
+                </Link>
+              ),
+          },
+          {
             key: 'state',
             header: 'Luna asta',
             width: '10rem',
             cell: (row) =>
               row.due === 0 ? (
-                <CellMeta>nu e datorată</CellMeta>
+                row.done > 0 ? (
+                  // Nedatorata, dar facuta: o inspectie in plus nu e o greseala,
+                  // si n-are voie sa arate ca una.
+                  <Badge tone="success">făcută în plus</Badge>
+                ) : (
+                  <CellMeta>nu e datorată</CellMeta>
+                )
               ) : row.done >= row.due ? (
                 <Badge tone="success">făcută</Badge>
               ) : (

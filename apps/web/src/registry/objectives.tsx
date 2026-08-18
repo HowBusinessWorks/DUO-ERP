@@ -1,5 +1,9 @@
 import { canEditNomenclature, canWriteSheets } from '@damina/auth';
-import { OBJECTIVE_KIND_LABELS, OBJECTIVE_KINDS } from '@damina/contracts';
+import {
+  OBJECTIVE_KIND_LABELS,
+  OBJECTIVE_KINDS,
+  WORK_UNIT_TYPE_LABELS,
+} from '@damina/contracts';
 import {
   checklistsForContractObjective,
   getObjective,
@@ -10,7 +14,9 @@ import {
   listObjectives,
   listWorkUnits,
   objectiveCostHistory,
+  objectiveWorkHistory,
   type ObjectiveCostYear,
+  type ObjectiveHistoryEntry,
   type ObjectiveRow,
 } from '@damina/services';
 import { Badge, CellMeta, CellTitle, EmptyState, Money, Table } from '@damina/ui';
@@ -240,7 +246,10 @@ export const obiective = defineEntity<ObjectiveRow>({
         slug: 'istoric',
         label: 'Istoric',
         render: async (row, ctx) => {
-          const years = await objectiveCostHistory(ctx.actor, row.id);
+          const [years, entries] = await Promise.all([
+            objectiveCostHistory(ctx.actor, row.id),
+            objectiveWorkHistory(ctx.actor, row.id),
+          ]);
 
           return (
             <div className="space-y-4">
@@ -315,6 +324,77 @@ export const obiective = defineEntity<ObjectiveRow>({
                 <strong>cu activitate</strong>, nu la 12: o stație atinsă în două luni din an n-a
                 costat „media pe douăsprezece”, iar cifra aia n-ar ajuta la nicio comparație.
               </p>
+
+              {/*
+                Cifrele de mai sus spun CAT. Lista de mai jos spune CE — si fara
+                ea, „18.400 lei in 2026" nu e un istoric, e un sold.
+              */}
+              <Table<ObjectiveHistoryEntry>
+                caption="Ce s-a întâmplat la obiectiv"
+                rows={entries}
+                rowKey={(entry) => entry.workUnitId}
+                rowHref={(entry) => `/activitate/${entry.workUnitId}`}
+                maxBodyHeight="28rem"
+                empty={
+                  <EmptyState
+                    title="Nicio inspecție, intervenție sau lucrare"
+                    body="Aici intră tot ce s-a executat la obiectiv, indiferent de contractul care a plătit și de anul în care s-a întâmplat."
+                    size="sm"
+                    className="rounded-lg border border-dashed border-border bg-surface"
+                  />
+                }
+                columns={[
+                  {
+                    key: 'date',
+                    header: 'Când',
+                    width: '8rem',
+                    cell: (entry) =>
+                      entry.happenedOn === null ? (
+                        <CellMeta>fără dată</CellMeta>
+                      ) : (
+                        <CellMeta>{formatDate(entry.happenedOn)}</CellMeta>
+                      ),
+                  },
+                  {
+                    key: 'type',
+                    header: 'Tip',
+                    width: '7rem',
+                    cell: (entry) => (
+                      <Badge tone={entry.type === 'lucrare' ? 'brand' : 'outline'}>
+                        {WORK_UNIT_TYPE_LABELS[entry.type as 'lucrare'] ?? entry.type}
+                      </Badge>
+                    ),
+                  },
+                  {
+                    key: 'what',
+                    header: 'Ce',
+                    cell: (entry) => (
+                      <div>
+                        <CellTitle>{entry.name}</CellTitle>
+                        <CellMeta>
+                          {entry.code}
+                          {entry.contractCode === null ? '' : ` · contract ${entry.contractCode}`}
+                        </CellMeta>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'company',
+                    header: 'Firma',
+                    hideBelow: 'lg',
+                    cell: (entry) => <CellMeta>{entry.companyName}</CellMeta>,
+                  },
+                  {
+                    key: 'cost',
+                    header: 'Cost',
+                    align: 'right',
+                    width: '9rem',
+                    // Zero e o informatie, nu o lipsa: fisa exista si n-a costat
+                    // inca nimic, pentru ca n-a fost validata.
+                    cell: (entry) => <Money value={entry.cost} />,
+                  },
+                ]}
+              />
             </div>
           );
         },

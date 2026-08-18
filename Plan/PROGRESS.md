@@ -24,10 +24,12 @@ dinadins** (vezi secțiunea lui mai jos). Pasul **09** e tăiat în trei, nu în
 - **09b-1 — fișa de INSPECȚIE** (creare de la obiectiv, tab-urile Fișă și Constatări): GATA.
 - **09b-2 — fișa de INTERVENȚIE** (Fișă, Materiale, Ore, bara așteptat vs real): GATA.
 - **09b-3 — pontaj, stoc și gestiuni, bon de consum, jobul nocturn de stoc**: GATA.
-- **09b-4 — ce a rămas din pas**: acoperirea inspecțiilor pe date reale, Obiectiv › Istoric,
-  ecranul „realizat vs estimat pe echipe" din catalogul de operațiuni, și seed-ul de „gata"
-  (2 checklist-uri, 8 inspecții, 3 intervenții, o săptămână de pontaje, o gestiune cu stoc):
-  **următorul lucru.**
+- **09b-4 — acoperirea inspecțiilor, Obiectiv › Istoric, validarea în masă, seed-ul**: GATA.
+
+**Pasul 09 e terminat.** Ecranul „realizat vs estimat pe echipe" din catalog exista din 08b și
+s-a umplut singur când `apply_intervention_actuals` a primit prima fișă validată — n-a cerut cod.
+**Următorul lucru e pasul 10** (teren offline și raportul lunar), sau datoriile deschise de mai
+jos, dacă vrei întâi curățenie.
 
 Tăierea în bucăți mai mici a fost cerută explicit de utilizator, ca o sesiune să nu se termine
 la jumătatea unui pas.
@@ -39,7 +41,7 @@ care regula asta a plătit: la 09b-1 a scos patru defecte din 09a, la 09b-2 înc
 tăcute, niciunul prins de typecheck sau de testele existente. Harness-ul se scrie în
 `packages/services/scripts/`, se rulează cu `pnpm exec tsx`, și se **șterge** după.
 
-**Pentru 09b-4, cele două capcane deja cunoscute:**
+**Cele două capcane deja cunoscute, valabile mai departe:**
 
 1. **Drizzle numește TOATE coloanele într-un `insert`**, punând `default` pe cele nedate. Deci un
    `grant insert (coloane)` nu poate fi satisfăcut niciodată prin drizzle dacă lista exclude ceva.
@@ -48,6 +50,67 @@ tăcute, niciunul prins de typecheck sau de testele existente. Harness-ul se scr
 2. **Extensiile 1:1 pe `work_units` se nasc din trigger**, nu din serviciu (0028). Dacă adaugi
    alta, urmează tiparul: `after insert … when (new.type = …)`, `on conflict do nothing`, backfill
    cu același cod, plasă la final.
+
+---
+
+## 09b-4 — acoperirea, istoricul, validarea în masă și seed-ul (18 august 2026)
+
+### Ce a intrat
+
+- **`Obiective › Acoperire inspecții` se umple cu date reale.** Până acum `done`
+  era **zero pe sârmă**, cu `basis` care recunoștea asta („fără date de teren").
+  Acum se numără fișele executate, **după data execuției, nu după luna de
+  raportare**: o inspecție făcută pe 31 martie și validată în aprilie a fost
+  totuși făcută în martie — acoperirea măsoară terenul, nu contabilitatea. Din
+  același motiv intră și fișele nevalidate: omul a fost acolo.
+  - Coloană nouă **„ultima inspecție"**, cu link la fișă. Fără ea o restanță e o
+    etichetă; cu ea e o decizie — „n-a mai fost călcată din februarie" și „a fost
+    săptămâna trecută, dar pe altă fișă" cer lucruri diferite.
+  - Insigna **„făcută în plus"** pentru luna în care nu era datorată dar s-a
+    făcut: o inspecție în plus nu e o greșeală și n-are voie să arate ca una.
+- **`Obiectiv › Istoric` capătă lista faptelor**, sub cifrele pe ani:
+  `objectiveWorkHistory` — inspecțiile, intervențiile și lucrările obiectivului,
+  cu costul fiecăreia, **transversal peste contracte și peste ani, pe analitica
+  „folosit"**. Cifrele de dinainte spuneau CÂT; fără lista asta, „18.400 lei în
+  2026" nu e un istoric, e un sold.
+- **`Activitate › De validat`** — ecranul de sfârșit de lună al PM-ului (§3.6):
+  inspecțiile și intervențiile nevalidate la un loc, cu `effect_date` pe lot.
+  Pentru cel care închide luna sunt același lucru — fișe care încă nu produc
+  cost — iar două liste separate l-ar fi pus să țină minte pe care a terminat-o.
+  Ca la pontaje, **fiecare fișă are tranzacția ei**: o intervenție fără stoc
+  destul n-are voie să dea înapoi validările care au mers.
+- **`pnpm db:seed --sheets`** — 8 inspecții validate pe luni diferite (două cu
+  NOK, una dintre ele născând o cerere), 3 intervenții cu materiale și ore, o
+  săptămână de pontaje, și o gestiune de echipă cu stoc din patru produse. Trece
+  prin **servicii**, ca restul seed-ului, deci și prin triggere.
+
+### Trei lucruri aflate scriind seed-ul
+
+1. **Lunile nu se fixează în cod.** Prima variantă cerea 03–05/2026 și a picat pe
+   dev, unde martie e închisă de la testul pasului 06. Un seed care presupune că o
+   lună e deschisă presupune că nimeni n-a folosit baza — adică exact invers
+   decât e adevărat despre o bază de dezvoltare. Acum alege ultimele trei luni
+   **deschise**.
+2. **Punctele care cer poză se răspund cu `na`.** Trigger-ul cere un nod de
+   fișier real, iar un seed care ar fabrica noduri fără conținut în R2 ar produce
+   fișiere care dau 404 la descărcare — date care mint. `na` cu notă spune
+   adevărul: n-a fost fotografiat, pentru că fișa n-a fost completată pe teren.
+3. **Idempotența a cerut o verificare pe nume.** `createInspection` nu primește
+   id din afara, ca `createWorkUnit`, deci a doua rulare producea încă opt
+   inspecții validate, cu liniile lor de cost — care nu se mai pot șterge.
+   Numele fișelor sunt deterministe, deci existența lor e criteriul.
+
+### Cum a fost verificat
+
+Seed rulat pe dev, apoi citit înapoi prin servicii: acoperirea arată `6/20`,
+`6/4` și `4/4` pe cele trei luni (cu „făcută în plus" acolo unde nu era
+datorată), iar istoricul obiectivului 1 are 52 de rânduri cu costurile lor.
+
+**3 teste noi de servicii**: o inspecție executată se vede în acoperire după data
+execuției și rămâne vizibilă ca „ultima" în luna următoare, plus istoricul care
+poartă costul fiecărei intrări.
+
+**Verificări din pasul 09 acoperite aici:** 19, 20, 21 și 22.
 
 ---
 
@@ -876,7 +939,7 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
 | 07 — File management (R2) | 🟩 **gata** (07a–07c-2; 20/21 — #7 cere Playwright pentru întreruperea reală de rețea) | 2026-08-18 |
 | 08 — Cereri, rutare, backlog | 🟨 în lucru (08a + 08b gata: schemă, domain, servicii, ecrane; **08c** email+cronuri neatins) | 2026-08-18 |
-| 09 — Fișe de lucru | 🟨 în lucru (**09a**, **09b-1**, **09b-2**, **09b-3** pontaj/stoc/bon: gata; **09b-4** acoperire, istoric, seed: neatins) | 2026-08-18 |
+| 09 — Fișe de lucru | ✅ gata (09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon · 09b-4 acoperire, istoric, validare în masă, seed) | 2026-08-18 |
 | 10 — Teren offline, raport lunar | ⬜ neînceput | — |
 
 Legendă: ⬜ neînceput · 🟨 în lucru · 🟩 gata (toate verificările din pas trec) · 🟥 blocat
@@ -900,7 +963,7 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași** — ceea ce e chiar comportamentul cerut de #16 — **dacă `MFA_ENFORCED` nu e `0`** (vezi rândul de mai jos). |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **~539** (09b-3 confirmat în CI `32168168466`) | La 09b-3: `packages/services` **+14** (`timesheets.test.ts` și `inventory.test.ts`, fișiere noi). La 09b-2: `packages/services` **+7** (`interventions.test.ts`, fișier nou). La 09a: `domain` 106 → **126** (+20, `sheets/` — inspecție, abatere, pontaj). La 08b: `domain` 104 → **106** (+2, `isCommercialOpportunity`), `packages/services` 116 → **131** (+8 în `requests.test.ts`, +7 în `operations.test.ts` — fișier nou). La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **~542** (09b-4 neconfirmat încă în CI) | La 09b-4: `packages/services` **+3** (acoperire cu date reale, istoricul obiectivului). La 09b-3: `packages/services` **+14** (`timesheets.test.ts` și `inventory.test.ts`, fișiere noi). La 09b-2: `packages/services` **+7** (`interventions.test.ts`, fișier nou). La 09a: `domain` 106 → **126** (+20, `sheets/` — inspecție, abatere, pontaj). La 08b: `domain` 104 → **106** (+2, `isCommercialOpportunity`), `packages/services` 116 → **131** (+8 în `requests.test.ts`, +7 în `operations.test.ts` — fișier nou). La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
 | **Martie 2026 e ÎNCHISĂ la firma A pe Supabase dev**, din 05c | Închisă dinadins, ca ecranul de re-alocări să aibă ce arăta: mutarea finanțării intervenției `IV-000001` de acolo a emis `NRA-000001` în august. Dacă un ecran refuză o scriere pe martie, ăsta e motivul — nu un bug. |
 | **Aplicația e deployată pe Vercel**, pe același proiect Supabase (`cspjtesltraiaveypuya`) | Deci datele de pe dev sunt aceleași care se văd în aplicația deployată — inclusiv seed-ul și luna închisă de mai sus. `next.config.ts` încarcă `.env.local` din rădăcina repo-ului, fișier care pe Vercel **nu există**: toate variabilele trebuie puse în Project Settings. |

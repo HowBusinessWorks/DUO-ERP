@@ -140,6 +140,7 @@ export const NAVIGATION: readonly NavItem[] = [
       { slug: 'lucrari', label: 'Lucrări' },
       { slug: 'calendar', label: 'Calendar / Gantt' },
       { slug: 'pontaj', label: 'Pontaj' },
+      { slug: 'validare', label: 'De validat' },
     ],
   },
   {

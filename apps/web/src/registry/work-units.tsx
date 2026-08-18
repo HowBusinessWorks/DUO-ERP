@@ -31,6 +31,8 @@ import {
   listStagesForCompanies,
   listStock,
   listTimesheetWeek,
+  listUnvalidatedInspections,
+  listUnvalidatedInterventions,
   listSubcontractors,
   listTeamOptions,
   listObjectives,
@@ -55,6 +57,7 @@ import { ClosingChecklist } from '../components/work-unit/closing-checklist';
 import { InspectionSheet } from '../components/work-unit/inspection-sheet';
 import { InterventionSheet } from '../components/work-unit/intervention-sheet';
 import { TimesheetWeek } from '../components/work-unit/timesheet-week';
+import { ValidationQueue } from '../components/work-unit/validation-queue';
 import { FundingPanel, fundingSummary, monthLabel } from '../components/work-unit/funding-panel';
 import { StageTimeline } from '../components/work-unit/stage-timeline';
 import {
@@ -163,6 +166,7 @@ export const activitate = defineEntity<WorkUnitRow>({
       { key: 'lucrari', label: 'Lucrări' },
       { key: 'calendar', label: 'Calendar / Gantt' },
       { key: 'pontaj', label: 'Pontaj' },
+      { key: 'validare', label: 'De validat' },
     ],
     renderView: async (rows, view, ctx, search) => {
       if (view === 'calendar') {
@@ -170,6 +174,9 @@ export const activitate = defineEntity<WorkUnitRow>({
       }
       if (view === 'pontaj') {
         return <TimesheetTab ctx={ctx} search={search} />;
+      }
+      if (view === 'validare') {
+        return <ValidationTab ctx={ctx} />;
       }
       // Cele trei vederi de tip folosesc ACELASI tabel: `load` a filtrat deja, iar
       // o a doua randare ar putea arata alt numar de randuri decat prima.
@@ -1835,4 +1842,39 @@ function defaultWeekStart(year: number, month: number): string {
     return today.toISOString().slice(0, 10);
   }
   return `${String(year)}-${String(month).padStart(2, '0')}-01`;
+}
+
+/**
+ * Activitate › De validat — ecranul de sfarsit de luna al PM-ului (§3.6).
+ *
+ * Inspectiile si interventiile nevalidate, la un loc: pentru cel care inchide
+ * luna sunt acelasi lucru — fise care inca nu produc cost si nu intra in
+ * raport. Doua liste separate l-ar fi pus sa tina minte pe care a terminat-o.
+ */
+async function ValidationTab({ ctx }: { readonly ctx: EntityContext }) {
+  const companyId = ctx.app.selectedCompanyIds[0] ?? '';
+
+  const [inspections, interventions, series] = await Promise.all([
+    listUnvalidatedInspections(ctx.actor, ctx.app.selectedCompanyIds),
+    listUnvalidatedInterventions(ctx.actor, ctx.app.selectedCompanyIds),
+    companyId === ''
+      ? Promise.resolve([])
+      : listDocumentSeries(ctx.actor, companyId, 'bon_consum'),
+  ]);
+
+  const sheets = [
+    ...inspections.map((row) => ({ ...row, kind: 'inspectie' as const })),
+    ...interventions.map((row) => ({ ...row, kind: 'interventie' as const })),
+  ].sort((a, b) => a.performedOn.localeCompare(b.performedOn));
+
+  return (
+    <ValidationQueue
+      sheets={sheets}
+      consumptionSeries={series.map((entry) => entry.series)}
+      // Luna aleasa in shell, nu ziua de azi: ecranul asta se deschide ca sa
+      // inchida o luna anume, iar aia e cea din selector.
+      suggestedEffectDate={`${String(ctx.app.year)}-${String(ctx.app.month).padStart(2, '0')}-01`}
+      canValidate={canValidateSheets(ctx.session)}
+    />
+  );
 }
