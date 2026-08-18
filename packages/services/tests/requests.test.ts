@@ -6,7 +6,14 @@ import {
   createRequest,
   decideRouting,
   evaluateRequest,
+  getRequest,
+  listRequests,
+  listRoutingDecisions,
   promoteBacklog,
+  proposeRouting,
+  routingContext,
+  suggestBacklogFill,
+  triageRequest,
 } from '../src/requests';
 import { officeActor, rejection } from './helpers';
 import { TEST_PERSON_ID } from './global-setup';
@@ -588,5 +595,210 @@ describe('promoteBacklog — plafonul lunii (B4, B2, I2)', () => {
       );
       expect(allocations.rows).toHaveLength(1);
     });
+  });
+});
+
+/**
+ * Citirile si trierea, adaugate la 08b.
+ *
+ * Ce apara: ecranele nu au voie sa arate alta cifra decat cea pe care o impun
+ * serviciile. „Delta liber" din `routingContext` e aceeasi definitie cu cea
+ * verificata de `promoteBacklog`, iar propunerea din `proposeRouting` se
+ * calculeaza pe exact cifrele intoarse alaturi de ea.
+ */
+describe('trierea si citirile ecranelor (08b)', () => {
+  it('trierea completeaza cererea si o trece in evaluare', async () => {
+    const base = await ground();
+    const { id: requestId } = await createRequest(
+      officeActor(),
+      requestInput(base, { objectiveId: '', title: 'Ceva de la client' }),
+    );
+
+    await triageRequest(officeActor('triere'), {
+      requestId,
+      type: 'solicitare',
+      objectiveId: base.objectiveId,
+      contractId: base.contractId,
+      contractObjectiveId: '',
+      title: 'Scurgere la vana',
+      description: 'de pe conducta principala',
+      estimatedValue: '1500.00',
+    });
+
+    const row = await getRequest(officeActor(), requestId);
+    expect(row.status).toBe('in_evaluare');
+    expect(row.objectiveId).toBe(base.objectiveId);
+    expect(row.contractId).toBe(base.contractId);
+    expect(row.estimatedValue).toBe('1500.00');
+    expect(row.title).toBe('Scurgere la vana');
+  });
+
+  it('trierea refuza un contract de la alta firma', async () => {
+    const base = await ground();
+    const other = await ground();
+    const { id: requestId } = await createRequest(officeActor(), requestInput(base));
+
+    const error = await rejection(
+      triageRequest(officeActor('triere'), {
+        requestId,
+        type: 'solicitare',
+        objectiveId: base.objectiveId,
+        contractId: other.contractId,
+        contractObjectiveId: '',
+        title: 'Titlu',
+        description: '',
+        estimatedValue: '',
+      }),
+    );
+
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).code).toBe('VALIDATION_FAILED');
+  });
+
+  it('o cerere deja decisa nu mai poate fi triata', async () => {
+    const base = await ground();
+    const { id: requestId } = await createRequest(
+      officeActor(),
+      requestInput(base, { estimatedValue: '3400.00' }),
+    );
+    await decideRouting(officeActor('decizie'), {
+      requestId,
+      choice: 'lucrare_delta',
+      systemProposal: 'lucrare_delta',
+      reason: 'incape in luna',
+      creation: creationFor(base, base.periodId),
+    });
+
+    const error = await rejection(
+      triageRequest(officeActor('triere tarzie'), {
+        requestId,
+        type: 'solicitare',
+        objectiveId: base.objectiveId,
+        contractId: base.contractId,
+        contractObjectiveId: '',
+        title: 'Alt titlu',
+        description: '',
+        estimatedValue: '',
+      }),
+    );
+
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).code).toBe('CONFLICT');
+  });
+
+  it('„Delta liber" din routingContext scade alocarile deja scrise', async () => {
+    const base = await ground();
+    await setDeltaCeiling(base, base.componentId, '10000.00');
+
+    const { id: firstId } = await createRequest(
+      officeActor(),
+      requestInput(base, { estimatedValue: '3400.00', contractId: base.contractId }),
+    );
+    const before = await routingContext(officeActor(), firstId);
+    expect(before.deltaMonths).toHaveLength(1);
+    expect(before.deltaMonths[0]?.free.toDbString()).toBe('10000.00');
+
+    await decideRouting(officeActor('decizie'), {
+      requestId: firstId,
+      choice: 'lucrare_delta',
+      systemProposal: 'lucrare_delta',
+      reason: 'incape',
+      creation: creationFor(base, base.periodId),
+    });
+
+    const { id: secondId } = await createRequest(
+      officeActor(),
+      requestInput(base, { estimatedValue: '1000.00', contractId: base.contractId }),
+    );
+    const after = await routingContext(officeActor(), secondId);
+    expect(after.deltaMonths[0]?.free.toDbString()).toBe('6600.00');
+  });
+
+  it('proposeRouting propune Delta cand valoarea incape, si Mentenanta sub prag', async () => {
+    const base = await ground();
+    await setDeltaCeiling(base, base.componentId, '4100.00');
+
+    const { id: bigId } = await createRequest(
+      officeActor(),
+      requestInput(base, { estimatedValue: '3400.00', contractId: base.contractId }),
+    );
+    const big = await proposeRouting(officeActor(), bigId);
+    expect(big.routing.proposal).toBe('lucrare_delta');
+    // Verificarea #7: „umple Delta la 83%" — cifra vine din liberul citit alaturi.
+    expect(big.routing.options.find((o) => o.choice === 'lucrare_delta')?.fillPercent).toBe(82.93);
+
+    const { id: smallId } = await createRequest(
+      officeActor(),
+      requestInput(base, { estimatedValue: '1500.00', contractId: base.contractId }),
+    );
+    const small = await proposeRouting(officeActor(), smallId);
+    expect(small.routing.proposal).toBe('interventie_mentenanta');
+  });
+
+  it('suggestBacklogFill alege combinatia care incape in liberul lunii (#14)', async () => {
+    const base = await ground();
+    await setDeltaCeiling(base, base.componentId, '5000.00');
+    await backlogged(base, 'Propunerea A', '3000.00');
+    await backlogged(base, 'Propunerea B', '2000.00');
+    await backlogged(base, 'Propunerea C', '4500.00');
+
+    const suggestion = await suggestBacklogFill(officeActor(), {
+      contractId: base.contractId,
+      periodId: base.periodId,
+    });
+
+    expect(suggestion.free.toDbString()).toBe('5000.00');
+    expect(suggestion.total.toDbString()).toBe('5000.00');
+    expect(suggestion.selectedIds).toHaveLength(2);
+    expect(suggestion.exact).toBe(true);
+  });
+
+  it('listRequests filtreaza pe stare si nu scapa cereri de la alte firme', async () => {
+    const base = await ground();
+    const other = await ground();
+    await createRequest(officeActor(), requestInput(base, { title: 'A firmei mele' }));
+    await createRequest(officeActor(), requestInput(other, { title: 'A altei firme' }));
+
+    const mine = await listRequests(officeActor(), { companyIds: [base.companyId] });
+    expect(mine.map((row) => row.title)).toContain('A firmei mele');
+    expect(mine.map((row) => row.title)).not.toContain('A altei firme');
+
+    const open = await listRequests(officeActor(), {
+      companyIds: [base.companyId],
+      statuses: ['neprocesata'],
+    });
+    expect(open.every((row) => row.status === 'neprocesata')).toBe(true);
+  });
+
+  it('jurnalul de decizii masoara divergenta fata de propunerea sistemului (#17)', async () => {
+    const base = await ground();
+    const { id: agreeId } = await createRequest(
+      officeActor(),
+      requestInput(base, { estimatedValue: '3400.00' }),
+    );
+    await decideRouting(officeActor('la fel'), {
+      requestId: agreeId,
+      choice: 'lucrare_delta',
+      systemProposal: 'lucrare_delta',
+      reason: 'confirm propunerea',
+      creation: creationFor(base, base.periodId),
+    });
+
+    const { id: divergeId } = await createRequest(
+      officeActor(),
+      requestInput(base, { estimatedValue: '3400.00' }),
+    );
+    await decideRouting(officeActor('altfel'), {
+      requestId: divergeId,
+      choice: 'lucrare_componenta_lucrari',
+      systemProposal: 'lucrare_delta',
+      reason: 'clientul vrea din Lucrari',
+      creation: creationFor(base, base.periodId),
+    });
+
+    const journal = await listRoutingDecisions(officeActor(), { companyIds: [base.companyId] });
+    expect(journal.total).toBe(2);
+    expect(journal.diverged).toBe(1);
+    expect(journal.divergencePercent).toBe(50);
   });
 });

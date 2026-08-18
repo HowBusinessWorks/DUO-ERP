@@ -115,6 +115,22 @@ export function splitDeltaAcrossPeriods(
   return parts;
 }
 
+/**
+ * Cererea e o oportunitate comerciala — candidat pentru contract individual nou?
+ *
+ * Regula de acum, si sta aici (nu in ecran) tocmai ca sa fie testabila fara DB
+ * si sa poata fi schimbata intr-un singur loc: un tichet de client sau o
+ * propunere interna pot ajunge contract individual nou; o constatare de
+ * inspectie sau o observatie de utilaj, nu — alea sunt obligatii, nu vanzari.
+ *
+ * Nu exista coloana `is_opportunity` pe cerere si nu s-a inventat una: pana cand
+ * cineva chiar cere sa poata bifa manual, tipul cererii e informatia care exista
+ * deja si care nu poate fi uitata la completare. Vezi `docs/routing.md`.
+ */
+export function isCommercialOpportunity(requestType: string): boolean {
+  return requestType === 'tichet_client' || requestType === 'propunere_interna';
+}
+
 const DEFAULT_THRESHOLD = Money.of(2000);
 
 const round = (n: number): number => Math.round(n * 100) / 100;

@@ -161,3 +161,32 @@ export type CreateRequestInput = z.input<typeof createRequestInputSchema>;
 export type RequestEstimateLineInput = z.input<typeof requestEstimateLineInputSchema>;
 export type DecideRoutingInput = z.input<typeof decideRoutingInputSchema>;
 export type PromoteBacklogInput = z.input<typeof promoteBacklogInputSchema>;
+
+/**
+ * Trierea unei cereri din inbox (§3.5, „ținta e 30 de secunde per email").
+ *
+ * Nu creeaza nimic: cererea exista deja — a intrat prin email sau a fost scrisa
+ * de mana — si trierea ii completeaza obiectivul, contractul, tipul si valoarea
+ * estimata, apoi o trece in `in_evaluare`. De aceea `requestId` e obligatoriu si
+ * `companyId`/`source` lipsesc: firma si sursa unei cereri nu se schimba la
+ * triere, iar un formular care le-ar oferi ar invita exact asta.
+ */
+export const triageRequestInputSchema = z.object({
+  requestId: uuidSchema,
+  type: z.enum(REQUEST_TYPES),
+  objectiveId: optionalUuid,
+  contractId: optionalUuid,
+  contractObjectiveId: optionalUuid,
+  title: requiredText(300, 'Scrie un titlu.'),
+  description: trimmed(5000).optional(),
+  estimatedValue: optionalMoney,
+});
+
+/** Evaluarea: liniile din catalog care produc valoarea estimata (verificarea #5). */
+export const evaluateRequestInputSchema = z.object({
+  requestId: uuidSchema,
+  lines: z.array(requestEstimateLineInputSchema),
+});
+
+export type TriageRequestInput = z.input<typeof triageRequestInputSchema>;
+export type EvaluateRequestInput = z.input<typeof evaluateRequestInputSchema>;

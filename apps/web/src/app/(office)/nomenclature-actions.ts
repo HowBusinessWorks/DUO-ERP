@@ -3,7 +3,9 @@
 import {
   clientInputSchema,
   contractInputSchema,
+  createRequestInputSchema,
   objectiveInputSchema,
+  operationInputSchema,
   personInputSchema,
   productInputSchema,
   qualificationInputSchema,
@@ -12,10 +14,13 @@ import {
   supplierInputSchema,
   workUnitFormSchema,
 } from '@damina/contracts';
-import { can, canEditNomenclature, canSeeFinancials } from '@damina/auth';
+import { can, canEditNomenclature, canSeeFinancials, canTriageRequests } from '@damina/auth';
 import {
   createClient,
+  createOperation,
   createPerson,
+  createRequest,
+  updateOperation,
   updatePerson,
   createContract,
   createObjective,
@@ -132,6 +137,27 @@ const WRITERS: Readonly<Record<string, Writer>> = {
     schema: workUnitFormSchema,
     create: createWorkUnitFromForm as Writer['create'],
     canWrite: canSeeFinancials,
+  },
+  /*
+   * Cererea manuala. Nu are `update`: dupa creare, cererea se schimba prin
+   * TRIERE (`triageRequest`), care ii muta si starea in `in_evaluare`. Un
+   * `update` de aici ar fi a doua usa spre aceleasi coloane, una care ar lasa
+   * starea neatinsa — adica o cerere completata care ramane „neprocesata".
+   */
+  cereri: {
+    schema: createRequestInputSchema,
+    create: createRequest as Writer['create'],
+    canWrite: canTriageRequests,
+  },
+  // Catalogul de operatiuni e nomenclator, dar manopera lui se deriveaza din
+  // tarife. Dreptul de scriere ramane cel de nomenclator: cifra nu se tasteaza,
+  // se calculeaza — deci nu se poate „scrie un salariu" prin ecranul asta.
+  operatiuni: {
+    schema: operationInputSchema,
+    create: createOperation as Writer['create'],
+    update: updateOperation as NonNullable<Writer['update']>,
+    canWrite: canEditNomenclature,
+    updateReason: 'modificare operatiune din catalog',
   },
   // Obiectivele NU au `company_id`: sunt nomenclator comun celor 5 firme.
   obiective: {

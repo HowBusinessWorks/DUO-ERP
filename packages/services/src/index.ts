@@ -282,3 +282,60 @@ export type {
   ShareRow,
   VersionRow,
 } from './files';
+
+export {
+  createRequest,
+  decideRouting,
+  deltaFreeForContract,
+  evaluateRequest,
+  expireBacklogProposals,
+  getRequest,
+  getRequestEmail,
+  listBacklogProposals,
+  listDecisionsForRequest,
+  listEstimateLines,
+  listRequests,
+  listRoutingDecisions,
+  monthLabel,
+  promoteBacklog,
+  proposeRouting,
+  routingContext,
+  suggestBacklogFill,
+  triageRequest,
+} from './requests';
+export type {
+  BacklogRow,
+  DecisionJournal,
+  DeltaMonth,
+  EstimateLineRow,
+  ListBacklogOptions,
+  ListRequestsOptions,
+  RequestEmailRow,
+  RequestRow,
+  RoutingContext,
+  RoutingDecisionRow,
+} from './requests';
+/*
+ * Tipurile propunerii de rutare vin din `domain`, dar se re-exporta de aici.
+ * `apps/web` n-are voie sa importe `domain` (regula de dependente din §3.2), iar
+ * ecranul de Decizie are nevoie de forma optiunilor. Re-exportul e singurul mod
+ * de a i-o da fara sa se sara peste `services`.
+ */
+export type { RoutingChoice, RoutingOption, RoutingProposal } from '@damina/domain';
+
+export {
+  createOperation,
+  getOperation,
+  listOperationMaterials,
+  listOperations,
+  operationActuals,
+  setOperationMaterials,
+  updateOperation,
+} from './operations';
+export type {
+  ListOperationsOptions,
+  OperationActualRow,
+  OperationActualsReport,
+  OperationMaterialRow,
+  OperationRow,
+} from './operations';

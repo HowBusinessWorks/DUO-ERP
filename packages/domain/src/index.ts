@@ -70,6 +70,7 @@ export type {
 export {
   estimateFromCatalog,
   ROUTING_CHOICES,
+  isCommercialOpportunity,
   routeRequest,
   selectBacklogToFill,
   splitDeltaAcrossPeriods,

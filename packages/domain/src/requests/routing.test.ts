@@ -1,6 +1,11 @@
 import { Money } from '@damina/shared';
 import { describe, expect, it } from 'vitest';
-import { routeRequest, splitDeltaAcrossPeriods, type RoutingCeilings } from './routing';
+import {
+  isCommercialOpportunity,
+  routeRequest,
+  splitDeltaAcrossPeriods,
+  type RoutingCeilings,
+} from './routing';
 
 const noLucrari: RoutingCeilings['lucrariCeilingFree'] = null;
 
@@ -170,5 +175,18 @@ describe('routeRequest — impartirea pe luni', () => {
     const multi = result.options.find((o) => o.choice === 'lucrare_delta_multi_luna');
     expect(multi?.available).toBe(true);
     expect(multi?.split?.map((p) => p.amount.toString())).toEqual(['4000.00', '2000.00']);
+  });
+});
+
+describe('isCommercialOpportunity', () => {
+  it('doar tichetele de client si propunerile interne pot deveni contract nou', () => {
+    expect(isCommercialOpportunity('tichet_client')).toBe(true);
+    expect(isCommercialOpportunity('propunere_interna')).toBe(true);
+  });
+
+  it('constatarile si observatiile de utilaj sunt obligatii, nu vanzari', () => {
+    expect(isCommercialOpportunity('constatare_inspectie')).toBe(false);
+    expect(isCommercialOpportunity('observatie_utilaj')).toBe(false);
+    expect(isCommercialOpportunity('solicitare')).toBe(false);
   });
 });

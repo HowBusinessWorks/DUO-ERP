@@ -39,6 +39,12 @@ export const CAPABILITIES = [
   'files.share',
   'audit.read',
   'admin.users',
+  /** Deschide modulul Cereri: inbox, backlog, jurnalul de decizii. */
+  'requests.read',
+  /** Triaza o cerere si o evalueaza din catalogul de operatiuni. */
+  'requests.triage',
+  /** Decide rutarea si promoveaza din backlog — adica CREEAZA unitati de lucru. */
+  'requests.decide',
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -174,6 +180,33 @@ export const PERMISSION_MATRIX: readonly CapabilitySpec[] = [
     personas: OFFICE_ONLY,
     officeRoles: ['admin'],
   },
+  {
+    key: 'requests.read',
+    group: 'Cereri',
+    label: 'Deschide cererile, backlogul și jurnalul de decizii',
+    // Si terenul: verificarea #20 cere ca omul din teren sa-si vada cererile
+    // legate de unitatile lui — FARA valori in lei. Ce coloane ies din baza
+    // decid grant-urile din 0011/0012, nu linia asta (vezi `docs/security.md`).
+    personas: INTERNAL,
+    officeRoles: ALL_OFFICE,
+  },
+  {
+    key: 'requests.triage',
+    group: 'Cereri',
+    label: 'Triază cererile din inbox și le evaluează din catalog',
+    personas: OFFICE_ONLY,
+    officeRoles: ['admin', 'pm', 'devizist'],
+  },
+  {
+    key: 'requests.decide',
+    group: 'Cereri',
+    label: 'Decide rutarea și promovează din backlog',
+    // Decizia CREEAZA unitatea de lucru si ii aloca finantarea: e aceeasi
+    // greutate ca „scrie contracte", nu ca „completeaza un formular". De aceea
+    // lista e cea de la `contracts.write`, nu cea de la triere.
+    personas: OFFICE_ONLY,
+    officeRoles: ['admin', 'pm'],
+  },
 ];
 
 const BY_KEY: ReadonlyMap<Capability, CapabilitySpec> = new Map(
@@ -231,6 +264,16 @@ export function canSeeFinancials(session: Session): boolean {
 /** Poate modifica nomenclatoarele? Ele sunt comune celor 5 firme. */
 export function canEditNomenclature(session: Session): boolean {
   return can(session, 'nomenclature.write');
+}
+
+/** Poate lua decizia de rutare (si, cu ea, poate promova din backlog)? */
+export function canDecideRouting(session: Session): boolean {
+  return can(session, 'requests.decide');
+}
+
+/** Poate tria si evalua o cerere? Decizia e alt drept, mai greu. */
+export function canTriageRequests(session: Session): boolean {
+  return can(session, 'requests.triage');
 }
 
 /** Ce vede si ce NU vede rolul curent. Ecranul de administrare cere ambele liste. */

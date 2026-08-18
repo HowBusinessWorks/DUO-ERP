@@ -12,6 +12,7 @@
   "dependencies": {
     "@damina/auth": "workspace:*",
     "@damina/contracts": "workspace:*",
+    "@damina/domain": "workspace:*",
     "@damina/i18n": "workspace:*",
     "@damina/jobs": "workspace:*",
     "@damina/services": "workspace:*",

@@ -1,5 +1,6 @@
 export { estimateFromCatalog, type EstimateLineInput, type EstimateResult } from './estimate';
 export {
+  isCommercialOpportunity,
   ROUTING_CHOICES,
   routeRequest,
   splitDeltaAcrossPeriods,

@@ -40,8 +40,10 @@ export type { ClaimsRejection, ClaimsResult } from './claims';
 
 export {
   can,
+  canDecideRouting,
   canEditNomenclature,
   canSeeFinancials,
+  canTriageRequests,
   capabilitiesOf,
   CAPABILITIES,
   grantsCapability,

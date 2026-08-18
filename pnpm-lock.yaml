@@ -40,6 +40,9 @@ importers:
       '@damina/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@damina/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@damina/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n

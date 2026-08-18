@@ -26,6 +26,7 @@ import { AuditTrail } from '../components/detail/audit-trail';
 import { administrare } from './administrare';
 import { contracte } from './contracts';
 import { obiective } from './objectives';
+import { cereri, operatiuni } from './requests';
 import { activitate, bani, etape } from './work-units';
 import { DefinitionList, Empty } from '../components/detail/definition-list';
 import { PhasePlaceholder } from '../components/detail/phase-placeholder';
@@ -1284,6 +1285,11 @@ export const entityRegistry: Readonly<Record<string, EntityDefinition>> = {
   activitate,
   etape,
   bani,
+  // Pasul 08b a adaugat cererile si catalogul de operatiuni pe acelasi drum:
+  // doua intrari aici, un fisier de declaratii, zero fisiere de pagina. Ecranul
+  // de Decizie — cel mai complicat din pas — e un tab, nu o pagina proprie.
+  cereri,
+  operatiuni,
   produse,
   furnizori,
   clienti,

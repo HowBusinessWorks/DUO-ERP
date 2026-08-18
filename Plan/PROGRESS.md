@@ -13,15 +13,94 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Scris la finalul lui 08a (18 august 2026). Citește-l primul; restul fișierului e istoric.*
+*Scris la finalul lui 08b (18 august 2026). Citește-l primul; restul fișierului e istoric.*
 
 ### Unde s-a ajuns
 
 Pașii **01, 02, 04, 05, 06 și 07 sunt gata**. Pasul **08 e tăiat în sub-etape** (decizia
 utilizatorului, 18 august 2026, ca la 07): **08a — fundația** (schemă, domain pur, servicii cu
-creare atomică) **e gata**. Rămân **08b — ecranele** (Inbox, Decizie, Backlog, jurnalul de decizii,
-Catalog de operațiuni) și **08c — inbox de email + cronuri** (IMAP, filtrul de 24h, alertele de
-Deltă pe 10/20).
+creare atomică) și **08b — ecranele** (Inbox, Decizie, Backlog, jurnalul de decizii, Catalog de
+operațiuni) **sunt gata**. Rămâne **08c — inbox de email + cronuri** (IMAP, `.eml` în R2, filtrul de
+24h, alertele de Deltă pe 10/20, expirarea propunerilor).
+
+---
+
+## 08b — ecranele (18 august 2026)
+
+### Ce a intrat
+
+- **`apps/web/src/registry/requests.tsx`** — două intrări noi în registry (`cereri`, `operatiuni`),
+  **zero fișiere de pagină**. Al treilea pas la rând în care testul din `registry/types.ts` trece.
+  Ecranul de Decizie — cel mai complicat din pas — e un **tab**, nu o pagină proprie.
+- **Vederile listei de cereri** (`?view=…`, aceleași sub-secțiuni care erau deja în `navigation.ts`):
+  `inbox` (triere pe două coloane, `Ctrl+Enter`, țintă 30 s), `backlog` (umplerea Deltei),
+  `rutare` (jurnalul de decizii cu procentul de divergență). Toate ies din **același `load`**, deci
+  numărul de cereri nu poate diferi între ele.
+- **Componente de client**: `decision-screen`, `backlog-fill`, `inbox-triage`, `evaluation-editor`,
+  `operation-materials` în `apps/web/src/components/request/`.
+- **Citiri noi în `packages/services/src/requests.ts`**: `listRequests`, `getRequest`,
+  `getRequestEmail`, `listEstimateLines`, `routingContext`, `proposeRouting`, `listRoutingDecisions`
+  (cu `divergencePercent`), `listDecisionsForRequest`, `listBacklogProposals`, `deltaFreeForContract`,
+  `suggestBacklogFill`. Plus use-case-ul **`triageRequest`** (completează cererea și o trece în
+  `in_evaluare`; nu primește `companyId`/`source` — nu se schimbă la triere).
+- **`packages/services/src/operations.ts`** — CRUD pe catalog, materialele tipice, `operationActuals`.
+- **`packages/auth`** — trei drepturi noi: `requests.read` (și teren), `requests.triage`,
+  `requests.decide`. Al treilea e de greutatea lui `contracts.write`: decizia **creează** unitatea de
+  lucru și îi alocă banii.
+- **`docs/routing.md`** — regula de propunere automată, scrisă ca să poată fi ajustată fără
+  arheologie în cod (cerută explicit de „definiția de gata").
+- **Seed**: 10 operațiuni, 2 calificări cu tarif, 4 produse, 3 cereri în stări diferite (una cu email
+  original) și 5 propuneri în backlog. Flag nou **`pnpm db:seed --requests`**, ca `--costs`.
+
+### Ce trebuie să știi ca să nu retrăiești
+
+- **`apps/web` NU are voie să importe `@damina/domain`** — `eslint-plugin-boundaries` o taie
+  (`web ──▶ services ──▶ domain`). Prima variantă chema `routeRequest` din registry și
+  `selectBacklogToFill` din componenta de client; ambele au trecut în `services`
+  (`proposeRouting`, `suggestBacklogFill`). **A ieșit mai bine, nu doar conform**: serverul citește
+  liberul lunii în același apel cu propunerea, deci ecranul nu poate afișa o cifră și trimite alta.
+  Totalul cumulat din backlog și previzualizarea din Evaluare rămân în browser — sunt adunări, iar
+  cifra care ajunge în bază vine din `evaluateRequest`.
+- **„Delta liber" are o singură definiție**: plafonul lunii minus
+  `component_period_rollup.allocated_revenue`. Aceeași în `routingContext`, `deltaFreeForContract` și
+  `freeRoom` (verificarea de plafon din `promoteBacklog`). Predarea de la 08a spunea „`unfilled` din
+  `deltaFill`" — **acela e alt număr** (folosește `component_ceilings.allocated_revenue`, setat
+  manual, pentru alerta de ritm din pasul 06). Dacă ecranul ar folosi definiția aia, ar promite loc
+  pe care `promoteBacklog` îl refuză.
+- **Tab-ul `Documente` al cererii NU folosește `<EntityDocuments>`**, contrar predării de la 08a:
+  `app.nodes` n-are coloană `request_id` și enum-ul `node_role` n-are `request`. Dosarul propriu al
+  cererii (`.eml` + atașamente) vine cu **08c**, unde chiar are ce ține; până atunci tab-ul duce la
+  dosarul unității de lucru create din cerere — cel care există, construit de triggerele din 07a.
+- **`estimated_labor` din catalog nu se tastează**: `createOperation`/`updateOperation` o derivă din
+  norma de timp × costul orar al calificării, din tariful în vigoare **azi**, și o **stochează** (o
+  cerere evaluată azi nu-și schimbă cifra mâine). Fără tarif curent, operațiunea nu se salvează.
+- **Lista de materiale e cantitativă, nu valorică.** Nu există preț de referință per produs în bază
+  (vine cu aprovizionarea, faza 3), deci `estimated_material` rămâne scris de om.
+- **Seed-ul citește calificările și produsele înapoi după cod, nu după id-ul fix.** Baza de dev avea
+  deja o calificare cu codul `INST`, scrisă de mână; `on conflict do nothing` a sărit tăcut peste
+  inserare și tariful a căzut cu `23503` — o eroare de cheie străină care nu spunea nimic despre
+  cauză.
+- `translateOperationError` se uită la **SQLSTATE**, nu la textul erorii: `DrizzleQueryError`
+  ambalează mesajul Postgres, iar potrivirea pe text nu prinde niciodată constrângerea. (A picat un
+  test exact pe asta.)
+
+### Ce NU a intrat, dinadins
+
+- Verificările #1–#3 și #18 (email, dedup, precompletare din expeditor, cronul de pe 10/20) sunt
+  **08c** — nu se pot rula fără ingestia IMAP.
+- #4 (cronometrarea trierei sub 30 s), #14 și #17 se pot verifica pe ecran, dar **nu au încă test
+  E2E Playwright**; „definiția de gata" a pasului 08 îl cere pentru fluxul cap-coadă.
+- #22 e implementat și testat pe date inserate manual; execuțiile reale vin cu fișele de intervenție
+  (pasul 09), care atașează trigger-ul pe `operation_actuals`.
+
+### Ce urmează concret — 08c
+
+§3.4 și §3.6 din `Plan/08_Cereri_Rutare_Backlog.md`. Coada `mail.ingest` (IMAP polling la 5 minute,
+dedup pe `Message-ID`, `.eml` permanent în R2, atașamentele ca `file_versions`), cronul zilnic de
+09:00 (filtrul de 24h), cronul de pe 10 și 20 (alerta de umplere a Deltei, **cu link direct în
+backlog filtrat pe contract**), și `expireBacklogProposals` — funcția există în `requests.ts` de la
+08a, dar **niciun job n-o cheamă încă**. Tot acolo intră coloana `request_id` pe `app.nodes` și rolul
+`request` în `node_role`, ca dosarul cererii să existe.
 
 ### Ce a intrat la 08a
 
@@ -104,6 +183,10 @@ Ce trebuie să știi ca să nu le reintroduci:
 - Accesul terenului la cereri e documentat acum în `docs/security.md` („Ce vede terenul din cereri").
 
 ### Ce urmează concret — 08b
+
+*(Făcut. Vezi secțiunea „08b — ecranele" de mai sus. Două lucruri din paragraful de mai jos s-au
+dovedit greșite la implementare și sunt corectate acolo: „Delta liber" **nu** e `unfilled` din
+`deltaFill`, iar tab-ul `Documente` **nu** poate folosi `<EntityDocuments>` încă.)*
 
 Citește §3.5 din `Plan/08_Cereri_Rutare_Backlog.md`. Ecranul de Decizie e central: citește
 `routeRequest` din `@damina/domain` cu `deltaFreeByPeriod` calculat din rollup-urile pasului 06
@@ -365,7 +448,7 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 | 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
 | 07 — File management (R2) | 🟩 **gata** (07a–07c-2; 20/21 — #7 cere Playwright pentru întreruperea reală de rețea) | 2026-08-18 |
-| 08 — Cereri, rutare, backlog | 🟨 în lucru (08a gata: schemă+domain+servicii; 08b ecrane, 08c email+cronuri neatinse) | 2026-08-18 |
+| 08 — Cereri, rutare, backlog | 🟨 în lucru (08a + 08b gata: schemă, domain, servicii, ecrane; **08c** email+cronuri neatins) | 2026-08-18 |
 | 09 — Fișe de lucru | ⬜ neînceput | — |
 | 10 — Teren offline, raport lunar | ⬜ neînceput | — |
 
@@ -390,7 +473,7 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași** — ceea ce e chiar comportamentul cerut de #16 — **dacă `MFA_ENFORCED` nu e `0`** (vezi rândul de mai jos). |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **~481** (neconfirmat încă în CI) | La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **~498** (neconfirmat încă în CI) | La 08b: `domain` 104 → **106** (+2, `isCommercialOpportunity`), `packages/services` 116 → **131** (+8 în `requests.test.ts`, +7 în `operations.test.ts` — fișier nou). La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
 | **Martie 2026 e ÎNCHISĂ la firma A pe Supabase dev**, din 05c | Închisă dinadins, ca ecranul de re-alocări să aibă ce arăta: mutarea finanțării intervenției `IV-000001` de acolo a emis `NRA-000001` în august. Dacă un ecran refuză o scriere pe martie, ăsta e motivul — nu un bug. |
 | **Aplicația e deployată pe Vercel**, pe același proiect Supabase (`cspjtesltraiaveypuya`) | Deci datele de pe dev sunt aceleași care se văd în aplicația deployată — inclusiv seed-ul și luna închisă de mai sus. `next.config.ts` încarcă `.env.local` din rădăcina repo-ului, fișier care pe Vercel **nu există**: toate variabilele trebuie puse în Project Settings. |

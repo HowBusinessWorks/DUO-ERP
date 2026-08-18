@@ -10,6 +10,7 @@ import {
 import { addProfileItem, createInspectionProfile, linkObjective } from '../src/objectives';
 import { ensureOpenPeriods } from '../src/periods';
 import { createStage, createWorkUnit } from '../src/work-units';
+import { createOperation, setOperationMaterials } from '../src/operations';
 
 /**
  * Seed-ul DETERMINIST al fazei 0 (pasul 04, §7).
@@ -26,8 +27,10 @@ import { createStage, createWorkUnit } from '../src/work-units';
  *    produce o baza in care aplicatia n-ar fi putut ajunge singura, si atunci
  *    testele verifica o realitate care nu exista.
  *
- * Rulare:  pnpm db:seed          — creeaza ce lipseste, nu atinge ce exista
- *          pnpm db:seed --force  — sterge intai datele de seed, apoi recreeaza
+ * Rulare:  pnpm db:seed             — creeaza ce lipseste, nu atinge ce exista
+ *          pnpm db:seed --force     — sterge intai datele de seed, apoi recreeaza
+ *          pnpm db:seed --costs     — doar registrul de cost, peste un seed existent
+ *          pnpm db:seed --requests  — doar catalogul, cererile si backlogul (pasul 08)
  */
 
 loadEnvFiles();
@@ -60,6 +63,16 @@ const IDS = {
   workUnitLucrare: id(8, 1),
   workUnitInterventie: id(8, 2),
   workUnitInspectie: id(8, 3),
+  // Pasul 08: calificari + tarife (fara ele catalogul n-are din ce sa derive
+  // manopera), produse pentru materialele tipice, catalogul, cererile si
+  // propunerile de backlog.
+  qualification: (n: number) => id(9, n),
+  rateCard: (n: number) => id(10, n),
+  product: (n: number) => id(11, n),
+  operation: (n: number) => id(12, n),
+  request: (n: number) => id(13, n),
+  requestEmail: (n: number) => id(14, n),
+  proposal: (n: number) => id(15, n),
 };
 
 /** Seriile de numerotare, per firma. Codurile UL trec prin acelasi alocator. */
@@ -137,6 +150,46 @@ async function wipe(): Promise<void> {
 
   // Ordinea conteaza doar pentru ce n-are `on delete cascade`.
   await withActor(actor('stergere date de seed'), async (tx) => {
+    /*
+     * Pasul 08, INAINTE de contracte: propunerile de backlog trimit spre
+     * contract fara cascada, deci un `delete` pe contract ar cadea cu 23503.
+     * Emailurile si liniile de evaluare cad singure, cu cererea (`on delete
+     * cascade`), la fel materialele cu operatiunea.
+     */
+    const seedRequestIds = Array.from({ length: 16 }, (_, index) => IDS.request(index));
+    await tx
+      .delete(schema.backlogProposals)
+      .where(inArray(schema.backlogProposals.requestId, seedRequestIds));
+    await tx.delete(schema.requests).where(inArray(schema.requests.id, seedRequestIds));
+    const seedOperationIds = Array.from({ length: 10 }, (_, index) => IDS.operation(index + 1));
+    await tx
+      .delete(schema.operationCatalog)
+      .where(inArray(schema.operationCatalog.id, seedOperationIds));
+    await tx
+      .delete(schema.products)
+      .where(
+        inArray(
+          schema.products.id,
+          Array.from({ length: 4 }, (_, index) => IDS.product(index + 1)),
+        ),
+      );
+    await tx
+      .delete(schema.rateCards)
+      .where(
+        inArray(
+          schema.rateCards.id,
+          Array.from({ length: 2 }, (_, index) => IDS.rateCard(index + 1)),
+        ),
+      );
+    await tx
+      .delete(schema.qualifications)
+      .where(
+        inArray(
+          schema.qualifications.id,
+          Array.from({ length: 2 }, (_, index) => IDS.qualification(index + 1)),
+        ),
+      );
+
     // Cautate dupa cheia naturala (cod + firma), nu dupa id: rulari mai vechi
     // ale seed-ului au lasat contracte cu id generat, iar ele blocheaza unicul
     // pe cod la reluare. Codurile '4700' si '5100' sunt rezervate seed-ului.
@@ -390,6 +443,7 @@ async function costGround(): Promise<WorkUnitGround | null> {
 async function main(): Promise<void> {
   const force = process.argv.includes('--force');
   const onlyCosts = process.argv.includes('--costs');
+  const onlyRequests = process.argv.includes('--requests');
 
   if (await exists()) {
     /*
@@ -410,8 +464,27 @@ async function main(): Promise<void> {
       return;
     }
 
+    /*
+     * `--requests` adauga DOAR catalogul, cererile si backlogul peste un seed
+     * existent — acelasi motiv ca la `--costs`: cine are deja unitati de lucru
+     * de seed nu mai poate rula `--force` (alocarile de finantare nu se sterg),
+     * deci fara flagul asta ecranele pasului 08 ar ramane goale pe o baza care
+     * are tot restul.
+     */
+    if (onlyRequests) {
+      const ground = await costGround();
+      if (ground === null) {
+        console.log('Contractul de seed lipseste; nu am pe ce sa pun cereri.');
+        return;
+      }
+      await seedRequestsAndCatalog(ground);
+      return;
+    }
+
     if (!force) {
-      console.log('Seed-ul exista deja. Ruleaza cu --force ca sa-l refaci (sau --costs).');
+      console.log(
+        'Seed-ul exista deja. Ruleaza cu --force ca sa-l refaci (sau --costs / --requests).',
+      );
       return;
     }
     await wipe();
@@ -621,9 +694,12 @@ async function main(): Promise<void> {
   // ── Registrul de cost (pasul 06) ───────────────────────────────────────────
   await seedCostLines(workUnitGround);
 
+  // ── Catalogul, cererile si backlogul (pasul 08) ────────────────────────────
+  await seedRequestsAndCatalog(workUnitGround);
+
   console.log(
     'Seed complet: 2 firme, 2 contracte, 20 obiective, plafoane pe 3 luni, 3 unitati de lucru,\n' +
-      'si 10.000 de linii de cost.',
+      '10.000 de linii de cost, 10 operatiuni in catalog, 8 cereri si 5 propuneri in backlog.',
   );
 }
 
@@ -999,10 +1075,295 @@ async function seedCostLines(base: WorkUnitGround): Promise<void> {
   );
 }
 
+
+
+/** Catalogul, calificarile si tarifele lor. Manopera se deriveaza din ele. */
+const QUALIFICATIONS = [
+  { code: 'INST', name: 'Instalator', salary: '28.00' },
+  { code: 'ELEC', name: 'Electrician', salary: '32.00' },
+] as const;
+
+const CATALOG_PRODUCTS = [
+  { code: 'GAR-32', name: 'Garnitură cauciuc 32 mm', uom: 'buc' },
+  { code: 'TEV-PP32', name: 'Țeavă PP-R 32 mm', uom: 'm' },
+  { code: 'CBL-3X25', name: 'Cablu CYY-F 3×2,5', uom: 'm' },
+  { code: 'ULE-HID', name: 'Ulei hidraulic', uom: 'l' },
+] as const;
+
+/**
+ * Zece operatiuni, cu norme si materiale plauzibile.
+ *
+ * `hours` × tariful calificarii da manopera; `material` e suma materialelor
+ * tipice, scrisa de om (preturile de referinta per produs vin cu aprovizionarea).
+ * Cifrele sunt alese ca sa acopere toate ramurile lui `routeRequest`: OP-101 e
+ * clar sub pragul de 2.000, OP-110 e clar peste, iar cele din mijloc pica pe
+ * Delta sau pe Lucrari in functie de plafonul lunii.
+ */
+const OPERATIONS = [
+  { code: 'OP-101', name: 'Înlocuire garnitură vană DN80', qual: 'INST', hours: '1.5000', material: '45.00', category: 'Instalații' },
+  { code: 'OP-102', name: 'Curățare gură de canal', qual: 'INST', hours: '2.0000', material: '0.00', category: 'Canalizare' },
+  { code: 'OP-103', name: 'Verificare tablou electric stație', qual: 'ELEC', hours: '1.0000', material: '0.00', category: 'Electrice' },
+  { code: 'OP-104', name: 'Înlocuire senzor nivel', qual: 'ELEC', hours: '2.5000', material: '380.00', category: 'Automatizări' },
+  { code: 'OP-105', name: 'Schimb ulei pompă submersibilă', qual: 'INST', hours: '3.0000', material: '210.00', category: 'Pompe' },
+  { code: 'OP-106', name: 'Reparație conductă PP-R 32', qual: 'INST', hours: '4.0000', material: '160.00', category: 'Instalații' },
+  { code: 'OP-107', name: 'Refacere circuit forță pompă', qual: 'ELEC', hours: '6.0000', material: '540.00', category: 'Electrice' },
+  { code: 'OP-108', name: 'Decolmatare bazin de retenție', qual: 'INST', hours: '12.0000', material: '0.00', category: 'Canalizare' },
+  { code: 'OP-109', name: 'Înlocuire pompă submersibilă 5,5 kW', qual: 'INST', hours: '10.0000', material: '4200.00', category: 'Pompe' },
+  { code: 'OP-110', name: 'Reabilitare tablou general stație', qual: 'ELEC', hours: '40.0000', material: '9800.00', category: 'Electrice' },
+] as const;
+
+/** Trei cereri in stari diferite + cinci amanate, care umplu backlogul. */
+const BACKLOG_SEED = [
+  { title: 'Vană blocată la SP-3', value: '1850.00', kind: 'inspectie' },
+  { title: 'Capac gură de canal spart', value: '2400.00', kind: 'inspectie' },
+  { title: 'Senzor de nivel defect la bazin', value: '3150.00', kind: 'tichet' },
+  { title: 'Circuit forță pompă îmbătrânit', value: '4700.00', kind: 'amanata' },
+  { title: 'Decolmatare bazin nr. 2', value: '6200.00', kind: 'inspectie' },
+] as const;
+
+/**
+ * Pasul 08: catalogul de operatiuni, trei cereri in stari diferite si cinci
+ * propuneri in backlog — exact ce cere „definitia de gata".
+ *
+ * Cererile de backlog sunt cereri REALE in stare `in_backlog`, nu propuneri
+ * orfane: `backlog_proposals.request_id` e `not null`, si asa si trebuie —
+ * fiecare propunere are o cerere care o explica.
+ */
+async function seedRequestsAndCatalog(base: WorkUnitGround): Promise<void> {
+  const already = await withActor(actor(), async (tx) =>
+    tx
+      .select({ id: schema.operationCatalog.id })
+      .from(schema.operationCatalog)
+      .where(eq(schema.operationCatalog.id, IDS.operation(1)))
+      .limit(1),
+  );
+  if (already.length > 0) {
+    console.log('Catalogul si cererile de seed exista deja.');
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const qualificationIds = new Map<string, string>();
+  const productIds = new Map<string, string>();
+
+  /*
+   * Calificarile si produsele se insereaza cu id fix, dar se CITESC inapoi dupa
+   * cod.
+   *
+   * Motivul l-am aflat pe pielea noastra: baza de dezvoltare avea deja o
+   * calificare cu codul `INST`, scrisa de mana. `on conflict do nothing` a sarit
+   * tacut peste inserare, iar tariful care arata spre id-ul fix a cazut cu 23503
+   * — o eroare de cheie straina care nu spunea nimic despre cauza reala. Codurile
+   * sunt unice global (nomenclatoarele sunt comune celor 5 firme), deci codul e
+   * cheia adevarata; id-ul fix ramane doar cand chiar l-am pus noi.
+   */
+  await withActor(actor('seed'), async (tx) => {
+    await tx
+      .insert(schema.qualifications)
+      .values(
+        QUALIFICATIONS.map((qualification, index) => ({
+          id: IDS.qualification(index + 1),
+          code: qualification.code,
+          name: qualification.name,
+          isActive: true,
+        })),
+      )
+      .onConflictDoNothing();
+
+    const existingQualifications = await tx
+      .select({ id: schema.qualifications.id, code: schema.qualifications.code })
+      .from(schema.qualifications)
+      .where(
+        inArray(
+          schema.qualifications.code,
+          QUALIFICATIONS.map((qualification) => qualification.code),
+        ),
+      );
+    for (const row of existingQualifications) {
+      qualificationIds.set(row.code, row.id);
+    }
+
+    // Tariful in vigoare de la 1 ianuarie, fara data de sfarsit: `createOperation`
+    // il cauta pe cel valabil AZI si refuza salvarea fara el. `exclude`-ul de pe
+    // `rate_cards` interzice intervalele suprapuse, deci se scrie doar cand
+    // calificarea n-are deja unul curent.
+    const tariffed = await tx
+      .select({ qualificationId: schema.rateCards.qualificationId })
+      .from(schema.rateCards)
+      .where(
+        inArray(schema.rateCards.qualificationId, [...qualificationIds.values()]),
+      );
+    const withTariff = new Set(tariffed.map((row) => row.qualificationId));
+
+    const missing = QUALIFICATIONS.map((qualification, index) => ({ qualification, index })).filter(
+      ({ qualification }) => {
+        const id = qualificationIds.get(qualification.code);
+        return id !== undefined && !withTariff.has(id);
+      },
+    );
+    if (missing.length > 0) {
+      await tx.insert(schema.rateCards).values(
+        missing.map(({ qualification, index }) => ({
+          id: IDS.rateCard(index + 1),
+          qualificationId: qualificationIds.get(qualification.code) ?? '',
+          validFrom: `${today.slice(0, 4)}-01-01`,
+          validTo: null,
+          hourlySalary: qualification.salary,
+          taxCoefficient: '0.4500',
+          unproductivityCoefficient: '0.1500',
+        })),
+      );
+    }
+
+    await tx
+      .insert(schema.products)
+      .values(
+        CATALOG_PRODUCTS.map((product, index) => ({
+          id: IDS.product(index + 1),
+          code: product.code,
+          name: product.name,
+          uom: product.uom,
+          category: 'Materiale',
+        })),
+      )
+      .onConflictDoNothing();
+
+    const existingProducts = await tx
+      .select({ id: schema.products.id, code: schema.products.code })
+      .from(schema.products)
+      .where(
+        inArray(
+          schema.products.code,
+          CATALOG_PRODUCTS.map((product) => product.code),
+        ),
+      );
+    for (const row of existingProducts) {
+      productIds.set(row.code, row.id);
+    }
+  });
+
+  // Operatiunile trec prin use-case, nu prin `insert`: manopera lor TREBUIE sa
+  // iasa din tariful curent, iar un `insert` direct ar fi putut scrie orice.
+  for (const [index, operation] of OPERATIONS.entries()) {
+    await createOperation(
+      actor('seed'),
+      {
+        code: operation.code,
+        name: operation.name,
+        category: operation.category,
+        standardHours: operation.hours,
+        qualificationId: qualificationIds.get(operation.qual) ?? '',
+        estimatedMaterial: operation.material,
+        isActive: true,
+      },
+      IDS.operation(index + 1),
+    );
+  }
+
+  // Doua materiale tipice pe cea mai scumpa operatiune de instalatii.
+  await setOperationMaterials(actor('seed'), {
+    operationId: IDS.operation(6),
+    lines: [
+      { productId: productIds.get('GAR-32') ?? '', quantity: '2.0000' },
+      { productId: productIds.get('TEV-PP32') ?? '', quantity: '6.0000' },
+    ],
+  });
+
+  // ── Trei cereri in stari diferite ─────────────────────────────────────────
+  const objective = base.objectiveIds[0] ?? '';
+  const secondObjective = base.objectiveIds[1] ?? objective;
+
+  await withActor(actor('seed'), async (tx) => {
+    await tx.insert(schema.requests).values([
+      {
+        id: IDS.request(1),
+        companyId: IDS.companyA,
+        type: 'tichet_client',
+        source: 'email',
+        status: 'neprocesata',
+        title: 'Scurgere la vana din stația SP-1',
+        description:
+          'Bună ziua,\n\nAvem o scurgere vizibilă la vana de pe conducta principală din stația SP-1. Vă rugăm să interveniți.\n\nMulțumesc,\nApa Nova',
+        createdBy: IDS.pm,
+      },
+      {
+        id: IDS.request(2),
+        companyId: IDS.companyA,
+        type: 'constatare_inspectie',
+        source: 'fisa_inspectie',
+        status: 'in_evaluare',
+        objectiveId: secondObjective,
+        contractId: base.contractId,
+        title: 'Senzor de nivel cu citiri eronate',
+        description: 'Constatat la inspecția lunară: senzorul raportează nivel constant.',
+        estimatedValue: '3150.00',
+        createdBy: IDS.pm,
+      },
+      {
+        id: IDS.request(3),
+        companyId: IDS.companyA,
+        type: 'solicitare',
+        source: 'manual',
+        status: 'in_backlog',
+        objectiveId: objective,
+        contractId: base.contractId,
+        title: 'Vopsire balustradă platformă',
+        estimatedValue: '900.00',
+        createdBy: IDS.pm,
+      },
+    ]);
+
+    // Emailul original al primei cereri: ecranul de triere il arata in stanga.
+    await tx.insert(schema.requestEmails).values({
+      id: IDS.requestEmail(1),
+      requestId: IDS.request(1),
+      messageId: '<seed-0001@apanova.test>',
+      fromAddress: 'dispecerat@apanova.test',
+      toAddress: 'cereri@damina.test',
+      subject: 'Scurgere la vana din stația SP-1',
+      receivedAt: new Date(),
+      bodyText:
+        'Bună ziua,\n\nAvem o scurgere vizibilă la vana de pe conducta principală din stația SP-1. Vă rugăm să interveniți.\n\nMulțumesc,\nApa Nova',
+    });
+
+    // ── Cinci propuneri in backlog, cu cererile lor ─────────────────────────
+    await tx.insert(schema.requests).values(
+      BACKLOG_SEED.map((entry, index) => ({
+        id: IDS.request(10 + index),
+        companyId: IDS.companyA,
+        type: entry.kind === 'tichet' ? ('tichet_client' as const) : ('constatare_inspectie' as const),
+        source: entry.kind === 'tichet' ? ('email' as const) : ('fisa_inspectie' as const),
+        status: 'in_backlog' as const,
+        objectiveId: base.objectiveIds[index % base.objectiveIds.length] ?? objective,
+        contractId: base.contractId,
+        title: entry.title,
+        estimatedValue: entry.value,
+        createdBy: IDS.pm,
+      })),
+    );
+
+    await tx.insert(schema.backlogProposals).values(
+      BACKLOG_SEED.map((entry, index) => ({
+        id: IDS.proposal(index + 1),
+        requestId: IDS.request(10 + index),
+        objectiveId: base.objectiveIds[index % base.objectiveIds.length] ?? objective,
+        contractId: base.contractId,
+        title: entry.title,
+        estimatedValue: entry.value,
+        sourceKind: entry.kind,
+        status: 'open',
+      })),
+    );
+  });
+
+  console.log(
+    '10 operatiuni in catalog, 2 calificari cu tarif, 3 cereri in stari diferite si 5 propuneri in backlog.',
+  );
+}
+
 main()
   .catch((error: unknown) => {
     console.error(error);
     process.exitCode = 1;
   })
   .finally(() => void closeConnections());
-

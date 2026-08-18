@@ -174,6 +174,7 @@ export type { CompleteUploadInput, PresignUploadInput, ShareNodeInput } from './
 export {
   createRequestInputSchema,
   decideRoutingInputSchema,
+  evaluateRequestInputSchema,
   promoteBacklogInputSchema,
   requestEstimateLineInputSchema,
   REQUEST_SOURCES,
@@ -183,10 +184,24 @@ export {
   REQUEST_TYPES,
   ROUTING_CHOICE_LABELS,
   ROUTING_CHOICES,
+  triageRequestInputSchema,
 } from './requests';
 export type {
   CreateRequestInput,
   DecideRoutingInput,
+  EvaluateRequestInput,
   PromoteBacklogInput,
   RequestEstimateLineInput,
+  TriageRequestInput,
 } from './requests';
+
+export {
+  operationInputSchema,
+  operationMaterialInputSchema,
+  operationMaterialsInputSchema,
+} from './operations';
+export type {
+  OperationInput,
+  OperationMaterialInput,
+  OperationMaterialsInput,
+} from './operations';

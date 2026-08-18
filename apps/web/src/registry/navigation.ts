@@ -111,9 +111,14 @@ export const NAVIGATION: readonly NavItem[] = [
     label: 'Cereri',
     icon: 'inbox',
     group: 'operational',
-    phase: 1,
+    // Construit la 08b. Sub-sectiunile sunt VEDERI ale aceleiasi liste
+    // (`?view=…`), nu pagini separate: numarul de cereri nu poate diferi intre
+    // „Toate cererile" si „Inbox" pentru ca amandoua ies din acelasi `load`.
+    phase: 0,
     queueKinds: ['cerere_neprocesata'],
-    usesPeriod: true,
+    // Cererea e a firmei, nu a lunii: traieste pana e decisa. Selectorul de
+    // perioada ar sugera ca inbox-ul se goleste la schimbarea lunii.
+    usesPeriod: false,
     children: [
       { slug: 'inbox', label: 'Inbox (email neprocesat)' },
       { slug: '', label: 'Toate cererile' },
@@ -270,7 +275,7 @@ export const NAVIGATION: readonly NavItem[] = [
     label: 'Catalog de operațiuni',
     icon: 'library',
     group: 'libraries',
-    phase: 1,
+    phase: 0,
   },
 
   // ── Configurare ───────────────────────────────────────────────────────────
