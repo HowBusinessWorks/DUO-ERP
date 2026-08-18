@@ -13,51 +13,307 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Scris la finalul lui 09b-2, 18 august 2026. Citește-l primul; restul fișierului e istoric.*
+*Rescris la finalul lui 10b, 18 august 2026. Citește-l pe tot; restul fișierului e istoricul
+fiecărui pas, util când ai o întrebare punctuală, nu ca lectură.*
 
-### Unde s-a ajuns
+### Ce e gata și ce nu
 
-Pașii **01, 02, 04, 05, 06 și 07 sunt gata**. Pasul **08** e gata pe 08a + 08b; **08c e sărit
-dinadins** (vezi secțiunea lui mai jos). Pasul **09** e tăiat în trei, nu în două:
+| Pas | Stare |
+|---|---|
+| **01–07** | Gata. |
+| **08** | Gata pe **08a** (schemă, domain, servicii) și **08b** (ecrane). **08c e SĂRIT dinadins** — decizia utilizatorului, vezi secțiunea lui mai jos. Din 08c există doar expirarea propunerilor. |
+| **09** | **Gata, tot** — 09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon de consum · 09b-4 acoperire, istoric, validare în masă, seed. Toate cele 24 de verificări acoperite. |
+| **10** | **10a** (sincronizarea) și **10b** (PWA-ul offline) sunt gata. Rămân **10c, 10d, 10e**. |
 
-- **09a — fundația** (schemă, triggere, domain pur, servicii): GATA.
-- **09b-1 — fișa de INSPECȚIE** (creare de la obiectiv, tab-urile Fișă și Constatări): GATA.
-- **09b-2 — fișa de INTERVENȚIE** (Fișă, Materiale, Ore, bara așteptat vs real): GATA.
-- **09b-3 — pontaj, stoc și gestiuni, bon de consum, jobul nocturn de stoc**: GATA.
-- **09b-4 — acoperirea inspecțiilor, Obiectiv › Istoric, validarea în masă, seed-ul**: GATA.
+**Următorul lucru de făcut e 10c.**
 
-**Pasul 09 e terminat.** Ecranul „realizat vs estimat pe echipe" din catalog exista din 08b și
-s-a umplut singur când `apply_intervention_actuals` a primit prima fișă validată — n-a cerut cod.
+### Pasul 10, tăiat în cinci
 
-**Pasul 10 e tăiat în cinci**, iar **10a e gata**:
+Tăierea în bucăți mici a fost cerută explicit de utilizator, ca o sesiune să nu se termine la
+jumătatea unui pas. Aceeași convenție a mers la 09.
 
-- **10a — fundația sincronizării** (jurnal de idempotență, `/api/field/sync`, retenție): GATA.
-- **10b — PWA-ul offline** (felia de date, Dexie, service worker, banda cu două contoare,
-  ecranul de conflicte): GATA.
-- **10c — cele 8 ecrane de teren** + bugetul de tapuri (blocat pe Playwright, datoria 3).
-  **Următorul lucru.**
+- **10a — fundația sincronizării**: GATA. `app.applied_mutations` (jurnal de idempotență),
+  `app.sync_cursors`, `pushMutations`, `/api/field/sync`, retenția de 90 de zile ca job săptămânal.
+- **10b — PWA-ul offline**: GATA. Felia de date (`pullFieldSnapshot`), IndexedDB prin Dexie
+  (snapshot · outbox · media), service worker scris de mână, banda cu **două contoare**, ecranul de
+  conflicte, `Azi` care citește din IndexedDB.
+- **10c — cele 8 ecrane de teren** + bugetul de tapuri. **Următorul lucru.**
 - **10d — raportul lunar** către client: migrare, coadă cu progres real, versionare și îngheț.
 - **10e — panoul PM** cu gauge-ul Delta.
 
-Tăierea în bucăți mai mici a fost cerută explicit de utilizator, ca o sesiune să nu se termine
-la jumătatea unui pas.
+### Ce trebuie să știi ca să începi 10c
 
-### Ce trebuie să știi înainte de 09b-3
+**Ce ai deja, gata de folosit:**
 
-**Rulează fiecare use-case pe date reale înainte să scrii ecranul.** A doua sesiune la rând în
-care regula asta a plătit: la 09b-1 a scos patru defecte din 09a, la 09b-2 încă trei, toate
-tăcute, niciunul prins de typecheck sau de testele existente. Harness-ul se scrie în
-`packages/services/scripts/`, se rulează cu `pnpm exec tsx`, și se **șterge** după.
+- `POST /api/field/sync` aplică un lot de mutații, idempotent, în ordinea creării, oprindu-se la
+  prima eroare de business. `GET` întoarce felia + cursorul.
+- Tipurile de mutație care merg **azi**: `inspection.save`, `intervention.save`, `timesheet.save`,
+  `consumption.save`, `material.request`. Fiecare cheamă exact serviciul pe care îl cheamă și
+  ecranul de birou.
+- `enqueueMutation()` și `enqueueMedia()` din `apps/web/src/lib/field/sync.ts` — ecranele pun în
+  coadă, restul se întâmplă singur.
+- `useSync()` dă contoarele și `syncNow()`. Banda și pastila de conflicte sunt deja legate.
+- Felia locală se citește din `fieldDb()`; `TodayList` e exemplul de urmat.
 
-**Cele două capcane deja cunoscute, valabile mai departe:**
+**Ce lipsește și trebuie construit la 10c** (§3.5 din plan):
 
-1. **Drizzle numește TOATE coloanele într-un `insert`**, punând `default` pe cele nedate. Deci un
-   `grant insert (coloane)` nu poate fi satisfăcut niciodată prin drizzle dacă lista exclude ceva.
-   `intervention_materials` și `timesheet_lines` au cerut amândouă un `insert` scris de mână.
-   Dacă atingi altă tabelă cu grant pe coloane, cheam-o din rolul de teren înainte de ecran.
-2. **Extensiile 1:1 pe `work_units` se nasc din trigger**, nu din serviciu (0028). Dacă adaugi
-   alta, urmează tiparul: `after insert … when (new.type = …)`, `on conflict do nothing`, backfill
-   cu același cod, plasă la final.
+| Ecran | De făcut |
+|---|---|
+| `Azi` | Există lista. Lipsesc butonul **＋** cu cele 4 acțiuni frecvente și rândurile de context („2 linii de verificat"). |
+| `Inspecție` | Tot. Checklist offline, NOK cu ieșire **impusă și local** (#18), poze. |
+| `Intervenție` | Tot. Materiale din gestiunea echipei, ore, poze înainte/după. |
+| `Necesar material` | Tot, **în 3 tapuri** — pragul e blocant. |
+| `Pontaj` | Tot. Ziua împărțită pe mai multe UL. |
+| `Bon de consum` | Tot — **dar vezi decizia deschisă de mai jos**. |
+| `Jurnal` | Tot, **și n-are tabelă**. `journal.append` nu e în `MUTATION_TYPES` fiindcă n-are executant. Ori adaugi tabela, ori muți ecranul în faza 2 și spui asta în plan. |
+| `Utilaje și PV`, `Verificare SL` | Doar schelet cu `EmptyState`. Fazele 4 și 2. |
+
+**Încărcarea pozelor nu e scrisă.** Coada `media` există în IndexedDB, cu progres per parte, dar
+uploader-ul care o golește prin presign-ul din pasul 07 rămâne de făcut la 10c. Contorul le
+numără deja separat de fișe.
+
+**Butonul „duplică drept fișă nouă"** din §3.3 lipsește din ecranul de conflicte, dinadins: are
+nevoie de ecranul fișei ca să deschidă o copie editabilă cu `id` nou. Se adaugă la 10c.
+
+### Trei decizii deschise, care nu sunt ale mele
+
+1. **Bonul de consum pe teren.** §3.5 îl cere ca ecran de teren complet, dar `inventory.write` e
+   drept de **birou** din pasul 09. Ori se lărgește dreptul pentru gestiunea propriei echipe, ori
+   terenul emite consumul doar prin fișa de intervenție. E o decizie de model.
+2. **Jurnalul de șantier** — tabelă nouă acum, sau amânat în faza 2 (vezi tabelul de mai sus).
+3. **Playwright.** Bugetul de tapuri (#12–15) e **blocant în CI conform planului**, iar Playwright
+   nu e instalat. Ori se instalează la începutul lui 10c, ori se scrie explicit în plan că pragul
+   se măsoară mai târziu — dar nu se lasă „se face cândva".
+
+### Regula care a plătit de cinci ori la rând
+
+**Rulează fiecare use-case pe date reale, din rolul restrâns, ÎNAINTE să scrii ecranul.**
+
+La 09b-1 a scos patru defecte din 09a. La 09b-2 încă trei. La 09b-3 două. La 10a unul. La 10b unul.
+**Zece defecte, toate tăcute, niciunul prins de typecheck sau de testele existente.** Harness-ul se
+scrie în `packages/services/scripts/`, se rulează cu `pnpm exec tsx`, și se **șterge** după.
+
+Trei dintre ele au avut exact aceeași formă — **partea de jos era corectă, dar o persona n-avea
+drum până la ea**:
+
+- catalogul de operațiuni, fără grant pentru teren (09b-2, migrarea `0027`);
+- liniile de pontaj, cu grant pe coloane pe care drizzle nu-l putea satisface (09b-3);
+- seriile de numerotare, fără grant pentru teren (10b, migrarea `0030`).
+
+### Patru capcane cunoscute, valabile mai departe
+
+1. **Drizzle numește TOATE coloanele într-un `insert`**, punând `default` pe cele nedate. Un
+   `grant insert (coloane)` nu poate fi satisfăcut prin drizzle dacă lista exclude ceva.
+   `intervention_materials` și `timesheet_lines` au cerut amândouă `insert` scris de mână.
+2. **Extensiile 1:1 pe `work_units` se nasc din trigger**, nu din serviciu (`0028`). Tiparul:
+   `after insert … when (new.type = …)`, `on conflict do nothing`, backfill cu același cod, plasă.
+3. **Ce trece prin `jsonb` trebuie convertit explicit.** `Money` și `Quantity` ajung acolo ca
+   structurile interne ale bibliotecii de zecimale. La 10a, telefonul care primea răspunsul
+   *memorat* vedea `{c:[8],e:0,s:1}` acolo unde cel care prinsese execuția vedea `"8.0000"`.
+4. **Nu presupune că o lună e deschisă.** Martie 2026 e închisă pe dev de la testul pasului 06;
+   seed-ul de fișe a picat pe asta. Alege dintre cele deschise, la rulare.
+
+### Cum verifici ce ai construit
+
+- **Testele de bază de date rulează în CI** (testcontainers). Local, portița e
+  `TEST_DATABASE_URL=<url de session pooling> pnpm exec vitest run` — vezi mai jos ce NU verifică.
+- **Ecranele se verifică fără browser** cu un harness de ~150 de linii peste `next dev`. Vezi
+  „Lucruri pe care le-am aflat greu".
+- **Ce atinge R2 sau rețeaua** se verifică prin smoke pe dev, cu bucket real. Nu în CI, dinadins.
+- Înainte de commit: `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets`.
+
+### Verificări din pașii anteriori care NU sunt complet închise
+
+| Pas | # | Ce lipsește |
+|---|---|---|
+| 06 | **11** | Drill-down-ul merge până la identitatea documentului. Documentele-sursă apar la 09–10. |
+| 06 | **19** | Comutatorul brut/net merge, dar **`overhead_snapshots` nu e populat de nimeni periodic**. Vezi datoria 2. |
+| 06 | **21** | Indexul de cursor măsurat la 10.000 de linii, nu la 100.000. Planul e însă independent de volum. |
+| 07 | **7** | Reluarea per parte există în client și merge; **întreruperea reală de rețea** cere Playwright. Singura verificare deschisă din pasul 07. |
+| 09 | — | Toate cele 24 sunt acoperite. |
+| 10 | **1–4, 8, 9, 12–15, 17–28** | Cer ecranele de teren (10c), raportul lunar (10d) și panoul PM (10e). Tapurile (#12–15) cer și Playwright. |
+
+### Datorii deschise, în ordinea în care le-aș lua
+
+| # | Ce | De ce contează |
+|---|---|---|
+| 1 | **Rotește `SUPABASE_SERVICE_ROLE_KEY`** (Project Settings → API) | A trecut printr-o fereastră de chat pe 17 august. Singurul cod care o folosește e `resetMfaFactors` din `apps/web/src/app/api/admin/service.ts`. |
+| 2 | **Jobul lunar de regie** | `recomputeOverheadSnapshot` există și e acordată doar lui `app_service`, dar n-o cheamă nimeni. Fără ea, marja netă e marjă brută cu altă etichetă. |
+| 3 | **CORS pe bucket-ul R2 `docs`** | Uploadul din browser NU merge fără el: `PUT` de pe originea aplicației și **`ExposeHeaders: ETag`**. Fără ETag expus, clientul se oprește la prima parte — cu mesaj explicit, dar se oprește. Verificat până acum doar din Node, unde CORS nu se aplică. |
+| 4 | **Playwright** | Neinstalat. Blochează #13 din pasul 03, clicul pe hartă din 04b (#14), partea de client din #7 și #20 ale pasului 07, și **bugetul de tapuri #12–15 din pasul 10, care e blocant în CI conform planului**. Devine urgent la 10c. |
+| 5 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Ori `grant select` pe `work_queue_items`/`notifications` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
+| 6 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
+| 7 | **Decizia despre bonul de consum pe teren** | §3.5 din pasul 10 cere `Bon de consum` ca ecran **de teren complet**, dar `inventory.write` e drept de **birou** din pasul 09. Ori se lărgește dreptul pentru gestiunea propriei echipe, ori terenul emite consumul doar prin fișa de intervenție. **E o decizie de model, nu de cod** — se ia înainte de 10c. |
+| 8 | **Miniaturi pentru video** | `files.derive` produce miniaturi doar pentru imagini; pentru restul iese tăcut, dinadins. PDF-ul se rezolvă acum prin previzualizarea `inline`, deci rămâne doar video. Se adaugă când apare nevoia reală (raportul lunar, pasul 10). |
+
+**Datoria `pnpm db:generate` rămâne plătită.** Toate migrările care ating tabele au fost
+**generate** cu drizzle-kit și completate dedesubt de mână (triggere, RLS, grant-uri pe coloană).
+Cele care NU schimbă schema — `0022`, `0023`, `0027`, `0028`, `0030` — sunt scrise integral de
+mână, iar snapshot-urile lor sunt copii ale precedentului, ca lanțul drizzle-kit să rămână întreg.
+**Nu scrie migrări de mână când schimbi tabele** — scrie schema Drizzle, generează, apoi
+completează dedesubt.
+
+### Starea bazei de dezvoltare
+
+- Migrările **până la `0030` inclusiv sunt aplicate** pe Supabase dev.
+- **pg-boss rulează**, cu 9 cozi: `system.ping`, `contracts.expiryScan`,
+  `contracts.deltaFillScan`, `rollup.verify`, `requests.expireBacklog`, `files.derive`,
+  `files.cleanup`, `inventory.verifyStock`, `field.pruneMutations`.
+- Seed: 10.000 de linii de cost, arborele de fișiere backfillat, catalogul și cererile pasului 08,
+  și — din 09b-4 — **fișele de lucru**: `pnpm db:seed --sheets` aduce 8 inspecții validate pe luni
+  diferite, 3 intervenții cu materiale și ore, o săptămână de pontaje și o gestiune de echipă cu
+  stoc din patru produse. Flagul e idempotent (verifică după numele fișelor).
+- **Martie 2026 e ÎNCHISĂ** pe dev, de la testul de închidere al pasului 06. Orice seed sau harness
+  care presupune o lună anume trebuie să aleagă dintre cele deschise — prima variantă a seed-ului de
+  fișe a picat exact pe asta.
+- **300 de poze cu EXIF** (`teren-001.jpg` … `teren-300.jpg`) în folderul `Poze` al lucrării
+  `01950000-…-000008000001`, cu miniaturile lor în `derived`. Se pot șterge oricând.
+- **Resturi de la harness-uri**: firme `Smoke06b …` / `Damina Fisiere …`, echipe și gestiuni
+  `Echipa 09b2 …`, `Gestiune 10a …`, plus unități de lucru `SMOKE …`. Nu deranjează, și nu se pot
+  șterge: alocările de finanțare și liniile de cost sunt append-only.
+- **A doua rulare a seed-ului de fișe pe 18 august a produs 8 inspecții și 3 intervenții în plus**,
+  înainte să existe verificarea de idempotență. De asta dev are 16 inspecții `Inspectie 2026-…`, nu 8.
+- Bază curată: `pnpm db:reset`. `--force` nu mai poate reface seed-ul.
+
+### Cum rulezi testele fără Docker
+
+Mașina n-are Docker, deci până la 07a orice greșeală se afla abia în CI, șase minute mai târziu.
+Acum există o portiță, în `tests/global-setup.ts` din **ambele** pachete:
+
+```
+TEST_DATABASE_URL=<url-ul de session pooling>  pnpm exec vitest run
+```
+
+Suita rulează pe baza indicată în loc de container. **Ce NU verifică** e exact lucrul cel mai valoros
+al containerului — că migrările reconstruiesc baza de la zero — deci în CI variabila rămâne
+nesetată, și acolo se dă verdictul. Testele lasă în urmă rândurile lor, iar două presupun o bază
+goală și pică pe dev fără să fie stricate: „100 de alocări în paralel" (epuizează pool-ul către
+Supabase) și „metricile de integritate sunt zero" (dev are 10.000 de linii de cost).
+
+Pentru ce atinge R2 sau rețeaua nu există teste în CI, dinadins: se verifică prin harness-uri de
+smoke aruncabile, pe dev, cu bucket real. **Așa au ieșit la iveală toate defectele tăcute din
+09b-2, 09b-3, 09b-4, 10a și 10b** — niciunul n-ar fi fost prins de typecheck.
+
+### Lucruri pe care le-am aflat greu și te scutesc de o zi
+
+- **Testele de bază de date rulează DOAR în CI.** Mașina n-are Docker. Consecința practică: scrii
+  testul, dai push, și afli abia acolo. La 02c′ un test de guard a picat în CI deși guard-ul
+  funcționa — pentru că `DrizzleQueryError` are ca mesaj doar „Failed query: …”. Folosește
+  `pgMessage(error)` din `tests/helpers.ts` (există în `packages/db` și, din 02c′, și în
+  `packages/services`), sau `sqlstate(error)`. **Nu potrivi pe `String(error)`.**
+- **Formularele pe `useActionState` au progressive enhancement** (React 19 emite `$ACTION_REF_1`,
+  `$ACTION_1:0`, `$ACTION_KEY` ca input-uri ascunse în HTML-ul randat pe server). Poți deci apela un
+  server action prin HTTP, fără browser: citești input-urile ascunse din `<form>`, le pui într-un
+  `FormData` împreună cu câmpurile reale și faci POST pe URL-ul paginii. Așa a fost testată limita
+  de login la 02c′. **E cea mai bună unealtă până apare Playwright.**
+- **Ecranele se verifică fără browser, cu un harness de 150 de linii.** Pornești `next dev`, fabrici cookie-ul de sesiune (mai jos), ceri paginile cu `fetch` și afirmi pe HTML-ul randat: „codul `L-000001` apare", „tab-ul Deviz NU apare pe inspecție", „cuvântul «Unitate de Lucru» nu apare nicăieri". Așa s-au bifat #11, #14 și #15 la 05c, 22 de verificări într-o rulare.
+  **Ce prinde**: rutare, drepturi, ce ajunge în DOM, texte interzise, redirecturi. **Ce nu prinde**: click, hover, focus, layout — alea rămân pentru Playwright (datoria #2). Un lucru la care să te aștepți: rolul `admin` cere al doilea factor, deci fără `MFA_ENFORCED=0` harness-ul primește 307 pe tot, iar simptomul arată exact ca „ecranul e stricat".
+- **Sesiunea se poate fabrica dintr-un script**: `POST /auth/v1/token?grant_type=password` la
+  Supabase, apoi cookie-ul `sb-<ref>-auth-token` = `base64-` + JSON-ul răspunsului, tăiat în bucăți
+  de 3180 de caractere dacă e lung. Cu el poți lovi orice rută ca orice persona.
+- **`getUser()` ≠ `getSession()` ≠ `mfa.listFactors()`.** Primul întreabă serverul Auth; celelalte
+  două citesc din cookie. Cookie-ul se scrie la login și nu se rescrie când se schimbă ceva la
+  utilizator — de aici un bug real la 02c′. **Unde iei o decizie, întreabă serverul.**
+- **`@damina/auth` NU se importă din middleware.** Bariera reexportă `@damina/db`, deci driverul de
+  Postgres, deci `node:fs`, care nu există pe Edge. Middleware-ul importă din **`@damina/auth/edge`**.
+  Dacă vezi „Reading from node:fs is not handled by plugins”, asta e.
+- **Rutele `/api` nu primesc redirect din middleware** pentru poarta de al doilea factor, dinadins:
+  un `fetch` urmează redirect-ul și încearcă să citească JSON dintr-o pagină HTML. Orice rută `/api`
+  nouă care are nevoie de drepturi își cheamă singură `can()` și `requireMfa()`.
+- **Admin API-ul GoTrue nu poate deconecta pe cineva după id.** Dacă vreun pas viitor cere asta,
+  răspunsul e `app.revoke_sessions()` din migrarea `0015`, nu Admin API.
+
+- **Harness-ul de smoke pe Supabase dev bate CI-ul ca viteză de învățare.** La 06a am dat push cu
+  două bug-uri de fixture și le-am aflat în CI, 6 minute mai târziu. La 06b am rulat întâi aceleași
+  scenarii printr-un script `tsx` peste use-case-urile reale, pe baza de dev: a prins ambele capcane
+  (o alocare scrisă direct într-o lună închisă; seria `NRA` lipsă) **înainte** de push, iar CI-ul a
+  ieșit verde din prima. Costul e ~80 de linii de script care se aruncă.
+- **`explain analyze` înainte de a adăuga un index, nu după.** Indexul de cursor din `0020` a apărut
+  dintr-o măsurătoare (`seq scan` + `top-N heapsort`, 5,35 ms la 10.000 de linii), nu dintr-o
+  presimțire. Aceeași măsurătoare a dat și cifra care justifică rollup-urile: 0,076 ms din rollup
+  față de 10–11 ms agregând registrul, la 5.000 de linii pe lună.
+- **Ecranele se pot verifica fără browser și fără sesiune Supabase**: pornești `next dev` cu
+  `ALLOW_DEV_SESSION=1` și `MFA_ENFORCED=0`, apoi ceri paginile cu `Invoke-WebRequest` și afirmi pe
+  HTML. Contextul de lună și de firmă se pune fabricând cookie-ul `damina_ctx` — e JSON simplu.
+  **Atenție la o capcană:** React sparge textul interpolat (`analitica: {x}`) cu comentarii HTML,
+  deci `Contains('analitica: folosit')` dă fals negativ. Caută bucăți care nu trec prin interpolare.
+- **`[module]/page.tsx` acceptă doar vederile DECLARATE** în `list.views`; una nedeclarată cade tăcut
+  pe vederea implicită. Așa a picat prima variantă de `?view=marja-neta`, și e garda bună — dar când
+  o vezi, semnul e „lipsește din `views`", nu „e stricat ecranul".
+
+- **O politică RLS care lipsește la SCRIERE nu dă eroare — atinge zero rânduri.** Asta a ținut
+  `complete` nefuncțional la 07b: `app.file_versions` avea `select` și `insert`, dar nu `update`, iar
+  fișierele rămâneau tăcut `uploading` cu tipul declarat de client. Un `insert` fără `update` pe
+  aceeași tabelă e aproape sigur o scăpare. `0023` se termină cu o plasă care verifică asta.
+- **`defineJob` rulează la ÎNCĂRCAREA modulului.** O validare care cade acolo nu strică un job, ci
+  întregul `import '@damina/jobs'` — deci worker-ul nu mai pornește deloc, iar simptomul nu seamănă
+  cu cauza. Merită ținut minte pentru orice validare pusă la nivel de modul.
+- **`next dev` nu e o măsurătoare.** La 300 de rânduri arăta 9 s; aceeași pagină, pe build de
+  producție, 2,2 s — din care 1,5 s e overheadul oricărei pagini (shell + drumurile la Supabase din
+  eu-west-1). Diferența e de zece ori, și e exact genul de cifră după care cineva rescrie un ecran
+  care nu avea nimic. **Dacă vrei o cifră de randare, fă build.**
+- **Într-o funcție „ensure", căutarea trebuie să compare EXACT valoarea pe care ar insera-o.**
+  `ensure_folder` inserează analitica moștenită din părinte (`coalesce(argument, părinte)`), dar
+  căuta după argument. Prima variantă a reparației din `0024` a picat imediat pe `Fișă`: se cheamă
+  cu `p_objective => null`, dar există în bază cu obiectivul moștenit. Cele două expresii trebuie
+  scrise o singură dată, în variabile, și folosite în amândouă locurile.
+- **Sesiunea de dezvoltare (`ALLOW_DEV_SESSION=1`) NU poate scrie fișiere.** `personId`-ul ei nu
+  există în `app.persons`, iar `nodes.created_by` are cheie străină — deci `presign` cade cu 500 și
+  `23503`. Ecranele se citesc cu ea, dar orice harness care **scrie** are nevoie de o sesiune
+  fabricată din grantul de parolă (rețeta e mai sus).
+- **ETag-ul unei părți e vizibil în browser doar dacă bucket-ul îl expune** (`ExposeHeaders: ETag`).
+  Din Node nu se vede problema — CORS nu se aplică acolo — deci uploadul poate arăta perfect în
+  harness și să se oprească la prima parte în browser. Clientul spune exact asta când se întâmplă.
+- **Un pachet pe care nimic din CI nu-l importă nu e testat, oricâte teste ar avea repo-ul.**
+  `@damina/jobs` arunca la import de la pasul 04 și s-a aflat abia la 07b, când `files.ts` l-a adus
+  în lanțul serviciilor.
+- **În `sql` de la drizzle, o listă JS devine `(a, b, c)`, nu un array Postgres.** Deci `= any(${ids})`
+  dă `cannot cast type record to uuid[]`; forma corectă e `in ${ids}`. Cu `${ids}::uuid[]` doar muți
+  eroarea, n-o repari.
+- **Verificările de scară se scriu ca invariant, nu ca cronometru.** Mutarea unui folder cu 1.000 de
+  fișiere se testează prin „un singur rând atins", nu prin milisecunde: pe un container în CI, cifra
+  n-ar însemna nimic, dar invariantul cade dacă cineva rescrie mutarea ca parcurgere de subarbore.
+- **Un eșec de decodare e permanent, unul de rețea e trecător.** În `files.derive`, `catch`-ul e
+  strâns exact în jurul apelului `sharp`: citirea din R2 și scrierea în bază rămân în afara lui,
+  fiindcă alea chiar merită reîncercate. Fără separarea asta, o poză stricată se reia de trei ori.
+
+### Reguli ale casei care nu se negociază
+
+- **Un modul nou = o intrare în `entityRegistry`**, nu fișiere de pagină. Lista și detaliul sunt
+  două pagini fractale pentru tot ERP-ul. Vezi `docs/entity-registry.md`.
+- **RLS e primul strat, guard-urile din `packages/auth` al doilea.** Guard-urile dau erori bune
+  (403 cu mesaj în română), nu apără. Adevărul despre ce rânduri și ce coloane ies din bază e în
+  politici și în grant-urile pe coloană.
+- **Nimic din dashboard.** Politici, grant-uri, coloane — totul în migrări versionate. Singura
+  excepție cunoscută e activarea hook-ului de token, care nu se poate versiona; de-aia e scrisă în
+  tabelul de mai sus.
+- **Codurile `AppError` sunt exact acestea:** `PERIOD_CLOSED`, `PRICE_FORBIDDEN`,
+  `AUTHORIZATION_EXPIRED`, `QUANTITY_EXCEEDS_CONTRACT`, `VALIDATION_FAILED`, `NOT_FOUND`,
+  `FORBIDDEN`, `CONFLICT`. Nu inventa altele — nu există `INTERNAL` sau `CONFIG_MISSING`.
+- **Comentariile din cod se scriu fără diacritice; textul de pe ecran, cu diacritice.**
+- **Există un agent de design** și utilizatorul a cerut explicit să fie folosit pentru ecrane.
+- **`MFA_ENFORCED=0` e o poartă oprită, nu un drept dat.** Nu construi nimic pe el: niciun cod nu trebuie să întrebe „e MFA oprit?" ca să decidă altceva decât banda de avertizare. Dacă un ecran începe să se comporte diferit după comutator, comutatorul a devenit o a doua configurație de securitate — exact ce nu trebuie.
+- **Un rând de checklist care nu poate cădea niciodată nu se pune pe ecran.** La 06b am scris o
+  verificare de închidere pe care `check`-ul din 0017 o face imposibilă; am aruncat-o. Oamenii învață
+  repede să nu mai citească rândurile care sunt mereu verzi, și atunci nu le mai citesc nici pe cele
+  care contează. Verificarea a rămas ca metrică de integritate, unde e la locul ei.
+- **Eticheta de analitică de pe un ecran cu bani se verifică odată cu cifra.** La 06c, Contract ›
+  Prezentare scria „folosit" peste niște cifre care sunt pe „descărcat". O etichetă greșită e mai rea
+  decât una lipsă: se citește ca fiind verificată.
+- **Tipul unui fișier se decide din conținut, nu din extensie și nu din ce declară browserul.**
+  `sniffMime` din `@damina/shared` e listă **albă**: ce nu e recunoscut se respinge. O listă neagră
+  se ocolește cu următorul format inventat.
+- **Antetele cu care se servește un fișier vin DIN BAZĂ**, acoperite de semnătura URL-ului. Un HTML
+  urcat ca „aviz.pdf" nu trebuie să poată fi servit ca HTML, oricât ar insista clientul.
+- **Coloanele derivate nu sunt evenimente de audit.** `audit.record_change` scoate `root_node_id` din
+  diferență înainte de verificarea „un UPDATE care nu schimbă nimic". Un jurnal în care jumătate din
+  intrări sunt scrise de sistem devine un jurnal pe care nu-l mai citește nimeni.
+- **Rulează smoke-ul pe dev înainte de push, nu CI-ul după.** La 06a și 07a am aflat greșeli în CI;
+  la 06b și 07b le-am prins înainte, cu ~100 de linii de script aruncabil, iar CI-ul a ieșit verde
+  din prima. Costul e mic, câștigul e de șase minute per greșeală.
+- Înainte de commit: `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets`.
+  Ultimul cere un build proaspăt, iar build-ul cade dacă un `next dev` ține `.next` ocupat — oprește
+  serverele de dezvoltare înainte.
 
 ---
 
@@ -890,186 +1146,6 @@ Ce ți-a lăsat pasul 07 și îți va folosi:
 2. **Mărimea anunțată nu era verificată** la `complete` (verificarea #8 din plan): se putea declara
    1 KB și urca 6 MB. Plafonul pe tip prindea doar exagerările. Acum egalitate strictă.
 
-### Verificări din pașii anteriori care NU sunt complet închise
-
-| Pas | # | Ce lipsește |
-|---|---|---|
-| 06 | **11** | Drill-down-ul merge până la identitatea documentului. Documentele-sursă apar la 09–10. |
-| 06 | **19** | Comutatorul brut/net merge, dar **`overhead_snapshots` nu e populat de nimeni periodic**. Vezi datoria 2. |
-| 06 | **21** | Indexul de cursor măsurat la 10.000 de linii, nu la 100.000. Planul e însă independent de volum. |
-| 07 | **7** | Reluarea per parte există în client și merge; **întreruperea reală de rețea** cere Playwright. Singura verificare deschisă din pasul 07. |
-
-### Datorii deschise, în ordinea în care le-aș lua
-
-| # | Ce | De ce contează |
-|---|---|---|
-| 1 | **Rotește `SUPABASE_SERVICE_ROLE_KEY`** (Project Settings → API) | A trecut printr-o fereastră de chat pe 17 august. Singurul cod care o folosește e `resetMfaFactors` din `apps/web/src/app/api/admin/service.ts`. |
-| 2 | **Jobul lunar de regie** | `recomputeOverheadSnapshot` există și e acordată doar lui `app_service`, dar n-o cheamă nimeni. Fără ea, marja netă e marjă brută cu altă etichetă. |
-| 3 | **CORS pe bucket-ul R2 `docs`** | Uploadul din browser NU merge fără el: `PUT` de pe originea aplicației și **`ExposeHeaders: ETag`**. Fără ETag expus, clientul se oprește la prima parte — cu mesaj explicit, dar se oprește. Verificat până acum doar din Node, unde CORS nu se aplică. |
-| 4 | **Playwright** | Neinstalat. Blochează #13 din pasul 03, clicul pe hartă din 04b (#14) și partea de client din #7 și #20. |
-| 5 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Ori `grant select` pe `work_queue_items`/`notifications` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
-| 6 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
-| 7 | **Miniaturi pentru video** | `files.derive` produce miniaturi doar pentru imagini; pentru restul iese tăcut, dinadins. PDF-ul se rezolvă acum prin previzualizarea `inline`, deci rămâne doar video. Se adaugă când apare nevoia reală (raportul lunar, pasul 10). |
-
-**Datoria `pnpm db:generate` rămâne plătită.** Migrările `0016`–`0021` au fost **generate**. `0022` și
-`0023` sunt scrise de mână **pentru că nu schimbă schema** — doar funcții, politici și grant-uri;
-snapshot-urile lor sunt copii ale precedentului, ca lanțul drizzle-kit să rămână întreg. **Nu scrie
-migrări de mână când schimbi tabele** — scrie schema Drizzle, generează, apoi completează dedesubt.
-
-### Starea bazei de dezvoltare
-
-- Migrările **`0017`–`0024` sunt aplicate** pe Supabase dev.
-- **pg-boss a fost pornit prima dată pe 18 august**: schema `jobs` există acum, cu cele 6 cozi
-  (`system.ping`, `contracts.expiryScan`, `contracts.deltaFillScan`, `rollup.verify`, `files.derive`,
-  `files.cleanup`). Înainte de asta nu exista deloc.
-- Seed: 10.000 de linii de cost pe lunile deschise din 03–05/2026, plus arborele de fișiere
-  backfillat. Seed-ul leagă acum unitățile de lucru de contract (`contractObjectiveId`), deci
-  folderele lor stau sub `Activitate` al contractului, nu al firmei.
-- **300 de poze cu EXIF** (`teren-001.jpg` … `teren-300.jpg`) în folderul `Poze` al lucrării
-  `01950000-…-000008000001`, urcate pentru verificarea #20, cu miniaturile lor în `derived`. Se pot
-  șterge oricând; sunt un fișier de 9 KB, repetat.
-- **Resturi de la harness-uri**: firme cu nume `Smoke06b …`, `Damina Fisiere …`, plus câteva foldere
-  și fișiere de probă în R2 (bucket-ul `docs`) și miniaturi în `derived`. Nu deranjează.
-- Bază curată: `pnpm db:reset`. `--force` nu mai poate reface seed-ul.
-
-### Cum rulezi testele fără Docker
-
-Mașina n-are Docker, deci până la 07a orice greșeală se afla abia în CI, șase minute mai târziu.
-Acum există o portiță, în `tests/global-setup.ts` din **ambele** pachete:
-
-```
-TEST_DATABASE_URL=<url-ul de session pooling>  pnpm exec vitest run
-```
-
-Suita rulează pe baza indicată în loc de container. **Ce NU verifică** e exact lucrul cel mai valoros
-al containerului — că migrările reconstruiesc baza de la zero — deci în CI variabila rămâne
-nesetată, și acolo se dă verdictul. Testele lasă în urmă rândurile lor, iar două presupun o bază
-goală și pică pe dev fără să fie stricate: „100 de alocări în paralel" (epuizează pool-ul către
-Supabase) și „metricile de integritate sunt zero" (dev are 10.000 de linii de cost).
-
-Pentru ce atinge R2 sau rețeaua nu există teste în CI, dinadins: se verifică prin harness-uri de
-smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bug-uri de mai sus.
-
-### Lucruri pe care le-am aflat greu și te scutesc de o zi
-
-- **Testele de bază de date rulează DOAR în CI.** Mașina n-are Docker. Consecința practică: scrii
-  testul, dai push, și afli abia acolo. La 02c′ un test de guard a picat în CI deși guard-ul
-  funcționa — pentru că `DrizzleQueryError` are ca mesaj doar „Failed query: …”. Folosește
-  `pgMessage(error)` din `tests/helpers.ts` (există în `packages/db` și, din 02c′, și în
-  `packages/services`), sau `sqlstate(error)`. **Nu potrivi pe `String(error)`.**
-- **Formularele pe `useActionState` au progressive enhancement** (React 19 emite `$ACTION_REF_1`,
-  `$ACTION_1:0`, `$ACTION_KEY` ca input-uri ascunse în HTML-ul randat pe server). Poți deci apela un
-  server action prin HTTP, fără browser: citești input-urile ascunse din `<form>`, le pui într-un
-  `FormData` împreună cu câmpurile reale și faci POST pe URL-ul paginii. Așa a fost testată limita
-  de login la 02c′. **E cea mai bună unealtă până apare Playwright.**
-- **Ecranele se verifică fără browser, cu un harness de 150 de linii.** Pornești `next dev`, fabrici cookie-ul de sesiune (mai jos), ceri paginile cu `fetch` și afirmi pe HTML-ul randat: „codul `L-000001` apare", „tab-ul Deviz NU apare pe inspecție", „cuvântul «Unitate de Lucru» nu apare nicăieri". Așa s-au bifat #11, #14 și #15 la 05c, 22 de verificări într-o rulare.
-  **Ce prinde**: rutare, drepturi, ce ajunge în DOM, texte interzise, redirecturi. **Ce nu prinde**: click, hover, focus, layout — alea rămân pentru Playwright (datoria #2). Un lucru la care să te aștepți: rolul `admin` cere al doilea factor, deci fără `MFA_ENFORCED=0` harness-ul primește 307 pe tot, iar simptomul arată exact ca „ecranul e stricat".
-- **Sesiunea se poate fabrica dintr-un script**: `POST /auth/v1/token?grant_type=password` la
-  Supabase, apoi cookie-ul `sb-<ref>-auth-token` = `base64-` + JSON-ul răspunsului, tăiat în bucăți
-  de 3180 de caractere dacă e lung. Cu el poți lovi orice rută ca orice persona.
-- **`getUser()` ≠ `getSession()` ≠ `mfa.listFactors()`.** Primul întreabă serverul Auth; celelalte
-  două citesc din cookie. Cookie-ul se scrie la login și nu se rescrie când se schimbă ceva la
-  utilizator — de aici un bug real la 02c′. **Unde iei o decizie, întreabă serverul.**
-- **`@damina/auth` NU se importă din middleware.** Bariera reexportă `@damina/db`, deci driverul de
-  Postgres, deci `node:fs`, care nu există pe Edge. Middleware-ul importă din **`@damina/auth/edge`**.
-  Dacă vezi „Reading from node:fs is not handled by plugins”, asta e.
-- **Rutele `/api` nu primesc redirect din middleware** pentru poarta de al doilea factor, dinadins:
-  un `fetch` urmează redirect-ul și încearcă să citească JSON dintr-o pagină HTML. Orice rută `/api`
-  nouă care are nevoie de drepturi își cheamă singură `can()` și `requireMfa()`.
-- **Admin API-ul GoTrue nu poate deconecta pe cineva după id.** Dacă vreun pas viitor cere asta,
-  răspunsul e `app.revoke_sessions()` din migrarea `0015`, nu Admin API.
-
-- **Harness-ul de smoke pe Supabase dev bate CI-ul ca viteză de învățare.** La 06a am dat push cu
-  două bug-uri de fixture și le-am aflat în CI, 6 minute mai târziu. La 06b am rulat întâi aceleași
-  scenarii printr-un script `tsx` peste use-case-urile reale, pe baza de dev: a prins ambele capcane
-  (o alocare scrisă direct într-o lună închisă; seria `NRA` lipsă) **înainte** de push, iar CI-ul a
-  ieșit verde din prima. Costul e ~80 de linii de script care se aruncă.
-- **`explain analyze` înainte de a adăuga un index, nu după.** Indexul de cursor din `0020` a apărut
-  dintr-o măsurătoare (`seq scan` + `top-N heapsort`, 5,35 ms la 10.000 de linii), nu dintr-o
-  presimțire. Aceeași măsurătoare a dat și cifra care justifică rollup-urile: 0,076 ms din rollup
-  față de 10–11 ms agregând registrul, la 5.000 de linii pe lună.
-- **Ecranele se pot verifica fără browser și fără sesiune Supabase**: pornești `next dev` cu
-  `ALLOW_DEV_SESSION=1` și `MFA_ENFORCED=0`, apoi ceri paginile cu `Invoke-WebRequest` și afirmi pe
-  HTML. Contextul de lună și de firmă se pune fabricând cookie-ul `damina_ctx` — e JSON simplu.
-  **Atenție la o capcană:** React sparge textul interpolat (`analitica: {x}`) cu comentarii HTML,
-  deci `Contains('analitica: folosit')` dă fals negativ. Caută bucăți care nu trec prin interpolare.
-- **`[module]/page.tsx` acceptă doar vederile DECLARATE** în `list.views`; una nedeclarată cade tăcut
-  pe vederea implicită. Așa a picat prima variantă de `?view=marja-neta`, și e garda bună — dar când
-  o vezi, semnul e „lipsește din `views`", nu „e stricat ecranul".
-
-- **O politică RLS care lipsește la SCRIERE nu dă eroare — atinge zero rânduri.** Asta a ținut
-  `complete` nefuncțional la 07b: `app.file_versions` avea `select` și `insert`, dar nu `update`, iar
-  fișierele rămâneau tăcut `uploading` cu tipul declarat de client. Un `insert` fără `update` pe
-  aceeași tabelă e aproape sigur o scăpare. `0023` se termină cu o plasă care verifică asta.
-- **`defineJob` rulează la ÎNCĂRCAREA modulului.** O validare care cade acolo nu strică un job, ci
-  întregul `import '@damina/jobs'` — deci worker-ul nu mai pornește deloc, iar simptomul nu seamănă
-  cu cauza. Merită ținut minte pentru orice validare pusă la nivel de modul.
-- **`next dev` nu e o măsurătoare.** La 300 de rânduri arăta 9 s; aceeași pagină, pe build de
-  producție, 2,2 s — din care 1,5 s e overheadul oricărei pagini (shell + drumurile la Supabase din
-  eu-west-1). Diferența e de zece ori, și e exact genul de cifră după care cineva rescrie un ecran
-  care nu avea nimic. **Dacă vrei o cifră de randare, fă build.**
-- **Într-o funcție „ensure", căutarea trebuie să compare EXACT valoarea pe care ar insera-o.**
-  `ensure_folder` inserează analitica moștenită din părinte (`coalesce(argument, părinte)`), dar
-  căuta după argument. Prima variantă a reparației din `0024` a picat imediat pe `Fișă`: se cheamă
-  cu `p_objective => null`, dar există în bază cu obiectivul moștenit. Cele două expresii trebuie
-  scrise o singură dată, în variabile, și folosite în amândouă locurile.
-- **Sesiunea de dezvoltare (`ALLOW_DEV_SESSION=1`) NU poate scrie fișiere.** `personId`-ul ei nu
-  există în `app.persons`, iar `nodes.created_by` are cheie străină — deci `presign` cade cu 500 și
-  `23503`. Ecranele se citesc cu ea, dar orice harness care **scrie** are nevoie de o sesiune
-  fabricată din grantul de parolă (rețeta e mai sus).
-- **ETag-ul unei părți e vizibil în browser doar dacă bucket-ul îl expune** (`ExposeHeaders: ETag`).
-  Din Node nu se vede problema — CORS nu se aplică acolo — deci uploadul poate arăta perfect în
-  harness și să se oprească la prima parte în browser. Clientul spune exact asta când se întâmplă.
-- **Un pachet pe care nimic din CI nu-l importă nu e testat, oricâte teste ar avea repo-ul.**
-  `@damina/jobs` arunca la import de la pasul 04 și s-a aflat abia la 07b, când `files.ts` l-a adus
-  în lanțul serviciilor.
-- **În `sql` de la drizzle, o listă JS devine `(a, b, c)`, nu un array Postgres.** Deci `= any(${ids})`
-  dă `cannot cast type record to uuid[]`; forma corectă e `in ${ids}`. Cu `${ids}::uuid[]` doar muți
-  eroarea, n-o repari.
-- **Verificările de scară se scriu ca invariant, nu ca cronometru.** Mutarea unui folder cu 1.000 de
-  fișiere se testează prin „un singur rând atins", nu prin milisecunde: pe un container în CI, cifra
-  n-ar însemna nimic, dar invariantul cade dacă cineva rescrie mutarea ca parcurgere de subarbore.
-- **Un eșec de decodare e permanent, unul de rețea e trecător.** În `files.derive`, `catch`-ul e
-  strâns exact în jurul apelului `sharp`: citirea din R2 și scrierea în bază rămân în afara lui,
-  fiindcă alea chiar merită reîncercate. Fără separarea asta, o poză stricată se reia de trei ori.
-
-### Reguli ale casei care nu se negociază
-
-- **Un modul nou = o intrare în `entityRegistry`**, nu fișiere de pagină. Lista și detaliul sunt
-  două pagini fractale pentru tot ERP-ul. Vezi `docs/entity-registry.md`.
-- **RLS e primul strat, guard-urile din `packages/auth` al doilea.** Guard-urile dau erori bune
-  (403 cu mesaj în română), nu apără. Adevărul despre ce rânduri și ce coloane ies din bază e în
-  politici și în grant-urile pe coloană.
-- **Nimic din dashboard.** Politici, grant-uri, coloane — totul în migrări versionate. Singura
-  excepție cunoscută e activarea hook-ului de token, care nu se poate versiona; de-aia e scrisă în
-  tabelul de mai sus.
-- **Codurile `AppError` sunt exact acestea:** `PERIOD_CLOSED`, `PRICE_FORBIDDEN`,
-  `AUTHORIZATION_EXPIRED`, `QUANTITY_EXCEEDS_CONTRACT`, `VALIDATION_FAILED`, `NOT_FOUND`,
-  `FORBIDDEN`, `CONFLICT`. Nu inventa altele — nu există `INTERNAL` sau `CONFIG_MISSING`.
-- **Comentariile din cod se scriu fără diacritice; textul de pe ecran, cu diacritice.**
-- **Există un agent de design** și utilizatorul a cerut explicit să fie folosit pentru ecrane.
-- **`MFA_ENFORCED=0` e o poartă oprită, nu un drept dat.** Nu construi nimic pe el: niciun cod nu trebuie să întrebe „e MFA oprit?" ca să decidă altceva decât banda de avertizare. Dacă un ecran începe să se comporte diferit după comutator, comutatorul a devenit o a doua configurație de securitate — exact ce nu trebuie.
-- **Un rând de checklist care nu poate cădea niciodată nu se pune pe ecran.** La 06b am scris o
-  verificare de închidere pe care `check`-ul din 0017 o face imposibilă; am aruncat-o. Oamenii învață
-  repede să nu mai citească rândurile care sunt mereu verzi, și atunci nu le mai citesc nici pe cele
-  care contează. Verificarea a rămas ca metrică de integritate, unde e la locul ei.
-- **Eticheta de analitică de pe un ecran cu bani se verifică odată cu cifra.** La 06c, Contract ›
-  Prezentare scria „folosit" peste niște cifre care sunt pe „descărcat". O etichetă greșită e mai rea
-  decât una lipsă: se citește ca fiind verificată.
-- **Tipul unui fișier se decide din conținut, nu din extensie și nu din ce declară browserul.**
-  `sniffMime` din `@damina/shared` e listă **albă**: ce nu e recunoscut se respinge. O listă neagră
-  se ocolește cu următorul format inventat.
-- **Antetele cu care se servește un fișier vin DIN BAZĂ**, acoperite de semnătura URL-ului. Un HTML
-  urcat ca „aviz.pdf" nu trebuie să poată fi servit ca HTML, oricât ar insista clientul.
-- **Coloanele derivate nu sunt evenimente de audit.** `audit.record_change` scoate `root_node_id` din
-  diferență înainte de verificarea „un UPDATE care nu schimbă nimic". Un jurnal în care jumătate din
-  intrări sunt scrise de sistem devine un jurnal pe care nu-l mai citește nimeni.
-- **Rulează smoke-ul pe dev înainte de push, nu CI-ul după.** La 06a și 07a am aflat greșeli în CI;
-  la 06b și 07b le-am prins înainte, cu ~100 de linii de script aruncabil, iar CI-ul a ieșit verde
-  din prima. Costul e mic, câștigul e de șase minute per greșeală.
-- Înainte de commit: `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets`.
-  Ultimul cere un build proaspăt, iar build-ul cade dacă un `next dev` ține `.next` ocupat — oprește
-  serverele de dezvoltare înainte.
 
 ---
 
@@ -1084,10 +1160,9 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 | 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
 | 07 — File management (R2) | 🟩 **gata** (07a–07c-2; 20/21 — #7 cere Playwright pentru întreruperea reală de rețea) | 2026-08-18 |
-| 08 — Cereri, rutare, backlog | 🟨 în lucru (08a + 08b gata: schemă, domain, servicii, ecrane; **08c** email+cronuri neatins) | 2026-08-18 |
-| 10 — Teren offline și raport lunar | 🟨 în lucru (**10a** sincronizarea și **10b** PWA-ul offline: gata; 10c–10e: neatinse) | 2026-08-18 |
-| 09 — Fișe de lucru | ✅ gata (09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon · 09b-4 acoperire, istoric, validare în masă, seed) | 2026-08-18 |
-| 10 — Teren offline, raport lunar | ⬜ neînceput | — |
+| 08 — Cereri, rutare, backlog | 🟨 în lucru (08a + 08b gata; **08c SĂRIT dinadins** — decizia utilizatorului) | 2026-08-18 |
+| 09 — Fișe de lucru | 🟩 **gata** (09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon · 09b-4 acoperire, istoric, validare în masă, seed; 24/24) | 2026-08-18 |
+| 10 — Teren offline, raport lunar | 🟨 în lucru (**10a** sincronizarea și **10b** PWA-ul offline: gata; **10c** ecranele, **10d** raportul, **10e** panoul PM: neatinse) | 2026-08-18 |
 
 Legendă: ⬜ neînceput · 🟨 în lucru · 🟩 gata (toate verificările din pas trec) · 🟥 blocat
 
