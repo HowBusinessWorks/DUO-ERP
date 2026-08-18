@@ -11,12 +11,15 @@
     "ping": "tsx scripts/ping.ts"
   },
   "dependencies": {
+    "@damina/contracts": "workspace:*",
     "@damina/db": "workspace:*",
     "@damina/jobs": "workspace:*",
     "@damina/services": "workspace:*",
     "@damina/shared": "workspace:*",
     "@damina/storage": "workspace:*",
-    "pg-boss": "^10.3.2"
+    "exifr": "^7.1.3",
+    "pg-boss": "^10.3.2",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@damina/tsconfig": "workspace:*",

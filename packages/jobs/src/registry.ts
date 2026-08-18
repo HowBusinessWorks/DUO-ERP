@@ -31,7 +31,17 @@ export function defineJob<TPayload>(
       >
     >,
 ): JobDefinition<TPayload> {
-  if (!/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$/.test(definition.name)) {
+  /*
+   * `domeniu.actiune`, cu actiunea eventual in camelCase — `contracts.expiryScan`.
+   *
+   * Verificarea a fost pana la 07b `[a-z0-9]` pe fiecare segment, deci respingea
+   * exact doua din cozile definite mai jos, adaugate la pasul 04. Fiindca
+   * `defineJob` ruleaza la INCARCAREA modulului, `import '@damina/jobs'` arunca
+   * — adica worker-ul nu mai pornea deloc. N-a observat nimeni pentru ca nimic
+   * din ce ruleaza in CI nu importa pachetul; s-a vazut abia cand `files.ts` l-a
+   * adus in lantul de import al serviciilor.
+   */
+  if (!/^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$/.test(definition.name)) {
     throw new Error(
       `Nume de coada invalid: "${definition.name}". Format asteptat: "domeniu.actiune".`,
     );
@@ -111,8 +121,47 @@ export const rollupVerify = defineJob({
   singletonKey: (payload) => payload.periodId ?? payload.on ?? new Date().toISOString().slice(0, 10),
 });
 
+/*
+ * Prelucrarea unui fisier proaspat urcat: EXIF, geotag, miniaturi (pasul 07).
+ *
+ * Coada cu cel mai mare debit din ERP — mii de poze de teren lunar. De aceea are
+ * `singletonKey` pe versiune: un retry, sau doua apeluri de `complete` pentru
+ * acelasi upload, nu produc doua seturi de miniaturi.
+ */
+export const filesDerive = defineJob({
+  name: 'files.derive',
+  schema: z.object({ versionId: z.string().uuid() }),
+  retryLimit: 3,
+  retryDelaySeconds: 30,
+  expireInSeconds: 10 * 60,
+  singletonKey: (payload) => payload.versionId,
+});
+
+/**
+ * Curatenia nocturna: uploaduri abandonate, parti multipart orfane, noduri din
+ * cosul golit acum peste 30 de zile.
+ *
+ * Nu e o comoditate, e o factura: partile multipart neterminate se platesc lunar
+ * pana cand le sterge cineva.
+ */
+export const filesCleanup = defineJob({
+  name: 'files.cleanup',
+  schema: z.object({ on: z.string().optional() }),
+  retryLimit: 2,
+  retryDelaySeconds: 600,
+  expireInSeconds: 30 * 60,
+  singletonKey: (payload) => payload.on ?? new Date().toISOString().slice(0, 10),
+});
+
 /** Toate cozile cunoscute. Worker-ul le creeaza pe toate la pornire. */
-export const ALL_JOBS = [systemPing, contractExpiryScan, deltaFillScan, rollupVerify] as const;
+export const ALL_JOBS = [
+  systemPing,
+  contractExpiryScan,
+  deltaFillScan,
+  rollupVerify,
+  filesDerive,
+  filesCleanup,
+] as const;
 
 /**
  * Cozile care ruleaza pe ceas, cu expresia lor cron. Fusul e cel al aplicatiei
@@ -138,6 +187,11 @@ export const SCHEDULED_JOBS: readonly {
     name: rollupVerify.name,
     cron: '0 2 * * *',
     why: 'Nocturn la 02:00, cand registrul sta linistit. O divergenta se afla a doua zi, nu peste o luna.',
+  },
+  {
+    name: filesCleanup.name,
+    cron: '30 3 * * *',
+    why: 'Nocturn la 03:30, dupa verificarea de rollup-uri. Partile multipart orfane se platesc lunar.',
   },
 ];
 

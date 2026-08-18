@@ -42,3 +42,39 @@ Evenimentul care declanșează construcția e un trigger `after insert` pe entit
 | subcontractant | **doar** `app.node_shares`, explicit. Nu moștenește nimic |
 
 Partajarea se moștenește în jos: pusă pe un folder, acoperă tot subarborele.
+
+## Upload și descărcare
+
+Serverul nu vede niciodată byte-ii.
+
+```
+client → POST /api/files/presign  { parentId, filename, size, checksum? }
+       ← uploadId + un URL presemnat PER PARTE (8 MB), valabile 15 minute
+client → PUT direct în R2, parte cu parte, retry PER PARTE
+client → POST /api/files/complete { versionId, parts[] }
+server → CompleteMultipartUpload, apoi verifică:
+           ContentLength real · magic bytes · sumă de control
+       → state='ready', enqueue files.derive
+```
+
+Până la `complete`, fișierul există în R2 dar nu e vizibil nicăieri: nodul n-are
+`current_version_id`, iar versiunea e `uploading`. Ce cade la o verificare nu
+rămâne pe jumătate — blobul se șterge, versiunea trece în `failed`.
+
+**Descărcarea** trece prin `/api/files/[versionId]`: verifică dreptul, emite un
+URL semnat de 60 s, redirect 302. `Content-Type` și `Content-Disposition` vin din
+baza de date și sunt acoperite de semnătură — un HTML urcat ca „aviz.pdf" nu se
+poate servi ca HTML. Miniaturile au ruta lor, cu `inline` și TTL de 15 minute.
+
+**Un fișier cu același nume** în același folder nu e conflict, e o versiune nouă
+a aceluiași nod.
+
+## Ce face worker-ul
+
+`files.derive`, la fiecare `complete`: EXIF (dată, GPS, aparat) și trei
+miniaturi WebP — 160, 480, 1200 px. Coordonatele trimise de aparat
+(`geo_source='device'`) **nu** se suprascriu cu cele din EXIF: cea culeasă la
+fața locului cântărește mai mult decât una scoasă dintr-un fișier editabil.
+
+`files.cleanup`, nocturn: uploaduri abandonate de peste 24 h, părți multipart
+orfane (se plătesc lunar), și nodurile din coșul golit acum peste 30 de zile.

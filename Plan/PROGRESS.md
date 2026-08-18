@@ -175,7 +175,7 @@ deschise**.
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
-| 07 — File management (R2) | 🟨 în lucru (07a gata: schema + arborele automat) | 2026-08-18 |
+| 07 — File management (R2) | 🟨 în lucru (07a + 07b gata; rămân ecranele din 07c) | 2026-08-18 |
 | 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
 | 09 — Fișe de lucru | ⬜ neînceput | — |
 | 10 — Teren offline, raport lunar | ⬜ neînceput | — |
@@ -1919,6 +1919,85 @@ regula 8 (finanțarea nu atinge arborele) și guard-ul de ciclu, care nu erau pe
 listă. Restul așteaptă 07b (upload/download, worker) și 07c (ecrane).
 
 **Suite:** 162 de teste de bază de date (146 + 16), 92 de servicii.
+
+---
+
+### 2026-08-18 — [status: gata] — 07b, uploadul, descărcarea și worker-ul
+
+**Ce a intrat**
+
+- `packages/services/src/files.ts` — presign, complete, download, miniaturi,
+  organizare (creare / redenumire / mutare / coș / restaurare), partajare,
+  curățenie.
+- Rutele `/api/files/presign`, `/api/files/complete`, `/api/files/[versionId]`
+  și `/api/files/[versionId]/thumb/[variant]`.
+- Cozile `files.derive` (EXIF + 3 miniaturi WebP) și `files.cleanup` (nocturn,
+  03:30), cu handler în worker.
+- `packages/shared/src/magic.ts` — recunoașterea tipului din conținut, scrisă de
+  mână, fără dependență. Listă **albă**: ce nu e recunoscut e respins.
+- Dependențe noi, doar în worker: `sharp` și `exifr`.
+- Drepturile `files.read` / `files.write` / `files.share`.
+- Migrările `0022_jobs_schema_usage` și `0023_file_write_policies` — amândouă
+  repară bug-uri, vezi mai jos.
+
+**Trei bug-uri vii, găsite de smoke, niciunul introdus de 07b**
+
+1. **`@damina/jobs` arunca la import.** Verificarea numelui de coadă din
+   `defineJob` cerea segmente `[a-z0-9]`, dar două cozi din pasul 04 se cheamă
+   `contracts.expiryScan` și `contracts.deltaFillScan`. Cum `defineJob` rulează
+   la încărcarea modulului, **worker-ul nu mai pornea deloc**. Nu observase
+   nimeni pentru că nimic din ce rulează în CI nu importa pachetul; s-a văzut
+   când `files.ts` l-a adus în lanțul de import al serviciilor.
+2. **Enqueue-ul din aplicație n-a funcționat niciodată.**
+   `jobs.grant_queue_access()` dădea drepturi pe tabelele din schema `jobs`, dar
+   niciodată `usage` pe schema însăși — deci orice `enqueue` făcut de un rol de
+   aplicație cădea cu „permission denied for schema jobs". Toate cozile de până
+   acum porneau din cron, din worker, care rulează cu rolul proprietar;
+   `files.derive` e prima pusă la coadă **din cererea unui om**.
+3. **`complete` nu-și putea termina treaba.** Migrarea 0021 dăduse pe
+   `app.file_versions` politici de `select` și `insert`, dar niciuna de
+   `update`. Cu `force row level security`, un `update` fără politică nu dă
+   eroare: **atinge zero rânduri**. Fișierul rămânea la nesfârșit `uploading`,
+   cu tipul și mărimea declarate de client — exact cele două valori pe care
+   pasul se laudă că nu le crede. `0023` adaugă politicile și, la final, o plasă
+   care refuză migrarea dacă vreo tabelă de fișiere rămâne fără politică de
+   scriere pentru birou.
+
+**Ce a mai ieșit la iveală**
+
+- `cleanupFiles` folosea `= any(${array})`; în `sql` de la drizzle o listă JS
+  devine `(a, b, c)`, nu un array — deci `cannot cast type record to uuid[]`.
+- Curățenia trebuie chemată cu actorul de **serviciu**: `delete` pe `app.nodes`
+  nu e acordat nimănui altcuiva. Din interfață, ștergerea e `deleted_at`.
+- O imagine pe care decodorul n-o poate citi e un eșec **permanent**: `catch`-ul
+  e strâns exact în jurul apelului `sharp`, ca citirea din R2 și scrierea în bază
+  — singurele care merită reîncercate — să rămână în afara lui.
+
+**Cum a fost verificat**
+
+Două harness-uri pe mediul de dezvoltare, cu **bucket R2 real**:
+
+- 18 verificări pe upload/download — multipart, tip real vs declarat, mărime
+  reală vs declarată, HTML redenumit `.pdf`, sumă de control greșită, TTL de
+  60 s, `Content-Type` și `Content-Disposition` din bază, numele eliberat la
+  ștergere.
+- 8 verificări pe worker, cu o poză reală generată cu EXIF: cele trei miniaturi,
+  data capturii, coordonatele (44.425, 26.103 — București) cu `geo_source='exif'`,
+  aparatul în `exif jsonb`, miniatura descărcată și confirmată WebP.
+
+În CI rămân testele care **nu** ating rețeaua: 6 unitare pe magic bytes și 10 de
+servicii pe arbore, coș, partajare și curățenie. Printre ele, verificarea #6 —
+mutarea unui folder cu 1.000 de fișiere — scrisă nu ca măsurătoare de timp (pe un
+container n-ar însemna nimic), ci ca **un singur rând atins**. Dacă cineva
+rescrie vreodată mutarea ca parcurgere de subarbore, testul cade indiferent de
+cât de rapidă e mașina.
+
+**Verificări din pasul 07 acoperite aici:** 6, 7 (parțial — reluarea per parte e
+proiectată și presemnată, dar întreruperea reală de rețea cere clientul din 07c),
+8, 9, 10, 11, 12, 13, 17, 18. Rămân pentru 07c: 19, 20 și #21 (uploadul din
+teren, care cere ecranul).
+
+**Suite:** 162 de bază de date, 102 de servicii (92 + 10), plus 6 unitare noi.
 
 ---
 

@@ -31,6 +31,12 @@ export const CAPABILITIES = [
   /** Lei, marje, indexari — orice cifra comerciala. */
   'financials.read',
   'periods.close',
+  /** Arborele de fisiere: deschide, descarca. */
+  'files.read',
+  /** Urca, redenumeste, muta, sterge in cos. */
+  'files.write',
+  /** Partajeaza explicit un nod — singura cale prin care vede un subcontractant. */
+  'files.share',
   'audit.read',
   'admin.users',
 ] as const;
@@ -126,6 +132,31 @@ export const PERMISSION_MATRIX: readonly CapabilitySpec[] = [
     label: 'Închide și redeschide luna',
     personas: OFFICE_ONLY,
     officeRoles: ['admin', 'financiar'],
+  },
+  {
+    key: 'files.read',
+    group: 'Fișiere',
+    label: 'Deschide arborele de fișiere și descarcă',
+    // Si subcontractantul: fara dreptul asta n-ar putea deschide nici pachetul
+    // care i s-a partajat explicit. CE vede ramane treaba RLS-ului, nu a listei.
+    personas: ['office', 'field', 'subcontractor'],
+    officeRoles: ALL_OFFICE,
+  },
+  {
+    key: 'files.write',
+    group: 'Fișiere',
+    label: 'Încarcă fișiere, creează și organizează foldere',
+    personas: ['office', 'field', 'subcontractor'],
+    officeRoles: ALL_OFFICE,
+  },
+  {
+    key: 'files.share',
+    group: 'Fișiere',
+    label: 'Partajează foldere cu subcontractanți',
+    // Doar biroul: partajarea e cea care sparge izolarea A-vs-B, deci nu se da
+    // din teren si cu atat mai putin de catre cel care o primeste.
+    personas: OFFICE_ONLY,
+    officeRoles: ['admin', 'pm', 'achizitii'],
   },
   {
     key: 'audit.read',

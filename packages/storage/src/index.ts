@@ -6,6 +6,7 @@ import {
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
+  PutObjectCommand,
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -111,6 +112,20 @@ export async function abortMultipart(upload: MultipartUpload): Promise<void> {
   );
 }
 
+export interface PresignGetOptions {
+  readonly ttlSeconds?: number;
+  /**
+   * Antetele cu care R2 va servi obiectul. Se dau DIN BAZA, niciodata din
+   * request: un HTML urcat ca „aviz" si servit cu `text/html` ruleaza
+   * JavaScript pe domeniul aplicatiei, cu sesiunea utilizatorului in el.
+   * Semnatura le acopera, deci nici clientul nu le poate schimba pe drum.
+   */
+  readonly contentType?: string;
+  readonly downloadName?: string;
+  /** `inline` doar pentru miniaturi si previzualizari, unde e si scopul. */
+  readonly disposition?: 'attachment' | 'inline';
+}
+
 /**
  * URL presemnat de citire, cu TTL scurt.
  *
@@ -120,11 +135,67 @@ export async function abortMultipart(upload: MultipartUpload): Promise<void> {
 export async function presignGet(
   target: BucketName,
   key: string,
-  ttlSeconds = DOWNLOAD_TTL_SECONDS,
+  options: PresignGetOptions = {},
 ): Promise<string> {
-  return getSignedUrl(r2(), new GetObjectCommand({ Bucket: bucket(target), Key: key }), {
-    expiresIn: ttlSeconds,
-  });
+  const disposition = options.disposition ?? 'attachment';
+  // Numele de fisier din antet trece prin RFC 5987: diacriticele romanesti nu
+  // sunt ASCII, iar un antet cu octeti bruti e respins de unele proxy-uri.
+  const filename =
+    options.downloadName === undefined
+      ? undefined
+      : `${disposition}; filename*=UTF-8''${encodeURIComponent(options.downloadName)}`;
+
+  return getSignedUrl(
+    r2(),
+    new GetObjectCommand({
+      Bucket: bucket(target),
+      Key: key,
+      ...(options.contentType === undefined ? {} : { ResponseContentType: options.contentType }),
+      ...(filename === undefined
+        ? { ResponseContentDisposition: disposition }
+        : { ResponseContentDisposition: filename }),
+    }),
+    { expiresIn: options.ttlSeconds ?? DOWNLOAD_TTL_SECONDS },
+  );
+}
+
+/**
+ * Citeste octeti din obiect, optional doar primii `length`.
+ *
+ * Cu `length` mic e cum verificam magic bytes la `complete` fara sa aducem
+ * fisierul: 64 de octeti dintr-un video de 500 MB, printr-un `Range`. Fara
+ * `length`, aduce tot — asa lucreaza worker-ul cu pozele.
+ */
+export async function getObjectBytes(
+  target: BucketName,
+  key: string,
+  length?: number,
+): Promise<Buffer> {
+  const response = await r2().send(
+    new GetObjectCommand({
+      Bucket: bucket(target),
+      Key: key,
+      ...(length === undefined ? {} : { Range: `bytes=0-${String(length - 1)}` }),
+    }),
+  );
+
+  const body = response.Body;
+  if (body === undefined) {
+    throw new Error(`Obiectul ${key} n-are continut.`);
+  }
+  return Buffer.from(await body.transformToByteArray());
+}
+
+/** Urca un obiect mic dintr-un buffer. Pentru miniaturile produse de worker. */
+export async function putObject(
+  target: BucketName,
+  key: string,
+  body: Buffer,
+  contentType: string,
+): Promise<void> {
+  await r2().send(
+    new PutObjectCommand({ Bucket: bucket(target), Key: key, Body: body, ContentType: contentType }),
+  );
 }
 
 export async function deleteObject(target: BucketName, key: string): Promise<void> {

@@ -241,3 +241,38 @@ export type {
   CloseCheckStatus,
   PeriodCloseState,
 } from './period-close';
+
+export {
+  applyExif,
+  breadcrumb,
+  cleanupFiles,
+  completeUpload,
+  createFolder,
+  deriveSource,
+  downloadUrl,
+  folderForEntity,
+  listChildren,
+  listShares,
+  listTrash,
+  listVersions,
+  moveNode,
+  presignUpload,
+  recordDerivedAsset,
+  renameNode,
+  restoreNode,
+  shareNode,
+  thumbnailUrl,
+  trashNode,
+  unshareNode,
+} from './files';
+export type {
+  CleanupReport,
+  CompletedUpload,
+  Crumb,
+  DeriveSource,
+  DownloadTarget,
+  ExifFacts,
+  NodeRow,
+  PresignedUpload,
+  VersionRow,
+} from './files';

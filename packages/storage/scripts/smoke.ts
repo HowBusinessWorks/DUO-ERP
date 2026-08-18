@@ -82,7 +82,7 @@ async function main(): Promise<void> {
     await completeMultipart(upload, completed);
     process.stdout.write('Upload finalizat.\n');
 
-    const downloadUrl = await presignGet('tmp', key, 120);
+    const downloadUrl = await presignGet('tmp', key, { ttlSeconds: 120 });
     const response = await fetch(downloadUrl);
     if (!response.ok) {
       throw new Error(`Download-ul a intors ${response.status}`);

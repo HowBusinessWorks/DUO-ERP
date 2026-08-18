@@ -3,6 +3,8 @@ export {
   contractExpiryScan,
   defineJob,
   deltaFillScan,
+  filesCleanup,
+  filesDerive,
   rollupVerify,
   SCHEDULED_JOBS,
   systemPing,
