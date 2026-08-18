@@ -95,12 +95,41 @@ operațiuni) **sunt gata**. Rămâne **08c — inbox de email + cronuri** (IMAP,
 
 ### Ce urmează concret — 08c
 
-§3.4 și §3.6 din `Plan/08_Cereri_Rutare_Backlog.md`. Coada `mail.ingest` (IMAP polling la 5 minute,
-dedup pe `Message-ID`, `.eml` permanent în R2, atașamentele ca `file_versions`), cronul zilnic de
-09:00 (filtrul de 24h), cronul de pe 10 și 20 (alerta de umplere a Deltei, **cu link direct în
-backlog filtrat pe contract**), și `expireBacklogProposals` — funcția există în `requests.ts` de la
-08a, dar **niciun job n-o cheamă încă**. Tot acolo intră coloana `request_id` pe `app.nodes` și rolul
-`request` în `node_role`, ca dosarul cererii să existe.
+§3.4 și §3.6 din `Plan/08_Cereri_Rutare_Backlog.md`.
+
+**Recunoaștere făcută la finalul lui 08b — citește-o înainte să estimezi.** Pasul e mai mic decât
+pare: infrastructura de cozi și cronuri există din 04 și 07, iar două din cele patru cronuri cerute
+de §3.6 rulează deja. Ce rămâne, în ordinea greutății:
+
+| De făcut | Stare acum | Efort |
+|---|---|---|
+| **Coada `mail.ingest`** — IMAP polling la 5 min, dedup pe `Message-ID`, `.eml` în R2, atașamente ca `file_versions` | **nimic**; cere dependențe noi în `apps/worker` (client IMAP + parser de mesaj) | mare — e ~80% din pas |
+| **Credențialele cutiei, per firmă, în Supabase Vault** | **nimic**; nu există tabelă de conturi de email și nici vreo folosire de Vault în repo | mediu, și e o **decizie de arhitectură** (întreabă utilizatorul) |
+| **`request_id` pe `app.nodes` + rolul `request` în `node_role`** + folderul cererii în `ensure_folder` | **nimic**; migrare nouă, pe tiparul din `0021_files.sql` | mic-mediu |
+| **Filtrul de 24h** (cron zilnic 09:00) | **nimic** | mic ca *cod*, dar **regula nu e specificată** — vezi mai jos |
+| **Expirarea propunerilor** (`valid_until` trecut → `expired`) | `expireBacklogProposals(tx, asOf)` există în `requests.ts` de la 08a, **niciun job n-o cheamă** | foarte mic — o coadă în `packages/jobs/src/registry.ts`, un handler, o linie în `SCHEDULED_JOBS` |
+| **Alerta de Deltă pe 10 și 20** (verificarea #18) | **rulează deja** din pasul 04: coada `contracts.deltaFillScan`, cron `0 9 10,20 * *`, handler în `apps/worker/src/handlers/contract-alerts.ts`, dedup prin `raiseAlert` | foarte mic — vezi mai jos |
+
+Trei lucruri concrete de știut:
+
+- **#18 e aproape gata.** Singurul lucru care lipsește e linkul: `scanDeltaFill` din
+  `packages/services/src/contract-alerts.ts` pune `href: '/contracte/{id}'`, iar planul cere **link
+  direct în backlog filtrat pe contract**. Ecranul de backlog din 08b ține contractul în starea
+  componentei, nu în URL (`renderView` nu primește `searchParams`) — deci ori se schimbă `href`-ul în
+  `/cereri?view=backlog&contract={id}` **și** `BacklogFill` citește parametrul, ori se mută selecția
+  de contract în URL. A doua variantă e mai curată și e o schimbare de vreo 20 de linii.
+- **Filtrul de 24h nu e specificat nicăieri.** §3.6 spune doar „cererile nedecise curg automat mai
+  departe, conform regulii lor". Trimiterea din §1 e la `Initial_Context/DaminaStructuraCapCoada
+  FInal.md` §13.2, dar acolo filtrul de 24h e despre **magazie și achiziții** (Canal C), nu despre
+  cereri — deci nu se poate transpune direct. **Întreabă utilizatorul ce înseamnă „curg mai departe"**
+  pentru o cerere nedecisă: alertă către PM? trecere automată în backlog? escaladare? Nu ghici — e o
+  regulă de business, nu un detaliu de implementare.
+- **`putObject` există deja** în `@damina/storage`, deci `.eml`-ul integral se scrie din worker fără
+  nimic nou. Atașamentele au nevoie de drumul complet de fișiere (`completeUpload` + `files.derive`),
+  care e tot gata din 07.
+
+Ordinea recomandată: migrarea (`request_id` pe noduri) → `mail.ingest` → Vault → cronurile mici
+(expirare, 24h) → linkul din #18. Primele două merită o sesiune proprie; restul încap împreună.
 
 ### Ce a intrat la 08a
 
