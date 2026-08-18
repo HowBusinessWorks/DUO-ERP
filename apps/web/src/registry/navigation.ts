@@ -147,14 +147,22 @@ export const NAVIGATION: readonly NavItem[] = [
     label: 'Aprovizionare',
     icon: 'truck',
     group: 'operational',
-    phase: 3,
+    // Construit la 09b-3, dar numai minimul fazei 1: stoc, gestiuni, bonuri de
+    // consum. Celelalte vederi raman in meniu si spun din ce faza vin.
+    phase: 0,
     queueKinds: ['necesar_de_procesat', 'receptie_de_facut'],
-    usesPeriod: true,
+    // Stocul e un SOLD, nu un flux de luna: nu se schimba cand comuti luna.
+    usesPeriod: false,
     children: [
+      { slug: '', label: 'Tot stocul' },
+      { slug: 'echipa', label: 'Gestiuni de echipă' },
+      { slug: 'magazie', label: 'Magazii' },
+      { slug: 'santier', label: 'Șantiere' },
+      { slug: 'gestiuni', label: 'Gestiuni' },
+      { slug: 'bonuri', label: 'Bonuri de consum' },
       { slug: 'necesare', label: 'Necesare de material' },
       { slug: 'comenzi', label: 'Comenzi (PO)' },
       { slug: 'receptii', label: 'Recepții' },
-      { slug: 'stoc', label: 'Stoc și gestiuni' },
       { slug: 'transferuri', label: 'Transferuri și retururi' },
       { slug: 'inventare', label: 'Inventare' },
       { slug: 'rezervari', label: 'Rezervări' },

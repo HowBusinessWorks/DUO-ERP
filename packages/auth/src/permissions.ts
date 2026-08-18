@@ -335,6 +335,21 @@ export function canValidateSheets(session: Session): boolean {
   return can(session, 'sheets.validate');
 }
 
+/** Poate vedea stocul si gestiunile? Si terenul poate — cantitatile, nu CMP-ul. */
+export function canReadInventory(session: Session): boolean {
+  return can(session, 'inventory.read');
+}
+
+/**
+ * Poate crea gestiuni si emite bonuri de consum?
+ *
+ * Bonul transforma un material in cheltuiala, deci e mai greu decat „vede
+ * stocul" — si mai usor decat validarea unei fise, care mai si inchide luna.
+ */
+export function canWriteInventory(session: Session): boolean {
+  return can(session, 'inventory.write');
+}
+
 /** Ce vede si ce NU vede rolul curent. Ecranul de administrare cere ambele liste. */
 export function capabilitiesOf(session: Session): {
   readonly granted: readonly CapabilitySpec[];

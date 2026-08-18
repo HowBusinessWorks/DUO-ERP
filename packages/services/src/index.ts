@@ -394,7 +394,10 @@ export type {
   ValidateTimesheetsResult,
 } from './timesheets';
 
+export { INVENTORY_ALERT_KINDS, verifyStockJob } from './inventory-integrity';
+
 export {
+  consumptionAnalyticsFor,
   createConsumptionNote,
   createLocation,
   issueConsumptionNoteTx,
@@ -406,6 +409,7 @@ export {
   verifyStockBalances,
 } from './inventory';
 export type {
+  ConsumptionAnalytics,
   ConsumptionNoteRow,
   IssuedConsumptionNote,
   ListStockOptions,

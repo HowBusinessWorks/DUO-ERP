@@ -5,6 +5,7 @@ export {
   deltaFillScan,
   filesCleanup,
   filesDerive,
+  inventoryVerifyStock,
   requestsExpireBacklog,
   rollupVerify,
   SCHEDULED_JOBS,

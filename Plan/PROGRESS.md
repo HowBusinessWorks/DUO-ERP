@@ -23,8 +23,10 @@ dinadins** (vezi secțiunea lui mai jos). Pasul **09** e tăiat în trei, nu în
 - **09a — fundația** (schemă, triggere, domain pur, servicii): GATA.
 - **09b-1 — fișa de INSPECȚIE** (creare de la obiectiv, tab-urile Fișă și Constatări): GATA.
 - **09b-2 — fișa de INTERVENȚIE** (Fișă, Materiale, Ore, bara așteptat vs real): GATA.
-- **09b-3 — pontaj, stoc și gestiuni, bon de consum**, apoi validarea de birou în masă,
-  acoperirea inspecțiilor, istoricul obiectivului, jobul nocturn de stoc și seed-ul de „gata":
+- **09b-3 — pontaj, stoc și gestiuni, bon de consum, jobul nocturn de stoc**: GATA.
+- **09b-4 — ce a rămas din pas**: acoperirea inspecțiilor pe date reale, Obiectiv › Istoric,
+  ecranul „realizat vs estimat pe echipe" din catalogul de operațiuni, și seed-ul de „gata"
+  (2 checklist-uri, 8 inspecții, 3 intervenții, o săptămână de pontaje, o gestiune cu stoc):
   **următorul lucru.**
 
 Tăierea în bucăți mai mici a fost cerută explicit de utilizator, ca o sesiune să nu se termine
@@ -37,15 +39,85 @@ care regula asta a plătit: la 09b-1 a scos patru defecte din 09a, la 09b-2 înc
 tăcute, niciunul prins de typecheck sau de testele existente. Harness-ul se scrie în
 `packages/services/scripts/`, se rulează cu `pnpm exec tsx`, și se **șterge** după.
 
-**Pentru 09b-3, cele două capcane deja cunoscute:**
+**Pentru 09b-4, cele două capcane deja cunoscute:**
 
 1. **Drizzle numește TOATE coloanele într-un `insert`**, punând `default` pe cele nedate. Deci un
    `grant insert (coloane)` nu poate fi satisfăcut niciodată prin drizzle dacă lista exclude ceva.
-   `intervention_materials` a cerut un `insert` scris de mână (vezi 09b-2). `timesheet_lines` are
-   aceeași formă de grant — verifică-l din rolul de teren înainte să construiești pontajul.
+   `intervention_materials` și `timesheet_lines` au cerut amândouă un `insert` scris de mână.
+   Dacă atingi altă tabelă cu grant pe coloane, cheam-o din rolul de teren înainte de ecran.
 2. **Extensiile 1:1 pe `work_units` se nasc din trigger**, nu din serviciu (0028). Dacă adaugi
    alta, urmează tiparul: `after insert … when (new.type = …)`, `on conflict do nothing`, backfill
    cu același cod, plasă la final.
+
+---
+
+## 09b-3 — pontajul, stocul, gestiunile și bonul de consum (18 august 2026)
+
+### Ce a intrat
+
+**Pontajul** (`Activitate › Pontaj`, §3.3):
+
+- Grilă **om × zi**, cu totaluri pe om și pe unitate de lucru. Celula nu e un
+  câmp editabil: e totalul zilei, iar editarea se face pe **linii**. Un „8" scris
+  direct în celulă ar fi cerut oricum a doua întrebare — pe ce anume — tocmai
+  pentru cazul care contează, ziua împărțită pe două lucrări.
+- Săptămâna vine din `?week=`, nu din selectorul de lună: o săptămână taie luna
+  în două de patru ori pe an, iar un pontaj de pe 31 n-are voie să dispară de pe
+  ecran pentru că a început altă lună.
+- Validarea în masă **nu e totul-sau-nimic între zile** — fiecare zi are
+  tranzacția ei, iar cele care nu pot fi validate se întorc listate, cu motivul.
+  În interiorul unei zile, orele și costul lor nu se despart niciodată.
+
+**Aprovizionare — minimul fazei 1** (§3.4):
+
+- Stocul cu **cele trei coloane** (fizic / rezervat / disponibil). Disponibilul
+  se calculează la citire; nu există ca a treia coloană în bază.
+- Tipul de gestiune e **vedere**, nu filtru de tabel — e întrebarea de nivel
+  înalt din §3.5, și o vedere poate fi ținta unui link dintr-o alertă.
+- Gestiuni: listă + creare. Verificarea #16 trece **negativ, prin construcție**:
+  „gestiune de contract" nu e o opțiune pentru că `location_type` n-are valoarea.
+- Bon de consum manual, din gestiunea echipei. Formularul **nu cere** contractul
+  și componenta: vin din finanțarea activă a unității (`consumptionAnalyticsFor`),
+  aceeași sursă pe care o citește validarea intervenției.
+- Restul modulului (necesare, comenzi, NIR, transferuri, inventare, rezervări)
+  rămâne în meniu și spune din ce fază vine.
+
+**Jobul nocturn de stoc** (`inventory.verifyStock`, 04:00) — recalculează
+soldurile din mișcări și ridică alertă **pe gestiune**, cu diferența în titlu.
+Scopul e gestiunea, nu produsul: cine primește alerta se duce la un loc și
+numără acolo, iar un scop pe produs ar fi produs zece alerte pentru același
+inventar prost făcut.
+
+### Două defecte vechi, ambele tăcute
+
+1. **Terenul nu-și putea salva pontajul.** Exact capcana scrisă în predarea de
+   la 09b-2: `grant insert (coloane)` pe `timesheet_lines` exclude `rate_card_id`
+   și `hourly_cost`, dar drizzle le numește oricum în `insert`, cu `default`.
+   Inserarea liniilor e acum scrisă de mână, cu doar coloanele acordate.
+2. **`rollup.verify` era programat din pasul 06 dar NECONSUMAT.** Coada exista,
+   cronul o alimenta la 02:00 în fiecare noapte, și niciun `boss.work` nu lua
+   joburile din ea — deci controlul de integritate al registrului n-a rulat
+   niciodată. Se înregistrează acum în `handlers/integrity.ts`, lângă fratele lui
+   de stoc; cele două verifică același fel de lucru și se citesc împreună.
+
+### Cum a fost verificat
+
+Două harness-uri aruncabile pe Supabase dev (șterse după):
+
+- **25 de verificări pe pontaj, stoc și bon**: ziua împărțită pe două unități,
+  rescrierea la a doua salvare, maximul de 24 pe TOTAL, etapa obligatorie pe
+  lucrare, terenul care își scrie pontajul, tariful înghețat, a doua validare
+  refuzată, prezența subcontractantului fără cost, cele trei coloane de stoc,
+  terenul care vede stocul fără CMP (și e refuzat când îl cere), bonul manual,
+  și consumul peste disponibil blocat cu soldul în mesaj.
+- **Verificarea #18**, cap-coadă: sold corupt → job → alertă critică pe gestiune,
+  cu ambele cifre în titlu, nedublată la a doua rulare. Coruperea a cerut
+  conexiunea **proprietarului** — și asta e în sine un rezultat: niciun rol de
+  aplicație, nici măcar `app_service`, n-are `update` pe `app.stock_balances`.
+
+În CI rămân **14 teste noi de servicii** (7 pontaj + 7 gestiuni și stoc).
+
+**Verificări din pasul 09 acoperite aici:** 11, 12, 13, 14, 15, 16, 17 și 18.
 
 ---
 
@@ -804,7 +876,7 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
 | 07 — File management (R2) | 🟩 **gata** (07a–07c-2; 20/21 — #7 cere Playwright pentru întreruperea reală de rețea) | 2026-08-18 |
 | 08 — Cereri, rutare, backlog | 🟨 în lucru (08a + 08b gata: schemă, domain, servicii, ecrane; **08c** email+cronuri neatins) | 2026-08-18 |
-| 09 — Fișe de lucru | 🟨 în lucru (**09a**, **09b-1** inspecția și **09b-2** intervenția: gata; **09b-3** pontaj, stoc, bon de consum: neatins) | 2026-08-18 |
+| 09 — Fișe de lucru | 🟨 în lucru (**09a**, **09b-1**, **09b-2**, **09b-3** pontaj/stoc/bon: gata; **09b-4** acoperire, istoric, seed: neatins) | 2026-08-18 |
 | 10 — Teren offline, raport lunar | ⬜ neînceput | — |
 
 Legendă: ⬜ neînceput · 🟨 în lucru · 🟩 gata (toate verificările din pas trec) · 🟥 blocat
@@ -828,7 +900,7 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași** — ceea ce e chiar comportamentul cerut de #16 — **dacă `MFA_ENFORCED` nu e `0`** (vezi rândul de mai jos). |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **~525** (09b-2 confirmat în CI `32158356158`) | La 09b-2: `packages/services` **+7** (`interventions.test.ts`, fișier nou). La 09a: `domain` 106 → **126** (+20, `sheets/` — inspecție, abatere, pontaj). La 08b: `domain` 104 → **106** (+2, `isCommercialOpportunity`), `packages/services` 116 → **131** (+8 în `requests.test.ts`, +7 în `operations.test.ts` — fișier nou). La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **~539** (09b-3 neconfirmat încă în CI) | La 09b-3: `packages/services` **+14** (`timesheets.test.ts` și `inventory.test.ts`, fișiere noi). La 09b-2: `packages/services` **+7** (`interventions.test.ts`, fișier nou). La 09a: `domain` 106 → **126** (+20, `sheets/` — inspecție, abatere, pontaj). La 08b: `domain` 104 → **106** (+2, `isCommercialOpportunity`), `packages/services` 116 → **131** (+8 în `requests.test.ts`, +7 în `operations.test.ts` — fișier nou). La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
 | **Martie 2026 e ÎNCHISĂ la firma A pe Supabase dev**, din 05c | Închisă dinadins, ca ecranul de re-alocări să aibă ce arăta: mutarea finanțării intervenției `IV-000001` de acolo a emis `NRA-000001` în august. Dacă un ecran refuză o scriere pe martie, ăsta e motivul — nu un bug. |
 | **Aplicația e deployată pe Vercel**, pe același proiect Supabase (`cspjtesltraiaveypuya`) | Deci datele de pe dev sunt aceleași care se văd în aplicația deployată — inclusiv seed-ul și luna închisă de mai sus. `next.config.ts` încarcă `.env.local` din rădăcina repo-ului, fișier care pe Vercel **nu există**: toate variabilele trebuie puse în Project Settings. |

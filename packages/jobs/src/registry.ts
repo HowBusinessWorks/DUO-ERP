@@ -129,6 +129,22 @@ export const rollupVerify = defineJob({
  * `singletonKey` pe versiune: un retry, sau doua apeluri de `complete` pentru
  * acelasi upload, nu produc doua seturi de miniaturi.
  */
+/*
+ * Controlul nocturn al soldurilor de stoc (pasul 09, verificarea #18).
+ *
+ * `stock_balances` e un rollup intretinut de trigger, iar un rollup ramas in
+ * urma nu rupe nimic — doar minte. Coada asta il recalculeaza din miscari si
+ * ridica alerta pe gestiunea divergenta.
+ */
+export const inventoryVerifyStock = defineJob({
+  name: 'inventory.verifyStock',
+  schema: z.object({}).passthrough(),
+  retryLimit: 3,
+  retryDelaySeconds: 300,
+  expireInSeconds: 30 * 60,
+  singletonKey: () => new Date().toISOString().slice(0, 10),
+});
+
 export const filesDerive = defineJob({
   name: 'files.derive',
   schema: z.object({ versionId: z.string().uuid() }),
@@ -177,6 +193,7 @@ export const ALL_JOBS = [
   contractExpiryScan,
   deltaFillScan,
   rollupVerify,
+  inventoryVerifyStock,
   filesDerive,
   filesCleanup,
   requestsExpireBacklog,
@@ -211,6 +228,11 @@ export const SCHEDULED_JOBS: readonly {
     name: requestsExpireBacklog.name,
     cron: '0 5 * * *',
     why: 'Zilnic la 05:00, inaintea alertelor de contract — backlogul e deja curat cand se uita cineva la el.',
+  },
+  {
+    name: inventoryVerifyStock.name,
+    cron: '0 4 * * *',
+    why: 'Nocturn la 04:00, dupa curatenia de fisiere. Un sold divergent se afla a doua zi dimineata, nu la inventarul de la anul.',
   },
   {
     name: filesCleanup.name,

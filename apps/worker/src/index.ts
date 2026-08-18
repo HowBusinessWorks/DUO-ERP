@@ -3,6 +3,7 @@ import { logger } from '@damina/shared/logger';
 import { createBoss, ensureQueues } from './boss';
 import { registerContractAlerts, scheduleContractAlerts } from './handlers/contract-alerts';
 import { registerFilesDerive } from './handlers/files-derive';
+import { registerIntegrityJobs } from './handlers/integrity';
 import { registerRequestJobs } from './handlers/requests';
 import { registerSystemPing } from './handlers/system-ping';
 
@@ -35,6 +36,7 @@ async function main(): Promise<void> {
   await registerContractAlerts(boss);
   await registerFilesDerive(boss);
   await registerRequestJobs(boss);
+  await registerIntegrityJobs(boss);
   await scheduleContractAlerts(boss);
   logger.info({ worker_id: WORKER_ID }, 'cozi inregistrate, worker activ');
 

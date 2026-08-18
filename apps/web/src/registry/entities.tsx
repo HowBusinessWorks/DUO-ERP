@@ -26,6 +26,7 @@ import { AuditTrail } from '../components/detail/audit-trail';
 import { administrare } from './administrare';
 import { contracte } from './contracts';
 import { obiective } from './objectives';
+import { aprovizionare } from './inventory';
 import { cereri, operatiuni } from './requests';
 import { activitate, bani, etape } from './work-units';
 import { DefinitionList, Empty } from '../components/detail/definition-list';
@@ -1290,6 +1291,11 @@ export const entityRegistry: Readonly<Record<string, EntityDefinition>> = {
   // de Decizie — cel mai complicat din pas — e un tab, nu o pagina proprie.
   cereri,
   operatiuni,
+  // Pasul 09b-3 a adaugat Aprovizionarea, dar numai **minimul fazei 1**: stocul
+  // cu cele trei coloane, gestiunile si bonurile de consum. Restul vederilor
+  // exista in meniu si spun din ce faza vin — o legatura care se rupe la sosire
+  // e mai rea decat un ecran care se prezinta.
+  aprovizionare,
   produse,
   furnizori,
   clienti,

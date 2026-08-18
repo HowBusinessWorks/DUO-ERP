@@ -56,6 +56,65 @@ export async function listLocations(
   );
 }
 
+export interface ConsumptionAnalytics {
+  readonly companyId: string;
+  readonly objectiveId: string;
+  readonly contractId: string;
+  readonly componentId: string;
+}
+
+/**
+ * Analitica obligatorie a unui bon, dedusa din unitatea de lucru.
+ *
+ * Contractul si componenta vin din **finantarea activa** a unitatii, nu dintr-un
+ * camp de formular — aceeasi sursa pe care o citeste `validateIntervention`.
+ * Un ecran care ar cere omului sa aleaga contractul ar fi a doua sursa de
+ * adevar pentru „cine plateste", si prima care se abate la prima mutare de bani.
+ */
+export async function consumptionAnalyticsFor(
+  actor: Actor,
+  workUnitId: string,
+): Promise<ConsumptionAnalytics> {
+  return withActor(actor, async (tx) => {
+    const [unit] = await tx
+      .select({
+        companyId: schema.workUnits.companyId,
+        objectiveId: schema.workUnits.objectiveId,
+      })
+      .from(schema.workUnits)
+      .where(eq(schema.workUnits.id, workUnitId))
+      .limit(1);
+
+    if (unit === undefined) {
+      throw new AppError('NOT_FOUND', 'Unitatea de lucru nu există sau nu e vizibilă.');
+    }
+
+    const [funding] = await tx
+      .select({
+        contractId: schema.fundingAllocations.contractId,
+        componentId: schema.fundingAllocations.componentId,
+      })
+      .from(schema.fundingAllocations)
+      .where(
+        and(
+          eq(schema.fundingAllocations.workUnitId, workUnitId),
+          eq(schema.fundingAllocations.status, 'active'),
+        ),
+      )
+      .orderBy(asc(schema.fundingAllocations.createdAt))
+      .limit(1);
+
+    if (funding === undefined) {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        'Unitatea n-are finanțare activă — nu se știe din ce contract se scade materialul.',
+      );
+    }
+
+    return { ...unit, ...funding };
+  });
+}
+
 export interface TeamOption {
   readonly id: string;
   readonly name: string;
