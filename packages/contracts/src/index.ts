@@ -170,3 +170,23 @@ export {
   uploadTtlSeconds,
 } from './files';
 export type { CompleteUploadInput, PresignUploadInput, ShareNodeInput } from './files';
+
+export {
+  createRequestInputSchema,
+  decideRoutingInputSchema,
+  promoteBacklogInputSchema,
+  requestEstimateLineInputSchema,
+  REQUEST_SOURCES,
+  REQUEST_STATUSES,
+  REQUEST_STATUS_LABELS,
+  REQUEST_TYPE_LABELS,
+  REQUEST_TYPES,
+  ROUTING_CHOICE_LABELS,
+  ROUTING_CHOICES,
+} from './requests';
+export type {
+  CreateRequestInput,
+  DecideRoutingInput,
+  PromoteBacklogInput,
+  RequestEstimateLineInput,
+} from './requests';

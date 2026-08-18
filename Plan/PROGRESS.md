@@ -13,7 +13,79 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Scris la finalul lui 07c-2 (18 august 2026). Citește-l primul; restul fișierului e istoric.*
+*Scris la finalul lui 08a (18 august 2026). Citește-l primul; restul fișierului e istoric.*
+
+### Unde s-a ajuns
+
+Pașii **01, 02, 04, 05, 06 și 07 sunt gata**. Pasul **08 e tăiat în sub-etape** (decizia
+utilizatorului, 18 august 2026, ca la 07): **08a — fundația** (schemă, domain pur, servicii cu
+creare atomică) **e gata**. Rămân **08b — ecranele** (Inbox, Decizie, Backlog, jurnalul de decizii,
+Catalog de operațiuni) și **08c — inbox de email + cronuri** (IMAP, filtrul de 24h, alertele de
+Deltă pe 10/20).
+
+### Ce a intrat la 08a
+
+- **Migrarea `0025_requests_and_catalog.sql`** — `app.requests`, `request_emails`,
+  `request_estimate_lines`, `request_decisions`, `backlog_proposals` (Anexa C.8) și
+  `app.operation_catalog`, `operation_catalog_materials`, `operation_actuals` (Anexa C.9). Generată
+  cu `drizzle-kit generate`, completată dedesubt cu FK-urile tăiate din 05/07
+  (`work_units.source_request_id`, `request_emails.raw_node_id` — cicluri de import evitate, ca la
+  `contract_objectives.root_node_id`), RLS, audit și grant-uri. **Aplicată pe Supabase dev.**
+- **`packages/domain/src/requests/`** — `routeRequest` (propunerea + toate alternativele cu motiv,
+  pur, fără DB), `estimateFromCatalog`, `selectBacklogToFill` (knapsack exact în cenți, sub 200 de
+  itemi). 13 teste, toate verde.
+- **`packages/services/src/requests.ts`** — `createRequest`, `evaluateRequest`, `decideRouting`
+  (atomic: UL + alocări + legătură, sau propunere de backlog — niciodată ambele), `promoteBacklog`
+  (mai multe propuneri → mai multe UL-uri, o tranzacție). Verificat pe Supabase dev: creare atomică,
+  **rollback complet la lună închisă** (#11), amânare → backlog (#13), promovare multiplă (#15).
+- **`packages/contracts/src/requests.ts`** — `decideRoutingInputSchema` reutilizează
+  `createWorkUnitInputSchema` întreg pentru `creation`, ca să nu existe două validări pentru „cum
+  arată o unitate de lucru nou-creată".
+
+### Ce NU a intrat, dinadins (rămâne pentru 08b/08c)
+
+- Niciun ecran. Inbox, Decizie, Backlog, jurnalul de decizii, Catalog de operațiuni — toate din
+  §3.5 — sunt neatinse.
+- Inbox-ul de email (IMAP, `.eml` în R2), cronurile (filtrul de 24h, alerta de Deltă pe 10/20,
+  expirarea propunerilor) — `expireBacklogProposals` există în `requests.ts` ca funcție gata de
+  agățat pe un job, dar **niciun job nu o cheamă încă**.
+- `operation_catalog` nu are încă rânduri de CRUD/ecran; catalogul cu ~10 operațiuni din seed
+  (cerut la „definiția de gata") vine odată cu ecranul.
+- Trigger-ul care întreține `operation_actuals` la validarea unei fișe de intervenție — pasul 09.
+
+### O decizie de model, netrivial din plan
+
+`request_decisions.target_periods` e `date[]` (luni calendaristice, prima zi a lunii), **nu**
+`period_id[]`. Planul nu spune explicit ce reprezintă coloana; alocările de finanțare (care chiar
+folosesc `period_id`) sunt sursa de adevăr, iar `decideRouting` rezolvă `period_id → date` printr-un
+`select` pe `app.periods` înainte de insert. Dacă vreun ecran viitor vrea să afișeze „Delta pe 3
+luni: august, septembrie, octombrie", cifra vine deja formatată de-acolo.
+
+### Capcane găsite la 08a, ca să nu le retrăiești
+
+- **Pool-ul de sesiune Supabase (15 conexiuni) s-a umplut** cu `node.exe` orfan de la sesiuni
+  anterioare — `pnpm db:migrate` cădea cu `EMAXCONNSESSION` chiar și izolat. S-a rezolvat cu
+  `taskkill /F /IM node.exe` (aprobat explicit de utilizator). Dacă reapare, verifică întâi câte
+  procese `node.exe` sunt deschise înainte să presupui o problemă de schemă.
+- **Rularea completă a suitei `packages/services`** (nu doar `requests.test.ts`) scoate 8 timeout-uri
+  în `cost.test.ts` și `objectives.test.ts` — **contenție pe pool, nu regresie**: fișierele izolat
+  trec. Suita completă locală, cu `TEST_DATABASE_URL`, are nevoie de mai mult de 15 conexiuni
+  simultane când vitest paralelizează fișierele; CI-ul (Testcontainers, fără limita de 15) nu are
+  problema asta.
+- `allocateCode` din `work-units.ts` a fost făcută `export`, ca `decideRouting`/`promoteBacklog`
+  să-și țină toate scrierile în ACEEAȘI tranzacție (`withActor` deschide o tranzacție nouă la fiecare
+  apel — a chema `createWorkUnit` din interiorul altui `withActor` ar fi folosit o conexiune
+  DIFERITĂ din pool, deci n-ar mai fi fost atomic). Orice use-case viitor care trebuie să compună
+  „creează UL" cu altceva, în aceeași tranzacție, ar trebui să facă la fel — nu să cheme
+  `createWorkUnit` direct.
+
+### Ce urmează concret — 08b
+
+Citește §3.5 din `Plan/08_Cereri_Rutare_Backlog.md`. Ecranul de Decizie e central: citește
+`routeRequest` din `@damina/domain` cu `deltaFreeByPeriod` calculat din rollup-urile pasului 06
+(„Delta liber" = `unfilled` din `deltaFill`, pasul 06), construiește `DecideRoutingInput.creation`
+din alegerea omului și cheamă `decideRouting`. Tab-ul `Documente` al cererii se activează cu
+`<EntityDocuments>`, ca la orice entitate — vezi `docs/files.md`.
 
 ### Unde s-a ajuns
 
@@ -269,7 +341,7 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 | 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
 | 07 — File management (R2) | 🟩 **gata** (07a–07c-2; 20/21 — #7 cere Playwright pentru întreruperea reală de rețea) | 2026-08-18 |
-| 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
+| 08 — Cereri, rutare, backlog | 🟨 în lucru (08a gata: schemă+domain+servicii; 08b ecrane, 08c email+cronuri neatinse) | 2026-08-18 |
 | 09 — Fișe de lucru | ⬜ neînceput | — |
 | 10 — Teren offline, raport lunar | ⬜ neînceput | — |
 
@@ -294,7 +366,7 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași** — ceea ce e chiar comportamentul cerut de #16 — **dacă `MFA_ENFORCED` nu e `0`** (vezi rândul de mai jos). |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **445** | 181 unitare (`shared` **45** · `domain` 82 · `auth` 35 · `storage` 6 · `i18n` 3, plus restul) + **162** `packages/db` + **102** `packages/services`. Confirmate în CI `32108456833` pe `16ac8a2`. Testele de bază de date **și cele de servicii** rulează în CI; local se pot rula cu `TEST_DATABASE_URL` (vezi „Cum rulezi testele fără Docker" din predare), dar atunci două pică fiindcă presupun o bază goală. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **~462** (neconfirmat încă în CI) | La 08a: `domain` 82 → **95** (+13, `requests/`), `packages/services` 102 → **106** (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
 | **Martie 2026 e ÎNCHISĂ la firma A pe Supabase dev**, din 05c | Închisă dinadins, ca ecranul de re-alocări să aibă ce arăta: mutarea finanțării intervenției `IV-000001` de acolo a emis `NRA-000001` în august. Dacă un ecran refuză o scriere pe martie, ăsta e motivul — nu un bug. |
 | **Aplicația e deployată pe Vercel**, pe același proiect Supabase (`cspjtesltraiaveypuya`) | Deci datele de pe dev sunt aceleași care se văd în aplicația deployată — inclusiv seed-ul și luna închisă de mai sus. `next.config.ts` încarcă `.env.local` din rădăcina repo-ului, fișier care pe Vercel **nu există**: toate variabilele trebuie puse în Project Settings. |

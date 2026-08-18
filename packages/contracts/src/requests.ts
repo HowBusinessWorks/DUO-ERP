@@ -1,0 +1,147 @@
+import { z } from 'zod';
+import { businessDateSchema, moneySchema, quantitySchema, uuidSchema } from './primitives';
+import { createWorkUnitInputSchema } from './work-units';
+
+/**
+ * Cererile, evaluarea si decizia de rutare (pasul 08).
+ *
+ * `decideRoutingInputSchema` e forma in care se citeste regula 2 din plan:
+ * decizia creeaza atomic UL + alocare + legatura, sau — pentru `amanata_backlog`
+ * — creeaza propunerea de backlog. Niciodata ambele, niciodata nici una.
+ * `creation` reutilizeaza `createWorkUnitInputSchema` intreg, ca sa nu existe
+ * doua validari pentru „cum arata o unitate de lucru nou-creata".
+ */
+
+const trimmed = (max: number): z.ZodString => z.string().trim().max(max);
+const requiredText = (max: number, message = 'Câmpul e obligatoriu.'): z.ZodString =>
+  trimmed(max).min(1, message);
+const optionalUuid = uuidSchema.or(z.literal('')).transform((v) => (v === '' ? null : v));
+const optionalMoney = moneySchema.or(z.literal('')).transform((v) => (v === '' ? null : v));
+const optionalDate = businessDateSchema.or(z.literal('')).transform((v) => (v === '' ? null : v));
+
+export const REQUEST_TYPES = [
+  'tichet_client',
+  'solicitare',
+  'constatare_inspectie',
+  'propunere_interna',
+  'solicitare_utilaj',
+  'observatie_utilaj',
+] as const;
+
+export const REQUEST_TYPE_LABELS: Readonly<Record<(typeof REQUEST_TYPES)[number], string>> = {
+  tichet_client: 'Tichet client',
+  solicitare: 'Solicitare internă',
+  constatare_inspectie: 'Constatare din inspecție',
+  propunere_interna: 'Propunere internă',
+  solicitare_utilaj: 'Solicitare utilaj',
+  observatie_utilaj: 'Observație utilaj',
+};
+
+export const REQUEST_SOURCES = ['email', 'manual', 'fisa_inspectie', 'utilaj'] as const;
+
+export const REQUEST_STATUSES = [
+  'neprocesata',
+  'in_evaluare',
+  'decisa',
+  'in_backlog',
+  'respinsa',
+  'anulata',
+] as const;
+
+export const REQUEST_STATUS_LABELS: Readonly<Record<(typeof REQUEST_STATUSES)[number], string>> =
+  {
+    neprocesata: 'Neprocesată',
+    in_evaluare: 'În evaluare',
+    decisa: 'Decisă',
+    in_backlog: 'În backlog',
+    respinsa: 'Respinsă',
+    anulata: 'Anulată',
+  };
+
+export const ROUTING_CHOICES = [
+  'interventie_mentenanta',
+  'lucrare_delta',
+  'lucrare_delta_multi_luna',
+  'lucrare_componenta_lucrari',
+  'contract_individual_nou',
+  'amanata_backlog',
+] as const;
+
+export const ROUTING_CHOICE_LABELS: Readonly<Record<(typeof ROUTING_CHOICES)[number], string>> = {
+  interventie_mentenanta: 'Intervenție pe Mentenanță',
+  lucrare_delta: 'Lucrare pe Deltă (1 lună)',
+  lucrare_delta_multi_luna: 'Lucrare pe Deltă (2–3 luni)',
+  lucrare_componenta_lucrari: 'Lucrare pe componenta Lucrări',
+  contract_individual_nou: 'Contract individual nou',
+  amanata_backlog: 'Amânare → backlog',
+};
+
+/** Cererea insasi, la creare (din inbox de email sau manual). */
+export const createRequestInputSchema = z.object({
+  companyId: uuidSchema,
+  type: z.enum(REQUEST_TYPES),
+  source: z.enum(REQUEST_SOURCES),
+  objectiveId: optionalUuid,
+  contractId: optionalUuid,
+  contractObjectiveId: optionalUuid,
+  title: requiredText(300, 'Scrie un titlu.'),
+  description: trimmed(5000).optional(),
+  estimatedValue: optionalMoney,
+  slaDueAt: z.string().datetime().or(z.literal('')).transform((v) => (v === '' ? null : v)),
+});
+
+/** O linie de evaluare: operatiune din catalog × cantitate. */
+export const requestEstimateLineInputSchema = z.object({
+  operationId: uuidSchema,
+  quantity: quantitySchema,
+});
+
+/** Ce se creeaza atunci cand alegerea NU e `amanata_backlog`. */
+const routingCreationSchema = createWorkUnitInputSchema;
+
+/** Ce se creeaza cand alegerea E `amanata_backlog`. */
+const routingBacklogSchema = z.object({
+  objectiveId: uuidSchema,
+  contractId: uuidSchema,
+  title: requiredText(300),
+  estimatedValue: moneySchema,
+  validUntil: optionalDate,
+});
+
+/**
+ * Decizia de rutare. Regula 3 din pas: `reason` obligatoriu si nevid — se
+ * salveaza pe `request_decisions`, iar pentru `amanata_backlog` NU exista
+ * fundingAllocationInputSchema (care cere motiv propriu), deci `reason` de aici
+ * e singurul.
+ */
+export const decideRoutingInputSchema = z
+  .object({
+    requestId: uuidSchema,
+    choice: z.enum(ROUTING_CHOICES),
+    systemProposal: z.enum(ROUTING_CHOICES),
+    reason: requiredText(500, 'Scrie de ce ai decis asa.'),
+    creation: routingCreationSchema.optional(),
+    backlog: routingBacklogSchema.optional(),
+  })
+  .refine((v) => (v.choice === 'amanata_backlog' ? v.backlog !== undefined : v.creation !== undefined), {
+    message:
+      'Amânarea cere datele propunerii de backlog; orice altă alegere cere datele unității de lucru.',
+    path: ['choice'],
+  });
+
+/** Promovarea din backlog (§0): mai multe propuneri → UL-uri, o singura tranzactie. */
+export const promoteBacklogInputSchema = z.object({
+  proposalIds: z.array(uuidSchema).min(1, 'Alege cel puțin o propunere.'),
+  /** Seria din care se ia codul UL-urilor create. */
+  series: requiredText(20, 'Alege seria de numerotare.'),
+  /** Contractul si componenta si luna din care se plătesc — toate promovările din același apel. */
+  contractId: uuidSchema,
+  componentId: uuidSchema,
+  periodId: uuidSchema,
+  reason: requiredText(500, 'Scrie de ce promovezi acum.'),
+});
+
+export type CreateRequestInput = z.input<typeof createRequestInputSchema>;
+export type RequestEstimateLineInput = z.input<typeof requestEstimateLineInputSchema>;
+export type DecideRoutingInput = z.input<typeof decideRoutingInputSchema>;
+export type PromoteBacklogInput = z.input<typeof promoteBacklogInputSchema>;

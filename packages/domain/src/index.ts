@@ -67,3 +67,21 @@ export type {
   DeltaFillInput,
   DeltaState,
 } from './contracts';
+export {
+  estimateFromCatalog,
+  ROUTING_CHOICES,
+  routeRequest,
+  selectBacklogToFill,
+} from './requests';
+export type {
+  BacklogProposalLike,
+  BacklogSelection,
+  DeltaPeriodFree,
+  EstimateLineInput,
+  EstimateResult,
+  RouteRequestInput,
+  RoutingCeilings,
+  RoutingChoice,
+  RoutingOption,
+  RoutingProposal,
+} from './requests';

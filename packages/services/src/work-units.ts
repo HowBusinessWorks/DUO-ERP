@@ -475,7 +475,7 @@ export async function getStageOverview(
  * incoace: `lucrare`, `interventie`, `inspectie` sunt valori in
  * `app.numbered_document_type`.
  */
-async function allocateCode(
+export async function allocateCode(
   tx: ActorTx,
   companyId: string,
   type: string,
