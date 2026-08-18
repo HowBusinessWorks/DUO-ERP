@@ -17,7 +17,8 @@ export const companies = app.table('companies', {
   cui: text('cui').unique(),
   regCom: text('reg_com'),
   address: jsonb('address'),
-  // Sigla de pe rapoartele catre client. `app.nodes` vine in pasul 07.
+  // Sigla de pe rapoartele catre client. FK-ul catre `app.nodes` se pune de
+  // mana in migrarea 07a — ciclu de import intre fisierele de schema.
   logoNodeId: uuid('logo_node_id'),
   isGroupMember: boolean('is_group_member').notNull().default(true),
   // Doar referinte catre Supabase Vault. Credentialele nu stau aici.

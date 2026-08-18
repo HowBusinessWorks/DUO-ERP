@@ -71,6 +71,7 @@ const EXPECTED_ENUMS = [
   'request_type',
   'routing_choice',
   'share_permission',
+  'share_subject_type',
   'work_unit_status',
   'work_unit_type',
 ];

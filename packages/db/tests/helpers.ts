@@ -101,4 +101,6 @@ export const SQLSTATE = {
   EXCLUSION_VIOLATION: '23P01',
   /** privilegiu insuficient */
   INSUFFICIENT_PRIVILEGE: '42501',
+  /** `raise ... using errcode = 'restrict_violation'` — guard-uri de trigger */
+  RESTRICT_VIOLATION: '23001',
 } as const;

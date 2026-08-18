@@ -175,7 +175,7 @@ deschise**.
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
-| 07 — File management (R2) | ⬜ neînceput | — |
+| 07 — File management (R2) | 🟨 în lucru (07a gata: schema + arborele automat) | 2026-08-18 |
 | 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
 | 09 — Fișe de lucru | ⬜ neînceput | — |
 | 10 — Teren offline, raport lunar | ⬜ neînceput | — |
@@ -1845,7 +1845,80 @@ la sine. **Dacă se repetă: nu e nimic stricat în repo — se reîncearcă pes
 
 ## Pasul 07 — File management (R2)
 
-*(nicio sesiune n-a lucrat încă aici)*
+*Tăiat în trei sub-etape, ca pasul 06: **07a** schema + arborele automat ·
+**07b** upload/download + worker · **07c** ecranele.*
+
+### 2026-08-18 — [status: gata] — 07a, schema și arborele care se face singur
+
+**Ce a intrat**
+
+- `packages/db/src/schema/files.ts` — `nodes`, `file_versions`, `derived_assets`,
+  `node_shares`. Migrarea `0021_files`, generată și completată dedesubt.
+- Arborele din Anexa E.3, construit de **triggere**, în aceeași tranzacție cu
+  entitatea: firmă → contract → legare obiectiv → unitate de lucru → etapă.
+- `app.can_access_node(nod, permisiune)` — o poartă, trei surse (birou prin
+  firmă, teren prin asignare, subcontractant **doar** prin `node_shares`).
+- Backfill peste datele existente, cu plasă: migrarea cade dacă rămâne vreo
+  unitate sau vreo legare fără folder.
+- `docs/files.md` (≤ 40 de linii) și 16 teste noi în `packages/db/tests/files.test.ts`.
+
+**Decizii care se abat de la plan, și de ce**
+
+- **`node_role` are 23 de valori, nu 7.** Cele șapte schițate în pasul 01
+  (`root_company|contract|objective|work_unit|stage|system|user`) fac regula
+  „caută folderul pe rol, nu pe nume" imposibil de aplicat: toate subfolderele
+  unei lucrări ar fi avut rolul `system`, deci `where work_unit_id = X and
+  node_role = 'pv'` n-ar fi avut ce întreba. Enumul a fost recreat în `0021`
+  (nicio linie nu-l folosea încă).
+- **`root_node_id` a fost mutat de pe `objectives` pe `contract_objectives`.**
+  Folderul obiectivului stă sub contract, iar același obiectiv poate fi pe două
+  contracte — coloana de pe `objectives` ar fi trebuit să aleagă arbitrar unul
+  dintre foldere. Stătea nefolosită din pasul 04. Consecință de dus la 07c:
+  tab-ul *Documente* pe obiectiv trebuie să aleagă contractul din context.
+- **Numele folderului de contract e „cod · client"**, fiindcă `app.contracts`
+  n-are coloană `name`. Se resincronizează la schimbarea codului sau a
+  clientului; redenumirea clientului nu propagă încă.
+- **Există un `Activitate` și la nivel de firmă**, nu doar sub contract: o
+  inspecție poate exista înaintea rutării (pasul 08) și trebuie să aibă unde
+  să-și țină pozele. Când primește contract, folderul ei **se mută** — un singur
+  `update parent_id`.
+- **`nodes.created_by` e nullabil, și e null pe tot ce generează sistemul.** Nu e
+  adevărat că folderele le-a făcut cine a apăsat „salvează" pe contract, iar
+  varianta cu autor pica la prima generare dintr-un job sau dintr-un test.
+
+**Ce a găsit harness-ul înainte de push**
+
+Am adăugat o portiță în `tests/global-setup.ts` (ambele pachete): cu
+`TEST_DATABASE_URL` setat, suita rulează pe baza indicată în loc de container.
+Mașina n-are Docker, deci până acum orice greșeală se afla în CI, șase minute mai
+târziu. A prins imediat trei lucruri:
+
+1. `ensure_folder` pica pe FK-ul `created_by` când actorul n-are rând în
+   `app.persons` → de aici decizia cu `created_by` null.
+2. Completarea lui `root_node_id` producea **o a doua intrare de audit** la
+   fiecare unitate de lucru creată (testul de promovare din 05a a căzut), iar pe
+   `contract_objectives` — auditată cu motiv obligatoriu — cerea un **motiv
+   scris pentru ceva ce n-a făcut niciun om**. Prima variantă a fost să fabric
+   motivul și să-l pun la loc; s-a înlocuit cu ceva onest: `audit.record_change`
+   scoate `root_node_id` din diferență **înainte** de verificarea „un UPDATE care
+   nu schimbă nimic nu e un eveniment". Coloanele derivate nu sunt evenimente.
+3. Două teste ale mele erau greșite, nu implementarea: „mută folderul" îl muta
+   unde era deja (deci guard-ul n-avea ce respinge), iar actorul de teren avea
+   `companyIds: []`, ceea ce îl scotea din raza lui `work_unit_assigned_to_me`.
+
+**Ce am mai reparat pe drum**
+
+- `scripts/migrate.ts` afișa doar „Failed query: …". Acum scrie și `cause`, adică
+  mesajul Postgres. Fără el, depanarea unei migrări de 1000 de linii înseamnă
+  înjumătățirea fișierului cu mâna.
+- Seed-ul lăsa `contractObjectiveId` gol pe toate unitățile de lucru, deci
+  arborele de probă atârna de firmă, nu de contract. Acum leagă.
+
+**Verificări din pasul 07 acoperite aici:** 1, 2, 3, 4, 5, 14, 15, 16 — plus
+regula 8 (finanțarea nu atinge arborele) și guard-ul de ciclu, care nu erau pe
+listă. Restul așteaptă 07b (upload/download, worker) și 07c (ecrane).
+
+**Suite:** 162 de teste de bază de date (146 + 16), 92 de servicii.
 
 ---
 

@@ -26,6 +26,36 @@ export const TEST_PERSON_ID = '01950000-0000-7000-8000-000000000001';
 let container: StartedPostgreSqlContainer | undefined;
 
 export async function setup(project: TestProject): Promise<void> {
+  /*
+   * Aceeasi portita ca in `@damina/db`: cu `TEST_DATABASE_URL` setat, suita
+   * ruleaza pe baza indicata in loc de un container efemer. Exista pentru
+   * masina de dezvoltare, care n-are Docker; in CI variabila ramane nesetata,
+   * si acolo se da verdictul — inclusiv pe intrebarea pe care numai containerul
+   * o pune, aceea daca migratiile reconstruiesc baza de la zero.
+   */
+  const provided = process.env['TEST_DATABASE_URL'];
+  if (provided !== undefined && provided !== '') {
+    const client = new pg.Pool({
+      connectionString: provided,
+      max: 1,
+      // Baza indicata e de obicei un Supabase la distanta, deci cu TLS — dar cu
+      // lant pe care masina de dezvoltare nu-l are. Local ramane fara.
+      ssl: provided.includes('localhost') ? false : { rejectUnauthorized: false },
+    });
+    try {
+      await client.query(
+        `insert into app.persons (id, persona, category, full_name, email)
+         values ($1, 'office', 'angajat', 'Actor de test', 'actor@test.local')
+         on conflict do nothing`,
+        [TEST_PERSON_ID],
+      );
+    } finally {
+      await client.end();
+    }
+    project.provide('databaseUrl', provided);
+    return;
+  }
+
   container = await new PostgreSqlContainer('postgres:17-alpine')
     .withDatabase('damina_services_test')
     .withUsername('postgres')

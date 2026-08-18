@@ -109,7 +109,11 @@ export const workUnits = app.table(
     sourceRequestId: uuid('source_request_id'),
     /** DOAR pentru scindare. Promovarea normala pastreaza randul. */
     promotedFromId: uuid('promoted_from_id').references((): AnyPgColumn => workUnits.id),
-    /** Folderul auto-generat. FK-ul vine in pasul 07, cu `app.nodes`. */
+    /**
+     * Folderul auto-generat al unitatii. Se completeaza prin trigger, la insert.
+     * FK-ul catre `app.nodes` se pune de mana in migrarea 07a: declarat aici ar
+     * inchide un ciclu de import intre fisierele de schema.
+     */
     rootNodeId: uuid('root_node_id'),
     closedAt: timestamp('closed_at', { withTimezone: true }),
     closedBy: uuid('closed_by').references(() => persons.id),

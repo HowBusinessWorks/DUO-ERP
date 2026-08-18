@@ -362,8 +362,24 @@ async function costGround(): Promise<WorkUnitGround | null> {
     const byType = (type: string): string =>
       components.find((row) => row.type === type)?.id ?? '';
 
+    const objectiveIds = Array.from({ length: 20 }, (_, index) => IDS.objective(index + 1));
+
+    // Citite, nu lasate goale: `--costs` nu creeaza unitati de lucru azi, dar
+    // urmatorul care refoloseste terenul asta ar primi altfel un arbore de
+    // fisiere agatat de firma in loc de contract, si n-ar avea de unde sa stie.
+    const links = await tx
+      .select({
+        id: schema.contractObjectives.id,
+        objectiveId: schema.contractObjectives.objectiveId,
+      })
+      .from(schema.contractObjectives)
+      .where(eq(schema.contractObjectives.contractId, contractId));
+
     return {
-      objectiveIds: Array.from({ length: 20 }, (_, index) => IDS.objective(index + 1)),
+      objectiveIds,
+      contractObjectiveIds: objectiveIds.map(
+        (objectiveId) => links.find((row) => row.objectiveId === objectiveId)?.id ?? '',
+      ),
       contractId,
       delta: byType('delta'),
       maintenance: byType('mentenanta'),
@@ -561,8 +577,15 @@ async function main(): Promise<void> {
   });
 
   // ── Obiectivele intra in contractul de mentenanta ──────────────────────────
+  /*
+   * Id-urile legaturilor se pastreaza: de la pasul 07 ele sunt si adresa din
+   * arborele de fisiere. O unitate de lucru fara `contractObjectiveId` isi
+   * primeste folderul sub „Activitate" la nivel de firma, nu sub contract —
+   * corect ca mecanism, dar nereprezentativ ca date de proba.
+   */
+  const maintenanceLinks: string[] = [];
   for (const [index, objectiveId] of objectiveIds.entries()) {
-    await linkObjective(actor('seed'), {
+    const link = await linkObjective(actor('seed'), {
       contractId: maintenance.id,
       objectiveId,
       validFrom: '2026-03-01',
@@ -570,6 +593,7 @@ async function main(): Promise<void> {
       // Bazinele se verifica lunar, restul trimestrial.
       inspectionProfileId: index % 5 === 1 ? monthly : quarterly,
     });
+    maintenanceLinks.push(link.id);
   }
 
   // Doua obiective sunt SI pe contractul individual, in acelasi timp — cazul
@@ -587,6 +611,7 @@ async function main(): Promise<void> {
   // ── Unitatile de lucru (pasul 05) ──────────────────────────────────────────
   const workUnitGround = {
     objectiveIds,
+    contractObjectiveIds: maintenanceLinks,
     delta: components.delta.id,
     maintenance: components.maintenance.id,
     contractId: maintenance.id,
@@ -604,6 +629,8 @@ async function main(): Promise<void> {
 
 interface WorkUnitGround {
   readonly objectiveIds: readonly string[];
+  /** Index-aliniat cu `objectiveIds`: legatura pe contractul de mentenanta. */
+  readonly contractObjectiveIds: readonly string[];
   readonly contractId: string;
   readonly delta: string;
   readonly maintenance: string;
@@ -700,6 +727,7 @@ async function seedWorkUnits(base: WorkUnitGround): Promise<void> {
   }
 
   const objective = (index: number): string => base.objectiveIds[index] ?? IDS.objective(1);
+  const link = (index: number): string => base.contractObjectiveIds[index] ?? '';
 
   // ── Lucrarea, pe trei luni de Delta ────────────────────────────────────────
   const lucrare = await createWorkUnit(
@@ -710,7 +738,7 @@ async function seedWorkUnits(base: WorkUnitGround): Promise<void> {
         type: 'lucrare',
         name: 'Reabilitare stație de pompare SP-1',
         objectiveId: objective(0),
-        contractObjectiveId: '',
+        contractObjectiveId: link(0),
         responsiblePersonId: IDS.pm,
         executorType: 'echipa_proprie',
         executorSubcontractorId: '',
@@ -774,7 +802,7 @@ async function seedWorkUnits(base: WorkUnitGround): Promise<void> {
         type: 'interventie',
         name: 'Înlocuire vană DN100',
         objectiveId: objective(2),
-        contractObjectiveId: '',
+        contractObjectiveId: link(2),
         responsiblePersonId: IDS.pm,
         executorType: 'echipa_proprie',
         executorSubcontractorId: '',
@@ -810,7 +838,7 @@ async function seedWorkUnits(base: WorkUnitGround): Promise<void> {
         type: 'inspectie',
         name: 'Inspecție trimestrială bazin',
         objectiveId: objective(1),
-        contractObjectiveId: '',
+        contractObjectiveId: link(1),
         responsiblePersonId: IDS.pm,
         executorType: 'echipa_proprie',
         executorSubcontractorId: '',

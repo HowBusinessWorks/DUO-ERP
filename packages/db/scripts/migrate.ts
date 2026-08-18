@@ -42,6 +42,16 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
+  /*
+   * Drizzle ambaleaza eroarea si pastreaza doar „Failed query: …", adica exact
+   * partea pe care o stiam deja. Mesajul Postgres — cel care spune ce anume
+   * n-a mers — sta in `cause`, si fara el depanarea unei migrari lungi inseamna
+   * injumatatirea fisierului cu mana.
+   */
+  const cause = error instanceof Error ? error.cause : undefined;
   process.stderr.write(`${String(error)}\n`);
+  if (cause !== undefined) {
+    process.stderr.write(`\nCauza: ${String(cause)}\n`);
+  }
   process.exitCode = 1;
 });

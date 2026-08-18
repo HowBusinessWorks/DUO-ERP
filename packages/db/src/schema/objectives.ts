@@ -64,8 +64,6 @@ export const objectives = app.table(
     geoLat: numeric('geo_lat', { precision: 10, scale: 7 }),
     geoLng: numeric('geo_lng', { precision: 10, scale: 7 }),
     areaSqm: numeric('area_sqm', { precision: 14, scale: 2 }),
-    /** Folderul de documente al obiectivului. `app.nodes` vine in pasul 07. */
-    rootNodeId: uuid('root_node_id'),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: createdAt(),
   },
@@ -199,6 +197,19 @@ export const contractObjectives = app.table(
     /** Null = obiectivul e inca in contract. */
     validTo: date('valid_to'),
     inspectionProfileId: uuid('inspection_profile_id').references(() => inspectionProfiles.id),
+    /**
+     * Folderul obiectivului, in arborele contractului (pasul 07).
+     *
+     * Sta pe LEGATURA, nu pe obiectiv, din acelasi motiv ca profilul de
+     * inspectie de deasupra: acelasi bazin poate fi pe doua contracte, si
+     * fiecare contract isi are propriul folder `Obiective/<nume>`. O coloana pe
+     * `objectives` ar fi trebuit sa aleaga unul dintre ele — de aceea a si fost
+     * stearsa la 07a, dupa ce a stat nefolosita din 04.
+     *
+     * FK-ul catre `app.nodes` se pune de mana in migrare: declarat aici ar
+     * inchide un ciclu de import intre fisierele de schema.
+     */
+    rootNodeId: uuid('root_node_id'),
     createdAt: createdAt(),
   },
   (t) => [

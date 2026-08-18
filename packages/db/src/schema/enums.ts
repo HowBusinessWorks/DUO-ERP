@@ -145,13 +145,46 @@ export const allocationStatusEnum = app.enum('allocation_status', ['active', 'su
 // ── fisiere ─────────────────────────────────────────────────────────────────
 export const nodeKindEnum = app.enum('node_kind', ['folder', 'file']);
 
+/**
+ * Rolul unui nod in arborele generat automat (Anexa E.3).
+ *
+ * Lista a fost largita la 07a de la cele sapte valori schitate in pasul 01, si
+ * a fost largita dinadins: regula „cautarea folderului se face pe `node_role`,
+ * nu pe nume" nu inseamna nimic daca toate subfolderele unei lucrari au acelasi
+ * rol. Un raport care vrea „folderul de procese verbale al lucrarii" scrie
+ * `where work_unit_id = X and node_role = 'pv'` si nu se strica atunci cand
+ * cineva schimba eticheta afisata din „PV" in „Procese verbale".
+ *
+ * Ca la `numbered_document_type`: o valoare nefolosita nu costa nimic, iar
+ * adaugarea uneia dupa ce exista date e o migrare in plus.
+ */
 export const nodeRoleEnum = app.enum('node_role', [
+  // structura de firma
   'root_company',
+  'contracts_root',
   'contract',
+  'contract_docs',
+  'objectives_root',
   'objective',
+  'objective_tech_docs',
+  'objective_photos',
+  'activity_root',
+  'month',
+  // unitatea de lucru
   'work_unit',
-  'stage',
-  'system',
+  'sheet',
+  'photos',
+  /** `Poze/{Inainte, Etapa 1..N, Dupa}`. Cele de etapa au si `stage_id`. */
+  'photo_phase',
+  'consumption_notes',
+  'estimate',
+  'offers',
+  'permits',
+  'invoices',
+  'pv',
+  'video',
+  'receptions',
+  /** Tot ce creeaza utilizatorul cu mana lui. Singurul rol care se poate sterge. */
   'user',
 ]);
 
@@ -163,6 +196,15 @@ export const fileStateEnum = app.enum('file_state', [
 ]);
 
 export const sharePermissionEnum = app.enum('share_permission', ['read', 'write', 'manage']);
+
+/**
+ * Cu cine se partajeaza un nod. Doua valori, si nu mai multe: biroul si terenul
+ * isi primesc accesul prin apartenenta (contractul firmei mele, respectiv
+ * asignarea pe unitate), deci n-au ce cauta intr-o partajare explicita.
+ * Subcontractantul, in schimb, NU mosteneste nimic — pentru el asta e singura
+ * cale de acces, si de-aia exista tabela.
+ */
+export const shareSubjectTypeEnum = app.enum('share_subject_type', ['person', 'subcontractor']);
 
 // ── gestiune si teren ───────────────────────────────────────────────────────
 export const locationTypeEnum = app.enum('location_type', [

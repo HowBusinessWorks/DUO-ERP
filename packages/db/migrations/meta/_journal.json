@@ -148,6 +148,13 @@
       "when": 1786973693776,
       "tag": "0020_cost_cursor_index",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787031483278,
+      "tag": "0021_files",
+      "breakpoints": true
     }
   ]
 }

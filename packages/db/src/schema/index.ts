@@ -10,3 +10,4 @@ export * from './objectives';
 export * from './work-units';
 export * from './cost';
 export * from './rollups';
+export * from './files';
