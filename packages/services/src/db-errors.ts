@@ -64,6 +64,15 @@ const RAISED_PREFIXES: readonly (readonly [string, AppErrorCode])[] = [
   ['CONFLICT', 'CONFLICT'],
   ['NOT_FOUND', 'NOT_FOUND'],
   ['FORBIDDEN', 'FORBIDDEN'],
+  /*
+   * Pasul 09. Prefixul nu mai e identic cu codul, si e dinadins: mesajul din
+   * baza numeste REGULA incalcata („stoc insuficient", „punctul n-are ieșire"),
+   * ceea ce face un log de Postgres citibil fara sa deschizi codul. Traducerea
+   * spre cele opt coduri se face aici, in singurul loc unde se face oricum.
+   */
+  ['STOCK_INSUFFICIENT', 'CONFLICT'],
+  ['FINDING_REQUIRED', 'VALIDATION_FAILED'],
+  ['PHOTO_REQUIRED', 'VALIDATION_FAILED'],
 ];
 
 const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);

@@ -45,14 +45,22 @@ export async function recordCost(
   const values = recordCostInputSchema.parse(input);
 
   try {
-    return await withActor(actor, async (tx) => insertCostLine(tx, actor, values));
+    return await withActor(actor, async (tx) => recordCostTx(tx, actor, values));
   } catch (error) {
     return translateDbError(error);
   }
 }
 
-/** Scrierea propriu-zisa, refolosita de storno si de seed. */
-async function insertCostLine(
+/**
+ * Scrierea propriu-zisa, pe o tranzactie DEJA deschisa.
+ *
+ * Exista exportata din acelasi motiv ca `createWorkUnitTx` din `work-units.ts`:
+ * validarea unei fise (pasul 09) scrie bonul de consum, miscarile de stoc si
+ * liniile de cost in ACEEASI tranzactie, iar un `withActor` in plus ar lua alta
+ * conexiune din pool si ar rupe rollback-ul. Regula 8 a pasului 09 — „validarea
+ * unei fise = o tranzactie" — trece pe aici.
+ */
+export async function recordCostTx(
   tx: ActorTx,
   actor: Actor,
   values: RecordCostInput,

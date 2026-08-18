@@ -13,16 +13,131 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Scris la finalul lui 08b, completat pe 18 august 2026 cu decizia de a sări peste 08c.
-Citește-l primul; restul fișierului e istoric.*
+*Scris la finalul lui 09a, 18 august 2026. Citește-l primul; restul fișierului e istoric.*
 
 ### Unde s-a ajuns
 
-Pașii **01, 02, 04, 05, 06 și 07 sunt gata**. Pasul **08 e tăiat în sub-etape** (decizia
-utilizatorului, 18 august 2026, ca la 07): **08a — fundația** (schemă, domain pur, servicii cu
-creare atomică) și **08b — ecranele** (Inbox, Decizie, Backlog, jurnalul de decizii, Catalog de
-operațiuni) **sunt gata**. **08c e sărit dinadins** — vezi mai jos. **Următorul pas e 09 — fișe de
-lucru** (`Plan/09_Fise_De_Lucru.md`).
+Pașii **01, 02, 04, 05, 06 și 07 sunt gata**. Pasul **08** e gata pe 08a + 08b; **08c e sărit
+dinadins** (vezi secțiunea lui mai jos). Pasul **09 e tăiat în două**, ca 07 și 08:
+**09a — fundația (schemă, triggere, domain pur, servicii) e GATA**; **09b — ecranele (§3.5 și
+§3.6) e următorul lucru de făcut.**
+
+---
+
+## 09a — fundația fișelor de lucru (18 august 2026)
+
+### Ce a intrat
+
+- **Migrarea `0026_sheets_and_inventory.sql`** — generată cu drizzle-kit din patru fișiere noi de
+  schemă (`inventory.ts`, `sheets.ts`, `timesheets.ts`, plus `products.is_lot_tracked`), completată
+  dedesubt cu ~700 de linii scrise de mână: triggere, RLS, grant-uri pe coloană, audit.
+  **Aplicată pe Supabase dev.** Cele patru migrări cerute de plan (`0019`–`0022` în numerotarea lui)
+  sunt **una singură** la noi: sunt tabele care se referă între ele, iar patru migrări ar fi însemnat
+  patru rulări de drizzle-kit pentru un singur pas de schemă.
+- **Triggere — acolo trăiesc regulile, nu în formulare**:
+  `guard_inspection_validation` (NOK fără ieșire → blocat; punct cu `requires_photo` fără poză →
+  blocat), `apply_stock_movement` (verifică disponibilul cu `for update`, scade soldul, recalculează
+  CMP la intrare), `guard_stock_movement_append_only`, `apply_intervention_actuals`
+  (`operation_actuals` întreținut incremental), `guard_timesheet_hours` (constraint trigger amânat,
+  pe TOTALUL zilei), `guard_timesheet_line_stage`, `guard_sheet_work_unit_type`,
+  `derive_period_from_effect_date`, plus `attach_period_guard` pe stoc și bonuri.
+  `app.verify_stock_balances()` recalculează soldurile din mișcări (verificarea #18).
+- **`packages/domain/src/sheets/`** — `inspectionValidationCheck` (oglinda regulii 1, ca ecranul să
+  spună CE punct blochează înainte de apăsare), `computeVariance` (asteptat vs real, cu prag),
+  `rateCardAt` + `timesheetTotals`. **20 de teste noi**, domain 106 → **126**.
+- **`packages/services/`** — `inspections.ts`, `interventions.ts`, `timesheets.ts`, `inventory.ts`.
+  Plus două funcții tranzacționale exportate din module existente: **`recordCostTx`** (era
+  `insertCostLine`, privată) și **`createRequestTx`**.
+- **`packages/contracts/`** — `sheets.ts` și `inventory.ts`.
+- **`packages/auth`** — patru drepturi noi: `sheets.write` (și teren), `sheets.validate`
+  (office, `admin|pm|financiar`), `inventory.read` (și teren), `inventory.write`.
+- **Seed**: seria `BC` pentru `bon_consum`, și calificarea șefului de șantier.
+
+### Smoke pe Supabase dev — 21 de verificări, toate verde
+
+Rulat înainte de commit, cu un harness aruncabil (regula casei). Confirmate pe date reale:
+**#7** (fișă din 28.07 validată → cost în august), **#8** (bon + mișcări + `consumat` +
+`manopera_proprie`, soldul scade exact), **#9** (fișa picată n-a lăsat nicio linie),
+**#10** (abaterea calculată + `operation_actuals` la 1 execuție), **#11** (consum peste disponibil
+blocat, cu soldul în mesaj), **#12**, **#13** (4+2+2 → 3 linii de cost), **#14** (tarif înghețat),
+**#16** (ambele ramuri), **#17**, **#19** (`PERIOD_CLOSED` pe martie închisă).
+
+### Ce trebuie să știi ca să nu retrăiești
+
+- **`for update` nu acceptă nume calificate pe schemă.** Drizzle emite
+  `for update of "app"."interventions"`, iar Postgres răspunde „FOR UPDATE must specify unqualified
+  relation names". Soluția din `lockOpenIntervention` și `validateOneTimesheet`: **lock-ul într-o
+  interogare, join-ul în alta**. E și mai corect — `for update` fără `of` ar fi blocat și rândul din
+  `work_units`, pe care nu-l scriem acolo.
+- **`recordCostTx` primește valori DEJA parsate**, deci `''` nu se mai transformă în `null`.
+  Apelanții trebuie să trimită `null` pentru câmpurile opționale, altfel Postgres cade cu
+  `invalid input syntax for type uuid: ""`. `RecordCostInput` e `z.infer` (output), deci TypeScript
+  acceptă `''` fără să se plângă — **typecheck-ul nu te apără aici**.
+- **Poarta de bani a prins o scăpare reală la prima rulare a migrării**:
+  `grant select on app.stock_movements to app_field` includea `unit_cost`.
+  `assert_no_money_leak` a oprit migrarea cu numele coloanei. A patra rulare a ei, a patra oară când
+  își merită existența. Coloana `variance_pct` e adăugată explicit în listă: nu e în lei, dar spune
+  același lucru despre bani, iar euristica pe nume n-o prinde.
+- **`app.stock_balances` n-are `insert`/`update` acordat NIMĂNUI** — nici măcar lui `app_service`.
+  Soldul e rollup, întreținut exclusiv din trigger `security definer`. Consecință practică:
+  ramura „după coruperea manuală a unui sold" din verificarea #18 **nu se poate reproduce din
+  aplicație**; cere consolă de bază de date. Am verificat în schimb că `update`-ul e respins.
+- **`lot_id` e nullabil, deci cheia naturală a soldului e un index pe expresie**:
+  `(location_id, product_id, coalesce(lot_id, uuid-ul nul))`. Fără `coalesce`, două NULL-uri nu sunt
+  egale în Postgres și fiecare intrare fără lot ar fi făcut un rând nou. Aceeași expresie apare în
+  `on conflict` din trigger — dacă se schimbă una, trebuie schimbată și cealaltă.
+- **Prefixele din `raise exception` nu mai sunt identice cu codurile `AppError`.**
+  `STOCK_INSUFFICIENT`, `FINDING_REQUIRED`, `PHOTO_REQUIRED` numesc REGULA (log-ul de Postgres
+  devine citibil fără cod), iar traducerea spre cele opt coduri se face în `RAISED_PREFIXES` din
+  `db-errors.ts`. **Nu inventa coduri noi de `AppError`** — doar prefixe, cu maparea lor.
+- **Seed-ul rulează acum `ensureDocumentSeries` și `ensureFieldLeadQualification` ÎNAINTE de
+  verificarea „seed-ul există deja".** Motivul e general: fiecare pas nou aduce un tip de document
+  numerotat, iar o bază de dev care are deja seed n-ar mai fi căpătat seria — simptomul ar fi apărut
+  abia la prima validare de fișă, ca un 404 despre o serie pe care nimeni nu-și amintește că trebuia
+  adăugată.
+- **Propunerea de backlog născută dintr-un NOK creează și o CERERE.** `backlog_proposals.request_id`
+  e `not null`, și e corect: backlogul e o coadă de cereri amânate, iar `promoteBacklog` are nevoie
+  de cerere. Cererea intră direct în `in_backlog`, nu în inbox.
+- **Salvarea fișei rescrie răspunsurile, dar NU șterge cererile deja născute.** Un punct trecut din
+  NOK în OK își pierde legătura; cererea rămâne și se anulează explicit din modulul Cereri. A o
+  șterge ar face-o să dispară de sub ochii celui care o tria.
+
+### Ce urmează concret — 09b (ecranele, §3.5 și §3.6)
+
+Toate citirile de care au nevoie ecranele **există deja** în servicii:
+
+| Ecran | Ce cheamă |
+|---|---|
+| Inspecția (`Fișă · Constatări · Costuri · Poze · Documente`) | `getInspectionSheet` (întoarce și `check`, cu blocajele pe puncte), `saveInspection`, `validateInspection` |
+| Intervenția (`Fișă · Materiale · Ore · Costuri · Poze · Documente`) | `getInterventionSheet`, `listInterventionMaterials`, `listInterventionHours`, `saveIntervention`, `validateIntervention` |
+| Activitate › Pontaj | `listTimesheetWeek` (are deja `byPerson` și `byWorkUnit`), `saveTimesheet`, `validateTimesheets` |
+| Aprovizionare › Stoc și gestiuni | `listStock` (fizic/rezervat/disponibil), `listLocations`, `createLocation` |
+| Bon de consum | `createConsumptionNote`, `listConsumptionNotes` |
+| Obiective › Acoperire inspecții | `inspectionCoverage` — **fără notificări către teren** |
+| Validare de birou în masă (§3.6) | `listUnvalidatedInspections`, `listUnvalidatedInterventions`, `listUnvalidatedTimesheets`, `validateInspections`, `validateTimesheets` |
+
+Trei lucruri de ținut minte când le construiești:
+
+1. **Un modul nou = o intrare în `entityRegistry`**, nu fișiere de pagină. Fișele sunt tab-uri pe
+   unitatea de lucru care există deja (`registry/work-units.tsx`), nu entități noi — cheia lor
+   primară E `work_unit_id`.
+2. **`apps/web` nu poate importa `@damina/domain`.** `inspectionValidationCheck` și `computeVariance`
+   sunt deja reexportate din `@damina/services` exact pentru asta.
+3. **Citirile au `withMoney`**: `getInspectionSheet`, `getInterventionSheet`,
+   `listInterventionMaterials`, `listStock`. Pe `false` nu se CERE coloana de bani din SQL — nu se
+   cere și se ascunde. Cerută, un `select` al terenului ar cădea cu „permission denied for column",
+   iar ecranul ar părea stricat.
+
+Ce mai rămâne din §3.5 și n-are încă serviciu: **jobul nocturn** care cheamă `verifyStockBalances`
+și ridică alerta (funcția și serviciul există; coada și cronul, nu — pe tiparul din
+`packages/jobs/src/registry.ts`), și seed-ul cerut de „definiția de gata" (8 inspecții validate pe
+luni diferite, 3 intervenții, o săptămână de pontaje, o gestiune de echipă cu stoc).
+
+### Datorie de igienă, nu de la pasul 09
+
+`pnpm lint` **pică pe 3 erori** în `Initial_Context/refrence-apps/utilaje-app/api/index.js` — fișier
+netrackat, adăugat în afara pașilor. Ori intră în `eslint.config.mjs` ca ignorat, ori în
+`.gitignore`. Codul pasului 09 trece lintul curat.
 
 ---
 
@@ -530,7 +645,7 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
 | 07 — File management (R2) | 🟩 **gata** (07a–07c-2; 20/21 — #7 cere Playwright pentru întreruperea reală de rețea) | 2026-08-18 |
 | 08 — Cereri, rutare, backlog | 🟨 în lucru (08a + 08b gata: schemă, domain, servicii, ecrane; **08c** email+cronuri neatins) | 2026-08-18 |
-| 09 — Fișe de lucru | ⬜ neînceput | — |
+| 09 — Fișe de lucru | 🟨 în lucru (**09a gata**: schemă, triggere, domain, servicii — smoke pe dev 21/21; **09b** ecranele, neatins) | 2026-08-18 |
 | 10 — Teren offline, raport lunar | ⬜ neînceput | — |
 
 Legendă: ⬜ neînceput · 🟨 în lucru · 🟩 gata (toate verificările din pas trec) · 🟥 blocat
@@ -554,7 +669,7 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași** — ceea ce e chiar comportamentul cerut de #16 — **dacă `MFA_ENFORCED` nu e `0`** (vezi rândul de mai jos). |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **~498** (neconfirmat încă în CI) | La 08b: `domain` 104 → **106** (+2, `isCommercialOpportunity`), `packages/services` 116 → **131** (+8 în `requests.test.ts`, +7 în `operations.test.ts` — fișier nou). La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **~518** (neconfirmat încă în CI) | La 09a: `domain` 106 → **126** (+20, `sheets/` — inspecție, abatere, pontaj). La 08b: `domain` 104 → **106** (+2, `isCommercialOpportunity`), `packages/services` 116 → **131** (+8 în `requests.test.ts`, +7 în `operations.test.ts` — fișier nou). La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
 | **Martie 2026 e ÎNCHISĂ la firma A pe Supabase dev**, din 05c | Închisă dinadins, ca ecranul de re-alocări să aibă ce arăta: mutarea finanțării intervenției `IV-000001` de acolo a emis `NRA-000001` în august. Dacă un ecran refuză o scriere pe martie, ăsta e motivul — nu un bug. |
 | **Aplicația e deployată pe Vercel**, pe același proiect Supabase (`cspjtesltraiaveypuya`) | Deci datele de pe dev sunt aceleași care se văd în aplicația deployată — inclusiv seed-ul și luna închisă de mai sus. `next.config.ts` încarcă `.env.local` din rădăcina repo-ului, fișier care pe Vercel **nu există**: toate variabilele trebuie puse în Project Settings. |
@@ -2506,7 +2621,12 @@ cere Playwright.
 
 ## Pasul 09 — Fișe de lucru
 
-*(nicio sesiune n-a lucrat încă aici)*
+### 2026-08-18 — 09a, fundația [status: gata]
+
+Detaliile complete sunt în secțiunea **„09a — fundația fișelor de lucru"** din predarea de la
+începutul fișierului. Pe scurt: migrarea `0026` (aplicată pe dev), triggerele care țin regulile 1–8
+ale pasului, `packages/domain/src/sheets/` cu 20 de teste, patru module noi de servicii, patru
+drepturi noi. Smoke pe Supabase dev: 21 de verificări, toate verde. Ecranele (§3.5, §3.6) sunt 09b.
 
 ---
 

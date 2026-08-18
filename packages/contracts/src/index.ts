@@ -205,3 +205,51 @@ export type {
   OperationMaterialInput,
   OperationMaterialsInput,
 } from './operations';
+
+export {
+  CHECKLIST_ANSWER_LABELS,
+  CHECKLIST_ANSWERS,
+  createInspectionInputSchema,
+  createInterventionInputSchema,
+  FINDING_OUTCOME_LABELS,
+  FINDING_OUTCOMES,
+  inspectionAnswerInputSchema,
+  inspectionFindingInputSchema,
+  interventionHourInputSchema,
+  interventionMaterialInputSchema,
+  saveInspectionInputSchema,
+  saveInterventionInputSchema,
+  saveTimesheetInputSchema,
+  subcontractorAttendanceInputSchema,
+  timesheetLineInputSchema,
+  validateInspectionInputSchema,
+  validateInterventionInputSchema,
+  validateTimesheetsInputSchema,
+} from './sheets';
+export type {
+  CreateInspectionInput,
+  CreateInterventionInput,
+  InspectionAnswerInput,
+  SaveInspectionInput,
+  SaveInterventionInput,
+  SaveTimesheetInput,
+  SubcontractorAttendanceInput,
+  ValidateInspectionInput,
+  ValidateInterventionInput,
+  ValidateTimesheetsInput,
+} from './sheets';
+
+export {
+  consumptionLineInputSchema,
+  createConsumptionNoteInputSchema,
+  createLocationInputSchema,
+  LOCATION_TYPE_HOLDER,
+  LOCATION_TYPE_LABELS,
+  LOCATION_TYPES,
+} from './inventory';
+export type {
+  ConsumptionLineInput,
+  CreateConsumptionNoteInput,
+  CreateLocationInput,
+  LocationType,
+} from './inventory';

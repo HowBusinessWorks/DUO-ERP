@@ -75,6 +75,31 @@ export {
   selectBacklogToFill,
   splitDeltaAcrossPeriods,
 } from './requests';
+export {
+  computeVariance,
+  DEFAULT_VARIANCE_THRESHOLD,
+  describeInspectionBlocker,
+  describeVariance,
+  INSPECTION_BLOCKER_MESSAGES,
+  inspectionValidationCheck,
+  MAX_HOURS_PER_DAY,
+  rateCardAt,
+  timesheetTotals,
+} from './sheets';
+export type {
+  AnswerLike,
+  ChecklistPointLike,
+  InspectionBlocker,
+  InspectionBlockerCode,
+  InspectionValidationCheck,
+  LaborConsumption,
+  MaterialConsumption,
+  RateCardLike,
+  TimesheetLineLike,
+  TimesheetTotals,
+  VarianceInput,
+  VarianceResult,
+} from './sheets';
 export type {
   BacklogProposalLike,
   BacklogSelection,

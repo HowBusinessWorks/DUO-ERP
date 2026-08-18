@@ -49,29 +49,44 @@ export async function createRequest(
   input: CreateRequestInput,
 ): Promise<{ readonly id: string }> {
   const values = createRequestInputSchema.parse(input);
-  const id = uuidv7();
 
   try {
-    return await withActor(actor, async (tx) => {
-      await tx.insert(schema.requests).values({
-        id,
-        companyId: values.companyId,
-        type: values.type,
-        source: values.source,
-        objectiveId: values.objectiveId,
-        contractId: values.contractId,
-        contractObjectiveId: values.contractObjectiveId,
-        title: values.title,
-        description: values.description ?? null,
-        estimatedValue: values.estimatedValue,
-        slaDueAt: values.slaDueAt === null ? null : new Date(values.slaDueAt),
-        createdBy: actor.personId,
-      });
-      return { id };
-    });
+    return await withActor(actor, async (tx) => createRequestTx(tx, actor, values));
   } catch (error) {
     return translateDbError(error);
   }
+}
+
+/**
+ * Crearea cererii pe o tranzactie DEJA deschisa.
+ *
+ * Exista din acelasi motiv ca `createWorkUnitTx`: iesirea „creează intervenție"
+ * a unui punct NOK (pasul 09) scrie constatarea SI cererea nascuta din ea in
+ * aceeasi tranzactie. Un `withActor` in plus ar lua alta conexiune din pool si
+ * fisa ar putea ramane salvata cu o constatare care arata spre o cerere care nu
+ * s-a scris.
+ */
+export async function createRequestTx(
+  tx: ActorTx,
+  actor: Actor,
+  values: ReturnType<typeof createRequestInputSchema.parse>,
+): Promise<{ readonly id: string }> {
+  const id = uuidv7();
+  await tx.insert(schema.requests).values({
+    id,
+    companyId: values.companyId,
+    type: values.type,
+    source: values.source,
+    objectiveId: values.objectiveId,
+    contractId: values.contractId,
+    contractObjectiveId: values.contractObjectiveId,
+    title: values.title,
+    description: values.description ?? null,
+    estimatedValue: values.estimatedValue,
+    slaDueAt: values.slaDueAt === null ? null : new Date(values.slaDueAt),
+    createdBy: actor.personId,
+  });
+  return { id };
 }
 
 // ── Cererea, sub lock ────────────────────────────────────────────────────────

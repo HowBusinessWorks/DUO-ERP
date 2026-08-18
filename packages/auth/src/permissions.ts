@@ -45,6 +45,19 @@ export const CAPABILITIES = [
   'requests.triage',
   /** Decide rutarea si promoveaza din backlog — adica CREEAZA unitati de lucru. */
   'requests.decide',
+  /** Deschide si completeaza fisele de lucru: inspectii, interventii, pontaj. */
+  'sheets.write',
+  /**
+   * Valideaza o fisa. Drept SEPARAT de completare, si asta e tot rostul lui:
+   * validarea seteaza `effect_date` si produce costuri, stoc si `operation_
+   * actuals`. Cine completeaza fisa nu trebuie sa fie si cel care ii confirma
+   * cifrele — altfel comparatia asteptat vs real din §8.5 n-ar mai insemna nimic.
+   */
+  'sheets.validate',
+  /** Deschide stocul si gestiunile. */
+  'inventory.read',
+  /** Creeaza gestiuni si emite bonuri de consum manuale. */
+  'inventory.write',
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -206,6 +219,39 @@ export const PERMISSION_MATRIX: readonly CapabilitySpec[] = [
     // lista e cea de la `contracts.write`, nu cea de la triere.
     personas: OFFICE_ONLY,
     officeRoles: ['admin', 'pm'],
+  },
+  {
+    key: 'sheets.write',
+    group: 'Fișe de lucru',
+    label: 'Completează inspecții, intervenții și pontaje',
+    // Terenul, in primul rand: fisele se completeaza acolo unde se lucreaza.
+    personas: INTERNAL,
+    officeRoles: ALL_OFFICE,
+  },
+  {
+    key: 'sheets.validate',
+    group: 'Fișe de lucru',
+    label: 'Validează fișele — setează luna de raportare și produce costuri',
+    // Doar biroul, si nu tot: validarea scrie in registrul de cost si misca
+    // stocul. E aceeasi greutate ca „închide luna", nu ca „scrie o fișă".
+    personas: OFFICE_ONLY,
+    officeRoles: ['admin', 'pm', 'financiar'],
+  },
+  {
+    key: 'inventory.read',
+    group: 'Aprovizionare',
+    label: 'Vede stocul și gestiunile',
+    // Si terenul: fara sold, nu poate declara un consum. Cantitatile da, CMP-ul
+    // nu — coloana `avg_cost` nu-i e acordata in 0026.
+    personas: INTERNAL,
+    officeRoles: ALL_OFFICE,
+  },
+  {
+    key: 'inventory.write',
+    group: 'Aprovizionare',
+    label: 'Creează gestiuni și emite bonuri de consum',
+    personas: OFFICE_ONLY,
+    officeRoles: ['admin', 'pm', 'magazie', 'achizitii'],
   },
 ];
 

@@ -340,3 +340,83 @@ export type {
   OperationMaterialRow,
   OperationRow,
 } from './operations';
+
+// ── Pasul 09: fise de lucru, pontaj, gestiuni ────────────────────────────────
+
+export {
+  checklistsForContractObjective,
+  createInspection,
+  getInspectionSheet,
+  inspectionCoverage,
+  listUnvalidatedInspections,
+  saveInspection,
+  validateInspection,
+  validateInspections,
+} from './inspections';
+export type {
+  InspectionCoverage,
+  InspectionCoverageRow,
+  InspectionPointRow,
+  InspectionSheet,
+  SaveInspectionResult,
+} from './inspections';
+
+export {
+  createIntervention,
+  getInterventionSheet,
+  listInterventionHours,
+  listInterventionMaterials,
+  listUnvalidatedInterventions,
+  saveIntervention,
+  validateIntervention,
+} from './interventions';
+export type {
+  InterventionHourRow,
+  InterventionMaterialRow,
+  InterventionSheet,
+  ValidateInterventionResult,
+} from './interventions';
+
+export {
+  declareSubcontractorAttendance,
+  listSubcontractorAttendance,
+  listTimesheetWeek,
+  listUnvalidatedTimesheets,
+  saveTimesheet,
+  validateTimesheets,
+} from './timesheets';
+export type {
+  TimesheetLineRow,
+  TimesheetRow,
+  TimesheetWeek,
+  ValidateTimesheetsResult,
+} from './timesheets';
+
+export {
+  createConsumptionNote,
+  createLocation,
+  issueConsumptionNoteTx,
+  listConsumptionNotes,
+  listLocations,
+  listStock,
+  unitCostKey,
+  verifyStockBalances,
+} from './inventory';
+export type {
+  ConsumptionNoteRow,
+  IssuedConsumptionNote,
+  ListStockOptions,
+  LocationRow,
+  StockDivergence,
+  StockRow,
+} from './inventory';
+
+export {
+  computeVariance,
+  describeInspectionBlocker,
+  describeVariance,
+  inspectionValidationCheck,
+  rateCardAt,
+  timesheetTotals,
+} from '@damina/domain';
+export type { InspectionBlocker, InspectionValidationCheck, VarianceResult } from '@damina/domain';

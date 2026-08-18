@@ -1,6 +1,6 @@
 import { closeConnections, loadEnvFiles, schema, withActor, type Actor } from '@damina/db';
 import { uuidv7 } from '@damina/shared';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import {
   createComponent,
   createContract,
@@ -39,6 +39,9 @@ loadEnvFiles();
 const P = '01950000';
 const id = (group: number, index = 0): string =>
   `${P}-0000-7000-8000-${String(group).padStart(6, '0')}${String(index).padStart(6, '0')}`;
+
+/** Trebuie sa ramana identic cu `DEV_PERSON_ID` din `apps/web/src/lib/session.ts`. */
+const DEV_PERSON_ID = '00000000-0000-7000-8000-0000000000de';
 
 const IDS = {
   companyA: id(1, 1),
@@ -81,6 +84,7 @@ const SERIES = {
   interventie: 'IV',
   inspectie: 'I',
   nota_realocare: 'NRA',
+  bon_consum: 'BC',
 } as const;
 
 /** Profilele isi iau id-ul din baza, deci numele le e cheia — si aici, si in `wipe`. */
@@ -276,13 +280,15 @@ async function bootstrap(): Promise<void> {
 
     await tx
       .insert(schema.persons)
-      .values({
-        id: IDS.pm,
-        persona: 'office',
-        category: 'angajat',
-        fullName: 'Andrei Ionescu',
-        email: 'andrei.ionescu@damina.test',
-      })
+      .values([
+        {
+          id: IDS.pm,
+          persona: 'office',
+          category: 'angajat',
+          fullName: 'Andrei Ionescu',
+          email: 'andrei.ionescu@damina.test',
+        },
+      ])
       .onConflictDoNothing();
 
     await tx
@@ -440,10 +446,111 @@ async function costGround(): Promise<WorkUnitGround | null> {
   });
 }
 
+/**
+ * Persoana sesiunii de dezvoltare (`DEV_PERSON_ID` din `apps/web/src/lib/session.ts`).
+ *
+ * Se asigura la FIECARE rulare, inainte de orice altceva, si NU face parte din
+ * `bootstrap()` — altfel o baza deja seedata (unde seed-ul iese devreme) ar
+ * ramane fara ea. Fara persoana asta, orice scriere din sesiunea de dev cade pe
+ * FK-ul `created_by → persons`: ecranul trece de validare, dar insertul spune
+ * „Key is not present in table persons".
+ *
+ * Nu primeste `person_company_access`: e `admin` fara firme atribuite, iar
+ * `app.current_company_ids()` trateaza cazul asta ca „tot grupul" — exact ce
+ * vrea sesiunea de dev, care nu are firma aleasa.
+ */
+async function ensureDevPerson(): Promise<void> {
+  await withActor(actor('seed'), async (tx) => {
+    await tx
+      .insert(schema.persons)
+      .values({
+        id: DEV_PERSON_ID,
+        persona: 'office',
+        category: 'angajat',
+        fullName: 'Utilizator de dezvoltare',
+        email: 'dev@damina.test',
+      })
+      .onConflictDoNothing();
+
+    await tx
+      .insert(schema.personOfficeRoles)
+      .values({ personId: DEV_PERSON_ID, role: 'admin' })
+      .onConflictDoNothing();
+  });
+}
+
+/**
+ * Seriile de numerotare, la ambele firme. O serie lipsa da „NOT_FOUND: seria …
+ * nu e definita" la prima creare din ecran, si nimeni nu ghiceste de ce.
+ *
+ * Ruleaza SEPARAT de `bootstrap` si INAINTE de verificarea „seed-ul exista
+ * deja", dinadins: fiecare pas nou aduce un tip de document numerotat (pasul 09
+ * a adus `bon_consum`), iar o baza de dezvoltare care are deja seed n-ar mai fi
+ * capatat seria — si simptomul ar fi aparut abia la prima validare de fisa, ca
+ * un 404 despre o serie pe care nimeni nu si-o aminteste ca trebuia adaugata.
+ */
+async function ensureDocumentSeries(): Promise<void> {
+  await withActor(actor('seed'), async (tx) => {
+    await tx
+      .insert(schema.documentSeries)
+      .values(
+        [IDS.companyA, IDS.companyB].flatMap((companyId) =>
+          (
+            [
+              ['lucrare', SERIES.lucrare],
+              ['interventie', SERIES.interventie],
+              ['inspectie', SERIES.inspectie],
+              ['nota_realocare', SERIES.nota_realocare],
+              ['bon_consum', SERIES.bon_consum],
+            ] as const
+          ).map(([documentType, series]) => ({
+            companyId,
+            documentType,
+            series,
+            nextNumber: 1,
+          })),
+        ),
+      )
+      .onConflictDoNothing();
+  });
+}
+
+/**
+ * Seful de santier capata o calificare (pasul 09).
+ *
+ * Fara ea nu i se poate valida niciun pontaj si nicio ora de pe o fisa de
+ * interventie: tariful se ia din `rate_cards`, iar cheia acolo e calificarea.
+ * Nu se scrie la crearea persoanei, fiindca acolo calificarile inca nu exista —
+ * si nu se scrie nici in `seedRequestsAndCatalog`, care iese devreme cand
+ * catalogul e deja pus. Ruleaza deci separat, ca `ensureDocumentSeries`, si e
+ * fara efect pe o baza care are deja calificarea.
+ */
+async function ensureFieldLeadQualification(): Promise<void> {
+  await withActor(actor('seed'), async (tx) => {
+    const [qualification] = await tx
+      .select({ id: schema.qualifications.id })
+      .from(schema.qualifications)
+      .where(eq(schema.qualifications.code, QUALIFICATIONS[0]?.code ?? ''))
+      .limit(1);
+
+    if (qualification === undefined) {
+      return;
+    }
+    await tx
+      .update(schema.persons)
+      .set({ qualificationId: qualification.id })
+      .where(and(eq(schema.persons.id, IDS.fieldLead), isNull(schema.persons.qualificationId)));
+  });
+}
+
 async function main(): Promise<void> {
   const force = process.argv.includes('--force');
   const onlyCosts = process.argv.includes('--costs');
   const onlyRequests = process.argv.includes('--requests');
+
+  await ensureDevPerson();
+  await ensureDocumentSeries();
+  await ensureFieldLeadQualification();
 
   if (await exists()) {
     /*
@@ -764,29 +871,9 @@ async function seedWorkUnits(base: WorkUnitGround): Promise<void> {
       })
       .onConflictDoNothing();
 
-    // Seriile, la ambele firme: o serie lipsa da „NOT_FOUND: seria … nu e
-    // definita" la prima creare din ecran, si nimeni nu ghiceste de ce.
-    await tx
-      .insert(schema.documentSeries)
-      .values(
-        [IDS.companyA, IDS.companyB].flatMap((companyId) =>
-          (
-            [
-              ['lucrare', SERIES.lucrare],
-              ['interventie', SERIES.interventie],
-              ['inspectie', SERIES.inspectie],
-              ['nota_realocare', SERIES.nota_realocare],
-            ] as const
-          ).map(([documentType, series]) => ({
-            companyId,
-            documentType,
-            series,
-            nextNumber: 1,
-          })),
-        ),
-      )
-      .onConflictDoNothing();
   });
+
+  await ensureDocumentSeries();
 
   const periods = await withActor(actor(), async (tx) =>
     tx.select().from(schema.periods).where(eq(schema.periods.companyId, IDS.companyA)),

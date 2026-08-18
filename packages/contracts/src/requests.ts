@@ -15,9 +15,24 @@ import { createWorkUnitInputSchema } from './work-units';
 const trimmed = (max: number): z.ZodString => z.string().trim().max(max);
 const requiredText = (max: number, message = 'Câmpul e obligatoriu.'): z.ZodString =>
   trimmed(max).min(1, message);
-const optionalUuid = uuidSchema.or(z.literal('')).transform((v) => (v === '' ? null : v));
-const optionalMoney = moneySchema.or(z.literal('')).transform((v) => (v === '' ? null : v));
-const optionalDate = businessDateSchema.or(z.literal('')).transform((v) => (v === '' ? null : v));
+/**
+ * Optionalele formularului de cerere trebuie sa fie IDEMPOTENTE: aceeasi schema
+ * ruleaza de doua ori pe acelasi obiect — o data in browser (react-hook-form,
+ * care trimite mai departe valorile DEJA transformate) si o data in server
+ * action. Daca ar accepta doar `''`, a doua trecere ar primi `null`-ul produs de
+ * prima si ar cadea cu „Invalid input" pe un formular corect completat.
+ */
+const emptyish = z.union([z.literal(''), z.null(), z.undefined()]);
+const optionalUuid = uuidSchema.or(emptyish).transform((v) => (v === '' || v == null ? null : v));
+const optionalMoney = moneySchema.or(emptyish).transform((v) => (v === '' || v == null ? null : v));
+const optionalDate = businessDateSchema
+  .or(emptyish)
+  .transform((v) => (v === '' || v == null ? null : v));
+const optionalDateTime = z
+  .string()
+  .datetime()
+  .or(emptyish)
+  .transform((v) => (v === '' || v == null ? null : v));
 
 export const REQUEST_TYPES = [
   'tichet_client',
@@ -85,9 +100,9 @@ export const createRequestInputSchema = z.object({
   contractId: optionalUuid,
   contractObjectiveId: optionalUuid,
   title: requiredText(300, 'Scrie un titlu.'),
-  description: trimmed(5000).optional(),
+  description: trimmed(5000).nullish(),
   estimatedValue: optionalMoney,
-  slaDueAt: z.string().datetime().or(z.literal('')).transform((v) => (v === '' ? null : v)),
+  slaDueAt: optionalDateTime,
 });
 
 /** O linie de evaluare: operatiune din catalog × cantitate. */
@@ -178,7 +193,7 @@ export const triageRequestInputSchema = z.object({
   contractId: optionalUuid,
   contractObjectiveId: optionalUuid,
   title: requiredText(300, 'Scrie un titlu.'),
-  description: trimmed(5000).optional(),
+  description: trimmed(5000).nullish(),
   estimatedValue: optionalMoney,
 });
 

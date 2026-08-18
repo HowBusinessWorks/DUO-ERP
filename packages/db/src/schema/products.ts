@@ -30,6 +30,13 @@ export const products = app.table(
     defaultSupplierId: uuid('default_supplier_id').references(() => suppliers.id),
     /** Fals pentru servicii si manopera facturata: nu intra niciodata in gestiune. */
     isStockItem: boolean('is_stock_item').notNull().default(true),
+    /**
+     * Se urmareste pe lot (pasul 09). Cand e adevarat, `lot_id` de pe miscarile
+     * de stoc si de pe liniile de consum e obligatoriu; cand e fals, produsul are
+     * un singur sold per gestiune. FEFO complet ramane faza 3 — aici doar steagul
+     * si coloana, ca sa nu fie nevoie de o migrare de date atunci.
+     */
+    isLotTracked: boolean('is_lot_tracked').notNull().default(false),
     /** Pragul care declanseaza alerta `stoc_sub_minim`. Null = fara prag. */
     minStock: numeric('min_stock', { precision: 14, scale: 4 }),
     notes: text('notes'),
