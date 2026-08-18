@@ -4,12 +4,22 @@ import { canValidateSheets, canWriteSheets } from '@damina/auth';
 import {
   createInspectionInputSchema,
   saveInspectionInputSchema,
+  saveInterventionInputSchema,
   validateInspectionInputSchema,
+  validateInterventionInputSchema,
   type CreateInspectionInput,
   type SaveInspectionInput,
+  type SaveInterventionInput,
   type ValidateInspectionInput,
+  type ValidateInterventionInput,
 } from '@damina/contracts';
-import { createInspection, saveInspection, validateInspection } from '@damina/services';
+import {
+  createInspection,
+  saveInspection,
+  saveIntervention,
+  validateInspection,
+  validateIntervention,
+} from '@damina/services';
 import { revalidatePath } from 'next/cache';
 import { createAction, type ActionResult } from '../../lib/action';
 import { requireSession } from '../../lib/session';
@@ -117,6 +127,77 @@ export async function validateInspectionAction(
     schema: validateInspectionInputSchema,
     run: (actor, _values, rawInput) =>
       validateInspection(actor, rawInput as ValidateInspectionInput),
+  });
+
+  const result = await run(raw);
+  if (result.ok) {
+    revalidatePath('/', 'layout');
+  }
+  return result;
+}
+
+// ── Interventia ──────────────────────────────────────────────────────────────
+
+/**
+ * Completarea fisei de interventie: materiale, ore, descriere.
+ *
+ * Se trimite fisa INTREAGA, ca la inspectie, si din acelasi motiv: serviciul
+ * sterge si rescrie liniile intr-o tranzactie. De aceea si ecranul e o singura
+ * componenta cu trei sectiuni — tab-ul Materiale si tab-ul Ore trimit amandoua
+ * tot ce e pe fisa, nu doar partea lor. O actiune „salveaza doar materialele"
+ * ar fi sters orele omului care era pe celalalt tab.
+ */
+export async function saveInterventionAction(
+  raw: unknown,
+): Promise<ActionResult<{ readonly materials: number; readonly hours: number }>> {
+  const session = await requireSession();
+  if (!canWriteSheets(session)) {
+    return WRITE_DENIED;
+  }
+
+  const run = createAction({
+    schema: saveInterventionInputSchema,
+    run: (actor, _values, rawInput) => saveIntervention(actor, rawInput as SaveInterventionInput),
+  });
+
+  const result = await run(raw);
+  if (result.ok) {
+    revalidatePath('/', 'layout');
+  }
+  return result;
+}
+
+/**
+ * Validarea de birou. Aici se intampla tot ce costa bani, intr-o tranzactie:
+ * bonul de consum, miscarile de stoc, liniile de cost si `operation_actuals`.
+ *
+ * Rezultatul se intoarce ca text, nu ca `Money`: valorile nu trec granita
+ * server→client ca obiecte.
+ */
+export async function validateInterventionAction(raw: unknown): Promise<
+  ActionResult<{
+    readonly consumptionNoteNumber: string | null;
+    readonly realCost: string;
+    readonly variancePct: string | null;
+    readonly flagged: boolean;
+  }>
+> {
+  const session = await requireSession();
+  if (!canValidateSheets(session)) {
+    return VALIDATE_DENIED;
+  }
+
+  const run = createAction({
+    schema: validateInterventionInputSchema,
+    run: async (actor, _values, rawInput) => {
+      const result = await validateIntervention(actor, rawInput as ValidateInterventionInput);
+      return {
+        consumptionNoteNumber: result.consumptionNoteNumber,
+        realCost: result.realCost.toDbString(),
+        variancePct: result.variancePct,
+        flagged: result.flagged,
+      };
+    },
   });
 
   const result = await run(raw);

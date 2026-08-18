@@ -150,6 +150,24 @@ instanțe. E o **frânare**, nu un zid — zidul e limita proprie a lui GoTrue, 
 instanțele. Alternativa, un tabel în Postgres, ar fi însemnat o scriere la fiecare încercare de
 login, adică exact suprafața pe care vrea s-o obosească un atacator.
 
+## Capcana grant-ului pe coloane la scriere
+
+`grant insert (coloane)` pare simetric cu `grant select (coloane)`. **Nu e**, dacă scrii prin
+drizzle: un `insert` generat de drizzle **numește toate coloanele tabelei**, punând `default`
+pe cele nedate. Postgres cere privilegiu pe fiecare coloană *numită*, nu doar pe cele cu
+valoare — deci un `insert` care lasă `unit_cost` pe `default` cade tot cu 42501.
+
+Consecința practică, aflată la 09b-2 pe `app.intervention_materials`:
+
+- **`created_at` trebuie să fie în listă.** Are `default now()` și e oricum în lista de `select`;
+  acordarea lui nu deschide nimic, doar permite să fie scris cu propriul default.
+- **Coloanele pe care chiar vrei să le ții închise cer un `insert` scris de mână**, cu doar
+  coloanele acordate. Alternativa — să le acorzi ca să treacă drizzle — e renunțarea la exact
+  protecția pentru care le-ai scos.
+
+Cum se vede: **numai chemând use-case-ul din rolul restrâns**. Din birou merge, typecheck-ul
+tace, testele de RLS nu se uită la `insert`-uri.
+
 ## Ce nu se face niciodată
 
 - Politici sau grant-uri din dashboard. Totul e migrare versionată.

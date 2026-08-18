@@ -401,6 +401,7 @@ export {
   listConsumptionNotes,
   listLocations,
   listStock,
+  listTeamOptions,
   unitCostKey,
   verifyStockBalances,
 } from './inventory';
@@ -411,6 +412,7 @@ export type {
   LocationRow,
   StockDivergence,
   StockRow,
+  TeamOption,
 } from './inventory';
 
 export {

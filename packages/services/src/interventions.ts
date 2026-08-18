@@ -79,14 +79,22 @@ export async function createIntervention(
         values.sourceRequestId === null ? {} : { sourceRequestId: values.sourceRequestId },
       );
 
-      await tx.insert(schema.interventions).values({
-        workUnitId,
-        sourceRequestId: values.sourceRequestId,
-        performedOn: values.performedOn,
-        description: values.description,
-        operationId: values.operationId,
-        teamId: values.teamId,
-      });
+      /*
+       * `update`, nu `insert`: randul de fisa exista deja. Trigger-ul din 0028
+       * il naste odata cu unitatea, ca sa aiba fisa si interventiile venite pe
+       * celelalte doua drumuri — formularul generic si decizia de rutare.
+       * Serviciul asta doar completeaza ce stie in plus.
+       */
+      await tx
+        .update(schema.interventions)
+        .set({
+          sourceRequestId: values.sourceRequestId,
+          performedOn: values.performedOn,
+          description: values.description,
+          operationId: values.operationId,
+          teamId: values.teamId,
+        })
+        .where(eq(schema.interventions.workUnitId, workUnitId));
 
       return { id: workUnitId, code: created.code };
     });
@@ -132,14 +140,29 @@ export async function saveIntervention(
         .where(eq(schema.interventionHours.workUnitId, values.workUnitId));
 
       for (const material of values.materials) {
-        await tx.insert(schema.interventionMaterials).values({
-          id: uuidv7(),
-          workUnitId: values.workUnitId,
-          productId: material.productId,
-          lotId: material.lotId,
-          quantity: material.quantity,
-          locationId: material.locationId,
-        });
+        /*
+         * `insert` scris de mana, nu prin drizzle, si nu din stil.
+         *
+         * Drizzle numeste in `insert` TOATE coloanele tabelei, si le pune
+         * `default` pe cele nedate — inclusiv `unit_cost` si
+         * `consumption_note_id`, singurele doua pe care 0026 le tine dinadins
+         * in afara grant-ului de teren. Postgres cere privilegiu pe fiecare
+         * coloana NUMITA, nu doar pe cele cu valoare, deci varianta prin
+         * drizzle cadea cu „permission denied" pentru orice om de pe teren,
+         * adica pentru singurul care completeaza fisa.
+         *
+         * Alternativa ar fi fost sa i se acorde terenului `insert` pe cele
+         * doua coloane — adica sa se renunte la exact protectia pentru care au
+         * fost scoase. Costul CMP se ingheata la validare, din gestiune; el nu
+         * are ce cauta in ce trimite telefonul.
+         */
+        await tx.execute(sql`
+          insert into app.intervention_materials
+            (id, work_unit_id, product_id, lot_id, quantity, location_id)
+          values (
+            ${uuidv7()}, ${values.workUnitId}, ${material.productId},
+            ${material.lotId}, ${material.quantity}, ${material.locationId}
+          )`);
       }
 
       for (const hour of values.hours) {

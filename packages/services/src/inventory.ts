@@ -56,6 +56,54 @@ export async function listLocations(
   );
 }
 
+export interface TeamOption {
+  readonly id: string;
+  readonly name: string;
+  /** Gestiunea echipei. Gol cand n-are una — materialele n-au atunci de unde iesi. */
+  readonly locationId: string;
+  readonly locationName: string | null;
+}
+
+/**
+ * Echipele si gestiunile lor, pentru selectoarele fisei de interventie.
+ *
+ * Cele doua se citesc IMPREUNA dinadins: alegerea echipei pe fisa decide din ce
+ * gestiune ies materialele, iar un ecran care ar cere separat „echipele" si
+ * „gestiunile" ar trebui sa le lege el — adica sa repete, in browser, regula
+ * `locations_holder_matches_type` din 0026.
+ */
+export async function listTeamOptions(
+  actor: Actor,
+  companyIds: readonly string[],
+): Promise<TeamOption[]> {
+  if (companyIds.length === 0) {
+    return [];
+  }
+  return withActor(actor, async (tx) => {
+    const rows = await tx
+      .select({
+        id: schema.teams.id,
+        name: schema.teams.name,
+        locationId: schema.locations.id,
+        locationName: schema.locations.name,
+      })
+      .from(schema.teams)
+      .leftJoin(
+        schema.locations,
+        and(eq(schema.locations.teamId, schema.teams.id), eq(schema.locations.isActive, true)),
+      )
+      .where(and(inArray(schema.teams.companyId, [...companyIds]), eq(schema.teams.isActive, true)))
+      .orderBy(asc(schema.teams.name));
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      locationId: row.locationId ?? '',
+      locationName: row.locationName,
+    }));
+  });
+}
+
 /**
  * Creeaza o gestiune. Verificarea #16 a pasului trece pe aici, si trece
  * negativ: nu exista drum prin care sa iasa o „gestiune de contract", fiindca

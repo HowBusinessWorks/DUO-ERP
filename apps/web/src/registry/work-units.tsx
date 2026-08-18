@@ -10,6 +10,7 @@ import {
   folderForEntity,
   getClosingChecklist,
   getInspectionSheet,
+  getInterventionSheet,
   getStage,
   getStageOverview,
   getWorkUnit,
@@ -17,13 +18,20 @@ import {
   listAssignments,
   listChildren,
   listComponentsForContracts,
+  listConsumptionNotes,
   listContracts,
+  listDocumentSeries,
+  listInterventionHours,
+  listInterventionMaterials,
   listPeriodOptions,
+  listOperations,
   listPersonOptions,
   listReallocationDocuments,
   listStages,
   listStagesForCompanies,
+  listStock,
   listSubcontractors,
+  listTeamOptions,
   listObjectives,
   listWorkUnits,
   previewFundingMove,
@@ -44,6 +52,7 @@ import { PhasePlaceholder } from '../components/detail/phase-placeholder';
 import { EntityDocuments } from '../components/files/entity-documents';
 import { ClosingChecklist } from '../components/work-unit/closing-checklist';
 import { InspectionSheet } from '../components/work-unit/inspection-sheet';
+import { InterventionSheet } from '../components/work-unit/intervention-sheet';
 import { FundingPanel, fundingSummary, monthLabel } from '../components/work-unit/funding-panel';
 import { StageTimeline } from '../components/work-unit/stage-timeline';
 import {
@@ -518,8 +527,14 @@ export const activitate = defineEntity<WorkUnitRow>({
       },
       {
         slug: '',
+        label: 'Fișă',
+        visible: (_session, row) => row.type === 'interventie',
+        render: async (row, ctx) => <InterventionTab row={row} ctx={ctx} section="fisa" />,
+      },
+      {
+        slug: '',
         label: 'Prezentare',
-        visible: (_session, row) => row.type !== 'inspectie',
+        visible: (_session, row) => row.type === 'lucrare',
         render: async (row, ctx) => <Overview row={row} ctx={ctx} />,
       },
 
@@ -557,13 +572,25 @@ export const activitate = defineEntity<WorkUnitRow>({
       {
         slug: 'materiale',
         label: 'Materiale',
-        visible: (_session, row) => row.type !== 'inspectie',
+        visible: (_session, row) => row.type === 'interventie',
+        render: async (row, ctx) => <InterventionTab row={row} ctx={ctx} section="materiale" />,
+      },
+      {
+        slug: 'materiale',
+        label: 'Materiale',
+        visible: (_session, row) => row.type === 'lucrare',
         render: () => <PhasePlaceholder phase={3} what="Consumurile de material" />,
       },
       {
         slug: 'manopera',
+        label: 'Ore',
+        visible: (_session, row) => row.type === 'interventie',
+        render: async (row, ctx) => <InterventionTab row={row} ctx={ctx} section="ore" />,
+      },
+      {
+        slug: 'manopera',
         label: 'Manoperă',
-        visible: (_session, row) => row.type !== 'inspectie',
+        visible: (_session, row) => row.type === 'lucrare',
         render: () => <PhasePlaceholder phase={1} what="Orele pontate pe unitate" />,
       },
       {
@@ -1588,5 +1615,116 @@ async function FindingsTab({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Fisa de interventie, in trei sectiuni pe trei tab-uri (§3.2).
+ *
+ * Toate trei incarca ACELEASI date si randeaza aceeasi componenta, cu alta
+ * sectiune. Nu e risipa: salvarea inlocuieste fisa intreaga, deci si tab-ul
+ * Materiale trebuie sa stie orele — altfel prima salvare de acolo le-ar sterge.
+ *
+ * Terenul primeste totul fara bani. Nu doar ascuns: coloanele nici nu se cer,
+ * fiindca `unit_cost`, `avg_cost` si costul estimat din catalog nu-i sunt
+ * acordate — o interogare care le-ar cere n-ar intoarce zero randuri, ci ar
+ * cadea cu „permission denied".
+ */
+async function InterventionTab({
+  row,
+  ctx,
+  section,
+}: {
+  readonly row: WorkUnitRow;
+  readonly ctx: EntityContext;
+  readonly section: 'fisa' | 'materiale' | 'ore';
+}) {
+  const withMoney = canSeeFinancials(ctx.session);
+
+  const [sheet, materials, hours, teams, operations, persons, series, notes] = await Promise.all([
+    getInterventionSheet(ctx.actor, row.id, { withMoney }),
+    listInterventionMaterials(ctx.actor, row.id, { withMoney }),
+    listInterventionHours(ctx.actor, row.id),
+    listTeamOptions(ctx.actor, [row.companyId]),
+    listOperations(ctx.actor, { withMoney }),
+    listPersonOptions(ctx.actor, ['office', 'field']),
+    canValidateSheets(ctx.session)
+      ? listDocumentSeries(ctx.actor, row.companyId, 'bon_consum')
+      : Promise.resolve([]),
+    listConsumptionNotes(ctx.actor, { companyIds: [row.companyId], workUnitId: row.id }),
+  ]);
+
+  const team = teams.find((candidate) => candidate.id === sheet.teamId);
+  const locationId = team?.locationId ?? '';
+
+  // Stocul se cere doar cand exista gestiune: fara ea selectorul n-are ce lista,
+  // iar o interogare pe toata firma ar aduce si ce nu poate fi consumat de aici.
+  const stock =
+    locationId === ''
+      ? []
+      : await listStock(ctx.actor, {
+          companyIds: [row.companyId],
+          locationId,
+          withCost: withMoney,
+        });
+
+  return (
+    <InterventionSheet
+      section={section}
+      workUnitId={row.id}
+      performedOn={sheet.performedOn}
+      effectDate={sheet.effectDate}
+      validated={sheet.validatedAt !== null}
+      description={sheet.description}
+      declaredHours={sheet.declaredHours === null ? null : sheet.declaredHours.toDbString()}
+      operationId={sheet.operationId}
+      teamId={sheet.teamId}
+      consumptionNoteNumber={notes[0]?.number ?? null}
+      materials={materials.map((line) => ({
+        id: line.id,
+        productId: line.productId,
+        productLabel: `${line.productCode} · ${line.productName}`,
+        quantity: line.quantity.toDbString(),
+        uom: line.uom,
+        locationId: line.locationId,
+        unitCost: line.unitCost === null ? null : line.unitCost.toDbString(),
+      }))}
+      hours={hours.map((line) => ({
+        id: line.id,
+        personId: line.personId,
+        personName: line.personName,
+        hours: line.hours.toDbString(),
+        workDate: line.workDate,
+      }))}
+      variance={
+        sheet.variance === null
+          ? null
+          : {
+              expectedCost: sheet.variance.expectedCost?.toDbString() ?? null,
+              realCost: sheet.variance.realCost.toDbString(),
+              variancePct: sheet.variance.variancePct,
+              flagged: sheet.variance.flagged,
+            }
+      }
+      locationId={locationId}
+      locationName={team?.locationName ?? null}
+      stock={stock.map((entry) => ({
+        productId: entry.productId,
+        label: `${entry.productCode} · ${entry.productName}`,
+        uom: entry.uom,
+        available: entry.available.toDbString(),
+      }))}
+      operations={operations.map((operation) => ({
+        id: operation.id,
+        label: `${operation.code} · ${operation.name}`,
+      }))}
+      teams={teams.map((entry) => ({ id: entry.id, name: entry.name }))}
+      persons={persons.map((person) => ({ id: person.id, name: person.fullName }))}
+      consumptionSeries={series.map((entry) => entry.series)}
+      canWrite={canWriteSheets(ctx.session)}
+      canValidateSheet={canValidateSheets(ctx.session)}
+      withMoney={withMoney}
+      suggestedEffectDate={new Date().toISOString().slice(0, 10)}
+    />
   );
 }

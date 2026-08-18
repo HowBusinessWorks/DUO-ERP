@@ -341,12 +341,19 @@ export const cereri = defineEntity<RequestRow>({
                 operationId: line.operationId,
                 quantity: line.quantity,
               }))}
+              /*
+               * Ecranul de evaluare e al biroului si CERE cifrele: fara ele
+               * n-are cum sa compare cu pragul de 2.000 lei. Lista s-a cerut
+               * cu bani (implicit), deci coloanele sunt acolo; `?? '0'` e doar
+               * ingustarea tipului, nu o valoare inventata — cine n-are dreptul
+               * la bani nu ajunge pe ecranul asta.
+               */
               operations={operations.map((operation) => ({
                 id: operation.id,
                 code: operation.code,
                 name: operation.name,
-                estimatedLabor: operation.estimatedLabor,
-                estimatedMaterial: operation.estimatedMaterial,
+                estimatedLabor: operation.estimatedLabor ?? '0',
+                estimatedMaterial: operation.estimatedMaterial ?? '0',
               }))}
               canEdit={open && canTriageRequests(ctx.session)}
               editBlockedReason={

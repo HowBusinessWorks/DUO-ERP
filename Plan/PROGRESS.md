@@ -13,7 +13,7 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Scris la finalul lui 09b-1, 18 august 2026. Citește-l primul; restul fișierului e istoric.*
+*Scris la finalul lui 09b-2, 18 august 2026. Citește-l primul; restul fișierului e istoric.*
 
 ### Unde s-a ajuns
 
@@ -22,12 +22,88 @@ dinadins** (vezi secțiunea lui mai jos). Pasul **09** e tăiat în trei, nu în
 
 - **09a — fundația** (schemă, triggere, domain pur, servicii): GATA.
 - **09b-1 — fișa de INSPECȚIE** (creare de la obiectiv, tab-urile Fișă și Constatări): GATA.
-- **09b-2 — fișa de INTERVENȚIE** (Materiale, Ore, bara așteptat vs real): **următorul lucru.**
+- **09b-2 — fișa de INTERVENȚIE** (Fișă, Materiale, Ore, bara așteptat vs real): GATA.
 - **09b-3 — pontaj, stoc și gestiuni, bon de consum**, apoi validarea de birou în masă,
-  acoperirea inspecțiilor, istoricul obiectivului, jobul nocturn de stoc și seed-ul de „gata".
+  acoperirea inspecțiilor, istoricul obiectivului, jobul nocturn de stoc și seed-ul de „gata":
+  **următorul lucru.**
 
 Tăierea în bucăți mai mici a fost cerută explicit de utilizator, ca o sesiune să nu se termine
 la jumătatea unui pas.
+
+### Ce trebuie să știi înainte de 09b-3
+
+**Rulează fiecare use-case pe date reale înainte să scrii ecranul.** A doua sesiune la rând în
+care regula asta a plătit: la 09b-1 a scos patru defecte din 09a, la 09b-2 încă trei, toate
+tăcute, niciunul prins de typecheck sau de testele existente. Harness-ul se scrie în
+`packages/services/scripts/`, se rulează cu `pnpm exec tsx`, și se **șterge** după.
+
+**Pentru 09b-3, cele două capcane deja cunoscute:**
+
+1. **Drizzle numește TOATE coloanele într-un `insert`**, punând `default` pe cele nedate. Deci un
+   `grant insert (coloane)` nu poate fi satisfăcut niciodată prin drizzle dacă lista exclude ceva.
+   `intervention_materials` a cerut un `insert` scris de mână (vezi 09b-2). `timesheet_lines` are
+   aceeași formă de grant — verifică-l din rolul de teren înainte să construiești pontajul.
+2. **Extensiile 1:1 pe `work_units` se nasc din trigger**, nu din serviciu (0028). Dacă adaugi
+   alta, urmează tiparul: `after insert … when (new.type = …)`, `on conflict do nothing`, backfill
+   cu același cod, plasă la final.
+
+---
+
+## 09b-2 — fișa de intervenție, pe ecran (18 august 2026)
+
+### Ce a intrat
+
+- **Trei tab-uri, o singură componentă.** `InterventionSheet` (Fișă · Materiale · Ore) ține
+  întotdeauna fișa întreagă și o trimite întreagă, indiferent de secțiunea afișată. Nu e un
+  moft: `saveIntervention` șterge și rescrie liniile într-o tranzacție, deci o acțiune
+  „salvează doar materialele" ar fi șters orele omului care era pe celălalt tab.
+- `saveInterventionAction` și `validateInterventionAction` în `sheet-actions.ts`, pe aceleași
+  două drepturi ca inspecția: `sheets.write` completează, `sheets.validate` închide.
+- **Bara așteptat vs real** pe fișă, după validare, cu marcaj când abaterea trece pragul.
+  Cifrele vin din `computeVariance`, calculate la validare și scrise pe fișă — ecranul nu le
+  recalculează.
+- `listTeamOptions(actor, companyIds)` — echipa **și gestiunea ei**, citite împreună: alegerea
+  echipei pe fișă decide din ce gestiune ies materialele.
+- `listOperations` / `getOperation` au acum `withMoney`, ca restul citirilor.
+- Migrările `0027_field_catalog_and_insert_grants` și `0028_intervention_row_by_trigger` —
+  amândouă repară, vezi mai jos.
+- **7 teste noi de servicii** (`tests/interventions.test.ts`), inclusiv verificarea #9 scrisă
+  invers: o validare care cade pe stoc insuficient nu lasă nici bon, nici cost, nici sold mișcat.
+
+### Trei defecte găsite de smoke, niciunul introdus aici
+
+Toate trei pe **drumul terenului** — singurul care nu fusese chemat niciodată:
+
+1. **Terenul nu putea deschide o fișă de intervenție. Deloc.** `getInterventionSheet` face
+   `left join app.operation_catalog`, iar catalogul intrase în 0025 ca nomenclator de birou: fără
+   politică și fără grant pentru `app_field`. Reparat în `0027`, după tiparul lui `app.products`:
+   citire pentru toți, **pe coloane enumerate**, cu `estimated_labor` și `estimated_material`
+   rămase la birou și `assert_no_money_leak` chemată a patra oară ca plasă.
+2. **Terenul nu-și putea SALVA fișa.** `0026` dăduse `grant insert (coloane)` pe
+   `intervention_materials`, ca `unit_cost` să nu poată fi scris de pe teren — dar **drizzle
+   numește toate coloanele tabelei în `insert`**, cu `default` pe cele nedate, iar Postgres cere
+   privilegiu pe fiecare coloană *numită*. Reparat pe două căi: `created_at` adăugat la grant
+   (`0027`, și pe `timesheet_lines` și `inspection_findings`, care au aceeași formă), iar inserția
+   materialelor rescrisă **de mână**, cu doar coloanele acordate. Alternativa — să i se dea
+   terenului `insert` pe `unit_cost` — ar fi însemnat exact renunțarea la protecția pentru care
+   coloana fusese scoasă.
+3. **O intervenție creată altfel decât prin `createIntervention` n-avea fișă.** Formularul generic
+   de Activitate și decizia de rutare din pasul 08 scriu unitatea, nu și rândul din
+   `app.interventions` — iar tab-ul Fișă răspundea „nu există sau nu e vizibilă" pentru o unitate
+   care exista și era vizibilă. La 09b-1 aceeași problemă pe inspecții a fost rezolvată **invers**,
+   prin interzicerea drumului generic, fiindcă un checklist nu se poate ghici. Fișa de intervenție
+   n-are nimic de ghicit, deci aici răspunsul corect e trigger-ul din `0028`, cu backfill și plasă.
+
+### Cum a fost verificat
+
+Harness aruncabil pe Supabase dev (șters după), **24 de verificări, toate verde**: crearea,
+citirea, dubla salvare, validarea cu bon + mișcare de stoc + cost + `operation_actuals`, refuzul
+celei de-a doua validări, citirea și scrierea din rolul de teren, selectorul de operațiuni fără
+bani, `select *` refuzat (#24) și fișa născută pe drumul generic.
+
+În CI rămân cele **7 teste de servicii** care nu ating rețeaua.
+
+**Verificări din pasul 09 acoperite aici:** 8, 9, 10, 23 și 24.
 
 ---
 
@@ -728,7 +804,7 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
 | 07 — File management (R2) | 🟩 **gata** (07a–07c-2; 20/21 — #7 cere Playwright pentru întreruperea reală de rețea) | 2026-08-18 |
 | 08 — Cereri, rutare, backlog | 🟨 în lucru (08a + 08b gata: schemă, domain, servicii, ecrane; **08c** email+cronuri neatins) | 2026-08-18 |
-| 09 — Fișe de lucru | 🟨 în lucru (**09a gata**: schemă, triggere, domain, servicii — smoke pe dev 21/21; **09b** ecranele, neatins) | 2026-08-18 |
+| 09 — Fișe de lucru | 🟨 în lucru (**09a**, **09b-1** inspecția și **09b-2** intervenția: gata; **09b-3** pontaj, stoc, bon de consum: neatins) | 2026-08-18 |
 | 10 — Teren offline, raport lunar | ⬜ neînceput | — |
 
 Legendă: ⬜ neînceput · 🟨 în lucru · 🟩 gata (toate verificările din pas trec) · 🟥 blocat

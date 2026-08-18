@@ -38,8 +38,9 @@ export interface OperationRow {
   readonly standardHours: string;
   readonly qualificationId: string;
   readonly qualificationName: string;
-  readonly estimatedLabor: string;
-  readonly estimatedMaterial: string;
+  /** `null` pentru cine n-are dreptul la bani — coloanele nici nu sunt cerute. */
+  readonly estimatedLabor: string | null;
+  readonly estimatedMaterial: string | null;
   readonly isActive: boolean;
   /** Cate materiale tipice are declarate. Zero e o informatie, nu o lipsa. */
   readonly materialCount: number;
@@ -49,6 +50,13 @@ export interface ListOperationsOptions {
   readonly query?: string;
   readonly includeInactive?: boolean;
   readonly limit?: number;
+  /**
+   * Fals pentru teren si subcontractant: `estimated_labor` si
+   * `estimated_material` nu le sunt acordate (0027), iar o interogare care le
+   * cere oricum nu intoarce zero randuri — cade cu „permission denied". De aia
+   * steagul nu e cosmetic: el decide DACA se poate citi catalogul.
+   */
+  readonly withMoney?: boolean;
 }
 
 export async function listOperations(
@@ -62,6 +70,7 @@ async function selectOperations(
   tx: ActorTx,
   options: ListOperationsOptions,
 ): Promise<OperationRow[]> {
+  const withMoney = options.withMoney ?? true;
   const conditions = [];
   if (options.includeInactive !== true) {
     conditions.push(eq(schema.operationCatalog.isActive, true));
@@ -91,8 +100,8 @@ async function selectOperations(
       standardHours: schema.operationCatalog.standardHours,
       qualificationId: schema.operationCatalog.qualificationId,
       qualificationName: schema.qualifications.name,
-      estimatedLabor: schema.operationCatalog.estimatedLabor,
-      estimatedMaterial: schema.operationCatalog.estimatedMaterial,
+      estimatedLabor: withMoney ? schema.operationCatalog.estimatedLabor : sql<null>`null`,
+      estimatedMaterial: withMoney ? schema.operationCatalog.estimatedMaterial : sql<null>`null`,
       isActive: schema.operationCatalog.isActive,
       materialCount,
     })
@@ -106,9 +115,17 @@ async function selectOperations(
     .limit(options.limit ?? DEFAULT_LIMIT);
 }
 
-export async function getOperation(actor: Actor, id: string): Promise<OperationRow> {
+export async function getOperation(
+  actor: Actor,
+  id: string,
+  options: { readonly withMoney?: boolean } = {},
+): Promise<OperationRow> {
   const [row] = await withActor(actor, async (tx) =>
-    selectOperations(tx, { includeInactive: true, limit: 1000 }).then((rows) =>
+    selectOperations(tx, {
+      includeInactive: true,
+      limit: 1000,
+      withMoney: options.withMoney ?? true,
+    }).then((rows) =>
       rows.filter((candidate) => candidate.id === id),
     ),
   );
