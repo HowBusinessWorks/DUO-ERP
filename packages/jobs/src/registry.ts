@@ -145,6 +145,21 @@ export const inventoryVerifyStock = defineJob({
   singletonKey: () => new Date().toISOString().slice(0, 10),
 });
 
+/*
+ * Retentia jurnalului de mutatii de teren (pasul 10, §3.2).
+ *
+ * 90 de zile. Un dispozitiv care revine dupa atat isi pierde memoria de
+ * idempotenta si face pull complet — comportament documentat, nu accidental.
+ */
+export const fieldPruneMutations = defineJob({
+  name: 'field.pruneMutations',
+  schema: z.object({ days: z.number().int().positive().max(3650).optional() }),
+  retryLimit: 2,
+  retryDelaySeconds: 600,
+  expireInSeconds: 15 * 60,
+  singletonKey: () => new Date().toISOString().slice(0, 10),
+});
+
 export const filesDerive = defineJob({
   name: 'files.derive',
   schema: z.object({ versionId: z.string().uuid() }),
@@ -194,6 +209,7 @@ export const ALL_JOBS = [
   deltaFillScan,
   rollupVerify,
   inventoryVerifyStock,
+  fieldPruneMutations,
   filesDerive,
   filesCleanup,
   requestsExpireBacklog,
@@ -233,6 +249,11 @@ export const SCHEDULED_JOBS: readonly {
     name: inventoryVerifyStock.name,
     cron: '0 4 * * *',
     why: 'Nocturn la 04:00, dupa curatenia de fisiere. Un sold divergent se afla a doua zi dimineata, nu la inventarul de la anul.',
+  },
+  {
+    name: fieldPruneMutations.name,
+    cron: '0 1 * * 0',
+    why: 'Duminica la 01:00. Retentia e de 90 de zile: nu are de ce sa fie zilnica, si tabela e cea mai scrisa din ERP.',
   },
   {
     name: filesCleanup.name,

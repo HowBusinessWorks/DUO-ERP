@@ -16,3 +16,4 @@ export * from './requests';
 export * from './inventory';
 export * from './sheets';
 export * from './timesheets';
+export * from './field-sync';

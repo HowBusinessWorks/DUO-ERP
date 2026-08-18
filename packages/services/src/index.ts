@@ -398,6 +398,9 @@ export type {
 
 export { INVENTORY_ALERT_KINDS, verifyStockJob } from './inventory-integrity';
 
+export { markPulled, pruneAppliedMutations, pushMutations, readCursor } from './field-sync';
+export type { PushResult, SyncCursor } from './field-sync';
+
 export {
   consumptionAnalyticsFor,
   createConsumptionNote,

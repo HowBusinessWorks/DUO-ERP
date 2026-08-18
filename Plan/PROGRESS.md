@@ -28,8 +28,15 @@ dinadins** (vezi secțiunea lui mai jos). Pasul **09** e tăiat în trei, nu în
 
 **Pasul 09 e terminat.** Ecranul „realizat vs estimat pe echipe" din catalog exista din 08b și
 s-a umplut singur când `apply_intervention_actuals` a primit prima fișă validată — n-a cerut cod.
-**Următorul lucru e pasul 10** (teren offline și raportul lunar), sau datoriile deschise de mai
-jos, dacă vrei întâi curățenie.
+
+**Pasul 10 e tăiat în cinci**, iar **10a e gata**:
+
+- **10a — fundația sincronizării** (jurnal de idempotență, `/api/field/sync`, retenție): GATA.
+- **10b — PWA-ul offline**: Dexie (snapshot · outbox · media), service worker, contorul care
+  numără separat datele și pozele, ecranul de conflicte cu diff. **Următorul lucru.**
+- **10c — cele 8 ecrane de teren** + bugetul de tapuri (blocat pe Playwright, datoria 3).
+- **10d — raportul lunar** către client: migrare, coadă cu progres real, versionare și îngheț.
+- **10e — panoul PM** cu gauge-ul Delta.
 
 Tăierea în bucăți mai mici a fost cerută explicit de utilizator, ca o sesiune să nu se termine
 la jumătatea unui pas.
@@ -50,6 +57,78 @@ tăcute, niciunul prins de typecheck sau de testele existente. Harness-ul se scr
 2. **Extensiile 1:1 pe `work_units` se nasc din trigger**, nu din serviciu (0028). Dacă adaugi
    alta, urmează tiparul: `after insert … when (new.type = …)`, `on conflict do nothing`, backfill
    cu același cod, plasă la final.
+
+---
+
+## 10a — fundația sincronizării de teren (18 august 2026)
+
+Pasul 10 e tăiat în cinci, ca 09b: **10a** fundația sincronizării · **10b** PWA-ul
+offline (Dexie, service worker, ecranul de conflicte) · **10c** cele 8 ecrane de
+teren și bugetul de tapuri · **10d** raportul lunar · **10e** panoul PM.
+
+### Ce a intrat
+
+- **Migrarea `0029_field_sync`** — `app.applied_mutations` (jurnalul de
+  idempotență) și `app.sync_cursors`, cu RLS „ale mele și atât" pe teren și
+  vizibilitate totală la birou: depanarea unei cozi blocate se face de la birou.
+  Plus `app.prune_applied_mutations(days)`, retenția de 90 de zile.
+- **`packages/contracts/src/field.ts`** — tipurile de mutație și, lângă fiecare,
+  **schema use-case-ului**. Nu una paralelă „pentru sync": a doua ar începe
+  identică și ar rămâne în urmă la prima regulă nouă.
+- **`packages/services/src/field-sync.ts`** — `pushMutations`: aplică lotul în
+  ordinea **creării**, secvențial, memorează rezultatul fiecărei mutații și **se
+  oprește la prima eroare de business** (cele de după se raportează `skipped`, nu
+  se sar tăcut).
+- **`/api/field/sync`** — `POST` pentru lot, `GET` pentru cursor. Limitare de rată
+  pe **(persoană, dispozitiv)**, nu pe IP: un telefon în roaming își schimbă
+  adresa între două cereri, iar o limită pe IP ar fi oprit exact omul cu semnal
+  prost.
+- **`field.pruneMutations`** — job săptămânal (duminica, 01:00), înregistrat în
+  `handlers/integrity.ts`.
+- **`docs/field-sync.md`** — cum adaugi un tip de mutație, cum depanezi o coadă
+  blocată, cum forțezi un pull complet.
+
+### Un defect prins de teste, nu de typecheck
+
+**Rezultatul memorat nu avea aceeași formă cu cel viu.** Prima variantă dădea mai
+departe obiectul use-case-ului, iar `Quantity` ajungea în `jsonb` ca structura
+internă a bibliotecii de zecimale: telefonul care primea răspunsul *memorat*
+vedea `{c:[8],e:0,s:1}` acolo unde cel care prinsese execuția vedea `"8.0000"`.
+Două răspunsuri diferite pentru aceeași mutație — exact felul de divergență care
+se vede abia după o cădere de rețea. Fiecare executant își declară acum forma de
+pe sârmă.
+
+### Trei decizii care se citesc greșit dacă nu sunt scrise
+
+1. **`POST` întoarce 200 chiar și când coada s-a oprit.** Lotul a fost primit și
+   procesat; starea fiecărei mutații e în corp. Un 4xx ar fi pus clientul să
+   retrimită tot lotul, inclusiv mutațiile deja aplicate.
+2. **Nicio tranzacție peste tot lotul.** Fiecare mutație e deja atomică în
+   use-case-ul ei; una mai mare ar fi dat înapoi și ce a mers.
+3. **Erorile care nu sunt `AppError` NU se memorează.** Memorarea unui timeout
+   l-ar fi transformat într-o respingere definitivă, iar fișa omului ar fi rămas
+   blocată pentru totdeauna într-o coadă care nu se mai mișcă.
+
+### Cum a fost verificat
+
+Harness aruncabil pe dev (15 verificări) plus **8 teste de servicii** în CI:
+aceeași mutație de trei ori → un singur pontaj în bază (#5, #6); coada se oprește
+la a doua din trei (#7); mutația respinsă rămâne respinsă fără reexecuție;
+ordinea de aplicare e cea a **creării**, nu cea din listă; payload invalid pică
+singur; cursorul e per dispozitiv; retenția uită și mutația se reexecută (#11).
+
+**Verificări din pasul 10 acoperite aici:** 5, 6, 7 și 11.
+
+### Ce rămâne pentru 10b–10e
+
+Felia de date (`snapshot`), Dexie, service worker-ul, ecranul de conflicte cu
+diff, cele 8 ecrane, bugetul de tapuri (blocat pe Playwright — datoria 3),
+raportul lunar și panoul PM.
+
+**O tensiune de rezolvat la 10c:** §3.5 cere `Bon de consum` ca ecran **de teren
+complet**, dar `inventory.write` e drept de **birou** din pasul 09. Ori se lărgește
+dreptul pentru gestiunea propriei echipe, ori ecranul de teren emite consumul
+doar prin fișa de intervenție. Nu am ales în locul tău.
 
 ---
 
@@ -939,6 +1018,7 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
 | 07 — File management (R2) | 🟩 **gata** (07a–07c-2; 20/21 — #7 cere Playwright pentru întreruperea reală de rețea) | 2026-08-18 |
 | 08 — Cereri, rutare, backlog | 🟨 în lucru (08a + 08b gata: schemă, domain, servicii, ecrane; **08c** email+cronuri neatins) | 2026-08-18 |
+| 10 — Teren offline și raport lunar | 🟨 în lucru (**10a** fundația sincronizării: gata; 10b–10e: neatinse) | 2026-08-18 |
 | 09 — Fișe de lucru | ✅ gata (09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon · 09b-4 acoperire, istoric, validare în masă, seed) | 2026-08-18 |
 | 10 — Teren offline, raport lunar | ⬜ neînceput | — |
 
@@ -963,7 +1043,7 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași** — ceea ce e chiar comportamentul cerut de #16 — **dacă `MFA_ENFORCED` nu e `0`** (vezi rândul de mai jos). |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **~542** (09b-4 confirmat în CI `32170723407`) | La 09b-4: `packages/services` **+3** (acoperire cu date reale, istoricul obiectivului). La 09b-3: `packages/services` **+14** (`timesheets.test.ts` și `inventory.test.ts`, fișiere noi). La 09b-2: `packages/services` **+7** (`interventions.test.ts`, fișier nou). La 09a: `domain` 106 → **126** (+20, `sheets/` — inspecție, abatere, pontaj). La 08b: `domain` 104 → **106** (+2, `isCommercialOpportunity`), `packages/services` 116 → **131** (+8 în `requests.test.ts`, +7 în `operations.test.ts` — fișier nou). La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **~550** (10a neconfirmat încă în CI) | La 10a: `packages/services` **+8** (`field-sync.test.ts`, fișier nou). La 09b-4: `packages/services` **+3** (acoperire cu date reale, istoricul obiectivului). La 09b-3: `packages/services` **+14** (`timesheets.test.ts` și `inventory.test.ts`, fișiere noi). La 09b-2: `packages/services` **+7** (`interventions.test.ts`, fișier nou). La 09a: `domain` 106 → **126** (+20, `sheets/` — inspecție, abatere, pontaj). La 08b: `domain` 104 → **106** (+2, `isCommercialOpportunity`), `packages/services` 116 → **131** (+8 în `requests.test.ts`, +7 în `operations.test.ts` — fișier nou). La 08a′ (reparațiile din review): `domain` 95 → **104** (+9, `backlog`/`routing`), `packages/services` 106 → **116** (+10, `requests.test.ts`). La 08a: `domain` 82 → 95 (+13, `requests/`), `packages/services` 102 → 106 (+4, `requests.test.ts`), restul neschimbat. Cele 4 noi verificate manual pe Supabase dev cu `TEST_DATABASE_URL` (vezi mai jos), nu încă printr-un push. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c), **445** (07c-2, confirmat CI `32108456833`). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
 | **Martie 2026 e ÎNCHISĂ la firma A pe Supabase dev**, din 05c | Închisă dinadins, ca ecranul de re-alocări să aibă ce arăta: mutarea finanțării intervenției `IV-000001` de acolo a emis `NRA-000001` în august. Dacă un ecran refuză o scriere pe martie, ăsta e motivul — nu un bug. |
 | **Aplicația e deployată pe Vercel**, pe același proiect Supabase (`cspjtesltraiaveypuya`) | Deci datele de pe dev sunt aceleași care se văd în aplicația deployată — inclusiv seed-ul și luna închisă de mai sus. `next.config.ts` încarcă `.env.local` din rădăcina repo-ului, fișier care pe Vercel **nu există**: toate variabilele trebuie puse în Project Settings. |

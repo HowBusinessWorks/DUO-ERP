@@ -1,5 +1,6 @@
-import { inventoryVerifyStock, rollupVerify } from '@damina/jobs';
-import { verifyRollupsJob, verifyStockJob } from '@damina/services';
+import { fieldPruneMutations, inventoryVerifyStock, rollupVerify } from '@damina/jobs';
+import { pruneAppliedMutations, verifyRollupsJob, verifyStockJob } from '@damina/services';
+import { serviceActor } from '@damina/db';
 import { logger } from '@damina/shared/logger';
 import type PgBoss from 'pg-boss';
 
@@ -23,6 +24,20 @@ export async function registerIntegrityJobs(boss: PgBoss): Promise<void> {
       logger.info(
         { use_case: rollupVerify.name, job_id: job.id, componente_divergente: alerted },
         'verificarea rollup-urilor terminata',
+      );
+    }
+  });
+
+  await boss.work(fieldPruneMutations.name, async (jobs) => {
+    for (const job of jobs) {
+      const { days } = fieldPruneMutations.schema.parse(job.data ?? {});
+      const pruned = await pruneAppliedMutations(
+        serviceActor(fieldPruneMutations.name),
+        days ?? 90,
+      );
+      logger.info(
+        { use_case: fieldPruneMutations.name, job_id: job.id, mutatii_sterse: pruned },
+        'retentia jurnalului de mutatii aplicata',
       );
     }
   });

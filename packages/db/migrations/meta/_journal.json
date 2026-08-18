@@ -204,6 +204,13 @@
       "when": 1787057085682,
       "tag": "0028_intervention_row_by_trigger",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1787077868285,
+      "tag": "0029_field_sync",
+      "breakpoints": true
     }
   ]
 }

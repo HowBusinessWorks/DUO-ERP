@@ -253,3 +253,20 @@ export type {
   CreateLocationInput,
   LocationType,
 } from './inventory';
+
+export {
+  MAX_MUTATIONS_PER_PUSH,
+  MUTATION_PAYLOAD_SCHEMAS,
+  MUTATION_TYPES,
+  mutationOutcomeSchema,
+  mutationSchema,
+  pullSyncInputSchema,
+  pushMutationsInputSchema,
+} from './field';
+export type {
+  FieldMutation,
+  MutationOutcome,
+  MutationType,
+  PullSyncInput,
+  PushMutationsInput,
+} from './field';

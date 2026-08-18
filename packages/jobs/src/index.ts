@@ -3,6 +3,7 @@ export {
   contractExpiryScan,
   defineJob,
   deltaFillScan,
+  fieldPruneMutations,
   filesCleanup,
   filesDerive,
   inventoryVerifyStock,
