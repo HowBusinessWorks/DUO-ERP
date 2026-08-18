@@ -30,6 +30,7 @@ import {
   listStages,
   listStagesForCompanies,
   listStock,
+  listTimesheetWeek,
   listSubcontractors,
   listTeamOptions,
   listObjectives,
@@ -53,6 +54,7 @@ import { EntityDocuments } from '../components/files/entity-documents';
 import { ClosingChecklist } from '../components/work-unit/closing-checklist';
 import { InspectionSheet } from '../components/work-unit/inspection-sheet';
 import { InterventionSheet } from '../components/work-unit/intervention-sheet';
+import { TimesheetWeek } from '../components/work-unit/timesheet-week';
 import { FundingPanel, fundingSummary, monthLabel } from '../components/work-unit/funding-panel';
 import { StageTimeline } from '../components/work-unit/stage-timeline';
 import {
@@ -162,12 +164,12 @@ export const activitate = defineEntity<WorkUnitRow>({
       { key: 'calendar', label: 'Calendar / Gantt' },
       { key: 'pontaj', label: 'Pontaj' },
     ],
-    renderView: async (rows, view, ctx) => {
+    renderView: async (rows, view, ctx, search) => {
       if (view === 'calendar') {
         return <GeneralGantt ctx={ctx} />;
       }
       if (view === 'pontaj') {
-        return <PhasePlaceholder phase={1} what="Pontajul pe unitate de lucru" />;
+        return <TimesheetTab ctx={ctx} search={search} />;
       }
       // Cele trei vederi de tip folosesc ACELASI tabel: `load` a filtrat deja, iar
       // o a doua randare ar putea arata alt numar de randuri decat prima.
@@ -1727,4 +1729,110 @@ async function InterventionTab({
       suggestedEffectDate={new Date().toISOString().slice(0, 10)}
     />
   );
+}
+
+/**
+ * Activitate › Pontaj — saptamana de birou (§3.3).
+ *
+ * Saptamana vine din `?week=`, nu din selectorul de luna al shell-ului, si
+ * dinadins: o saptamana taie luna in doua de patru ori pe an, iar un pontaj de
+ * pe 31 nu poate sa dispara de pe ecran doar pentru ca a inceput alta luna.
+ * Implicit e saptamana zilei de azi, daca ea cade in luna aleasa, altfel prima
+ * saptamana a lunii — asa comutatorul de luna ramane util fara sa fie stapan.
+ */
+async function TimesheetTab({
+  ctx,
+  search,
+}: {
+  readonly ctx: EntityContext;
+  readonly search: Readonly<Record<string, string | string[] | undefined>>;
+}) {
+  const requested = typeof search.week === 'string' ? search.week : undefined;
+  const start = mondayOf(requested ?? defaultWeekStart(ctx.app.year, ctx.app.month));
+  const days = Array.from({ length: 7 }, (_, index) => addDays(start, index));
+  const from = days[0] as string;
+  const to = days[6] as string;
+
+  const [week, persons, units, stages] = await Promise.all([
+    listTimesheetWeek(ctx.actor, { companyIds: ctx.app.selectedCompanyIds, from, to }),
+    listPersonOptions(ctx.actor, ['office', 'field']),
+    listWorkUnits(ctx.actor, {
+      companyIds: ctx.app.selectedCompanyIds,
+      statuses: ['planificata', 'in_executie', 'suspendata'],
+      limit: 500,
+    }),
+    listStagesForCompanies(ctx.actor, { companyIds: ctx.app.selectedCompanyIds, limit: 1000 }),
+  ]);
+
+  const stagesByUnit = new Map<string, { id: string; name: string }[]>();
+  for (const stage of stages) {
+    const list = stagesByUnit.get(stage.workUnitId) ?? [];
+    list.push({ id: stage.id, name: stage.name });
+    stagesByUnit.set(stage.workUnitId, list);
+  }
+
+  const unitLabels = new Map(units.map((unit) => [unit.id, `${unit.code} · ${unit.name}`]));
+
+  return (
+    <TimesheetWeek
+      companyId={ctx.app.selectedCompanyIds[0] ?? ''}
+      days={days}
+      sheets={week.sheets.map((sheet) => ({
+        id: sheet.id,
+        personId: sheet.personId,
+        personName: sheet.personName,
+        workDate: sheet.workDate,
+        status: sheet.status,
+        totalHours: sheet.totalHours.toDbString(),
+        lines: sheet.lines.map((line) => ({
+          id: line.id,
+          workUnitId: line.workUnitId,
+          stageId: line.stageId,
+          hours: line.hours.toDbString(),
+        })),
+      }))}
+      persons={persons.map((person) => ({ id: person.id, name: person.fullName }))}
+      workUnits={units.map((unit) => ({
+        id: unit.id,
+        label: `${unit.code} · ${unit.name}`,
+        type: unit.type,
+        stages: stagesByUnit.get(unit.id) ?? [],
+      }))}
+      byPerson={Object.fromEntries(
+        [...week.byPerson.entries()].map(([id, hours]) => [id, hours.toDbString()]),
+      )}
+      byWorkUnit={[...week.byWorkUnit.entries()].map(([id, hours]) => ({
+        label: unitLabels.get(id) ?? id,
+        hours: hours.toDbString(),
+      }))}
+      weekHref={(value) => `/activitate?view=pontaj&week=${value}`}
+      previousWeek={addDays(start, -7)}
+      nextWeek={addDays(start, 7)}
+      canWrite={canWriteSheets(ctx.session)}
+      canValidate={canValidateSheets(ctx.session)}
+    />
+  );
+}
+
+/** Luni din saptamana zilei date. Saptamana incepe luni, ca in tara. */
+function mondayOf(iso: string): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  const weekday = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - weekday);
+  return date.toISOString().slice(0, 10);
+}
+
+function addDays(iso: string, days: number): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Ziua de azi daca e in luna aleasa; altfel intai ale ei. */
+function defaultWeekStart(year: number, month: number): string {
+  const today = new Date();
+  if (today.getFullYear() === year && today.getMonth() + 1 === month) {
+    return today.toISOString().slice(0, 10);
+  }
+  return `${String(year)}-${String(month).padStart(2, '0')}-01`;
 }

@@ -92,13 +92,22 @@ export async function saveTimesheet(
       }
 
       for (const line of values.lines) {
-        await tx.insert(schema.timesheetLines).values({
-          id: uuidv7(),
-          timesheetId,
-          workUnitId: line.workUnitId,
-          stageId: line.stageId,
-          hours: line.hours,
-        });
+        /*
+         * `insert` scris de mana, ca la `intervention_materials`.
+         *
+         * Drizzle numeste in `insert` toate coloanele tabelei, cu `default` pe
+         * cele nedate — deci si `rate_card_id`, si `hourly_cost`, exact cele
+         * doua tinute in afara grant-ului de teren (0026). Postgres cere
+         * privilegiu pe fiecare coloana NUMITA, asa ca varianta prin drizzle
+         * cadea cu „permission denied" pentru orice om care isi scria propriul
+         * pontaj — adica pentru cazul obisnuit.
+         *
+         * Tariful se ingheata la validare, din rate card-ul zilei lucrate. N-are
+         * ce cauta in ce trimite telefonul, si de asta nu se acorda.
+         */
+        await tx.execute(sql`
+          insert into app.timesheet_lines (id, timesheet_id, work_unit_id, stage_id, hours)
+          values (${uuidv7()}, ${timesheetId}, ${line.workUnitId}, ${line.stageId}, ${line.hours})`);
       }
 
       return { id: timesheetId, totalHours: totals.total };
