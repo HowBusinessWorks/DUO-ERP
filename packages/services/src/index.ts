@@ -79,6 +79,7 @@ export {
   getContractOverview,
   listCeilings,
   listComponents,
+  listComponentsForContracts,
   listContracts,
   listContractsForObjective,
   listContractYears,

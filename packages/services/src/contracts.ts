@@ -317,6 +317,29 @@ export async function listComponents(actor: Actor, contractId: string): Promise<
 }
 
 /**
+ * Componentele mai multor contracte deodata, intr-o singura interogare.
+ *
+ * Varianta cu `listComponents` chemat in `Promise.all` peste lista de contracte
+ * deschidea cate o conexiune per contract si epuiza pool-ul: ecranul cadea cu
+ * „timeout exceeded when trying to connect” exact cand firma avea multe contracte.
+ */
+export async function listComponentsForContracts(
+  actor: Actor,
+  contractIds: readonly string[],
+): Promise<ComponentRow[]> {
+  if (contractIds.length === 0) {
+    return [];
+  }
+  return withActor(actor, async (tx) =>
+    tx
+      .select()
+      .from(schema.contractComponents)
+      .where(inArray(schema.contractComponents.contractId, [...contractIds]))
+      .orderBy(asc(schema.contractComponents.type)),
+  );
+}
+
+/**
  * `is_fill_target` se DERIVA din tip, nu se cere de la apelant.
  *
  * E singurul camp din tot pasul care inverseaza sensul unui indicator pe ecran:

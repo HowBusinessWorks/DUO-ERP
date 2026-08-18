@@ -11,6 +11,7 @@ import {
   type DefaultValues,
   type FieldValues,
   type Path,
+  type Resolver,
   type SubmitHandler,
   type UseFormReturn,
 } from 'react-hook-form';
@@ -47,7 +48,17 @@ export function Form<Schema extends z.ZodType>({
   id,
 }: FormProps<Schema>) {
   const form = useForm<z.output<Schema>>({
-    resolver: zodResolver(schema),
+    // `raw: true`: `handleSubmit` primeste valorile BRUTE din formular, nu
+    // rezultatul transformarilor Zod.
+    //
+    // Aceeasi schema ruleaza de doua ori pe acelasi obiect — o data aici, in
+    // browser, si o data in server action. Fara `raw`, a doua trecere ar primi
+    // rezultatul primei: `null` in loc de `''`, `number` in loc de sir,
+    // `0.4500` in loc de `45`. Transformarile nu sunt idempotente (nici nu au
+    // de ce sa fie), asa ca formularul corect completat ar cadea cu „Invalid
+    // input" pe a doua validare. Browserul valideaza, serverul transforma —
+    // o singura data, acolo unde rezultatul chiar se scrie in baza.
+    resolver: zodResolver(schema, undefined, { raw: true }) as Resolver<z.output<Schema>>,
     defaultValues,
     // Validam la iesirea din camp, nu la fiecare tasta: rosul care apare cat
     // scrii omul e cel mai rapid mod de a-l invata sa ignore rosul.

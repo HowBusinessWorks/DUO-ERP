@@ -11,7 +11,7 @@ import {
   getWorkUnit,
   listAllocations,
   listAssignments,
-  listComponents,
+  listComponentsForContracts,
   listContracts,
   listPeriodOptions,
   listPersonOptions,
@@ -266,8 +266,9 @@ export const activitate = defineEntity<WorkUnitRow>({
         listPeriodOptions(ctx.actor, { companyIds: ctx.app.selectedCompanyIds }),
       ]);
 
-      const componentGroups = await Promise.all(
-        contracts.map((contract) => listComponents(ctx.actor, contract.id)),
+      const components = await listComponentsForContracts(
+        ctx.actor,
+        contracts.map((contract) => contract.id),
       );
 
       return {
@@ -284,7 +285,7 @@ export const activitate = defineEntity<WorkUnitRow>({
           value: contract.id,
           label: `${contract.code} · ${contract.clientName}`,
         })),
-        components: componentGroups.flat().map((component) => ({
+        components: components.map((component) => ({
           value: component.id,
           label: component.name,
         })),
@@ -1306,15 +1307,16 @@ async function FundingTab({
     Promise.all(active.map((allocation) => previewFundingMove(ctx.actor, allocation.id))),
   ]);
 
-  const componentGroups = await Promise.all(
-    contracts.map((contract) => listComponents(ctx.actor, contract.id)),
+  const components = await listComponentsForContracts(
+    ctx.actor,
+    contracts.map((contract) => contract.id),
   );
 
   const contractOptions = contracts.map((contract) => ({
     value: contract.id,
     label: `${contract.code} · ${contract.clientName}`,
   }));
-  const componentOptions = componentGroups.flat().map((component) => ({
+  const componentOptions = components.map((component) => ({
     value: component.id,
     label: component.name,
   }));
