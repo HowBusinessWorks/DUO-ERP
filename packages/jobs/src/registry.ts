@@ -118,7 +118,8 @@ export const rollupVerify = defineJob({
   retryLimit: 3,
   retryDelaySeconds: 300,
   expireInSeconds: 30 * 60,
-  singletonKey: (payload) => payload.periodId ?? payload.on ?? new Date().toISOString().slice(0, 10),
+  singletonKey: (payload) =>
+    payload.periodId ?? payload.on ?? new Date().toISOString().slice(0, 10),
 });
 
 /*
@@ -153,6 +154,23 @@ export const filesCleanup = defineJob({
   singletonKey: (payload) => payload.on ?? new Date().toISOString().slice(0, 10),
 });
 
+/**
+ * `requests.expireBacklog` — propunerile din backlog cu `valid_until` depasit
+ * trec in `expired` (pasul 08, §3.6).
+ *
+ * **Nu se sterg.** O propunere expirata ramane vizibila cu filtru: e istoria
+ * lucrurilor pe care firma le-a vazut si nu le-a facut la timp, iar cifra aia
+ * spune ceva. Stergerea ar face backlogul sa arate mai curat decat este.
+ */
+export const requestsExpireBacklog = defineJob({
+  name: 'requests.expireBacklog',
+  schema: z.object({ on: z.string().optional() }),
+  retryLimit: 3,
+  retryDelaySeconds: 300,
+  expireInSeconds: 10 * 60,
+  singletonKey: (payload) => payload.on ?? new Date().toISOString().slice(0, 10),
+});
+
 /** Toate cozile cunoscute. Worker-ul le creeaza pe toate la pornire. */
 export const ALL_JOBS = [
   systemPing,
@@ -161,6 +179,7 @@ export const ALL_JOBS = [
   rollupVerify,
   filesDerive,
   filesCleanup,
+  requestsExpireBacklog,
 ] as const;
 
 /**
@@ -187,6 +206,11 @@ export const SCHEDULED_JOBS: readonly {
     name: rollupVerify.name,
     cron: '0 2 * * *',
     why: 'Nocturn la 02:00, cand registrul sta linistit. O divergenta se afla a doua zi, nu peste o luna.',
+  },
+  {
+    name: requestsExpireBacklog.name,
+    cron: '0 5 * * *',
+    why: 'Zilnic la 05:00, inaintea alertelor de contract — backlogul e deja curat cand se uita cineva la el.',
   },
   {
     name: filesCleanup.name,

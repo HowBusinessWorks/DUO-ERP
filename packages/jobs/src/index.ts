@@ -5,6 +5,7 @@ export {
   deltaFillScan,
   filesCleanup,
   filesDerive,
+  requestsExpireBacklog,
   rollupVerify,
   SCHEDULED_JOBS,
   systemPing,

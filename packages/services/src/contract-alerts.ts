@@ -90,7 +90,10 @@ export async function scanDeltaFill(
       // Cifra din titlu e cea care se pierde, nu procentul: „12.400 lei” misca
       // pe cineva, „38%” nu.
       title: `Delta contractului ${row.contractCode}: ${unfilled.format()} neumpluți, ${String(row.fill.daysLeft)} zile rămase`,
-      href: `/contracte/${row.contractId}`,
+      // Backlogul filtrat pe contract, nu fisa contractului: „alerta fara link e
+      // inutila" (§3.6), iar linkul util e cel care duce direct in ecranul unde
+      // Delta se poate umple. Parametrul e citit de `BacklogFill`.
+      href: `/cereri?view=backlog&contract=${row.contractId}`,
       payload: {
         fillPercent: Math.round(row.fill.fillPercent),
         expectedPercent: Math.round(row.fill.expectedPercent),

@@ -86,7 +86,7 @@ export default async function ModuleListPage({
   const alternate =
     view === '' || entity.list.renderView === undefined
       ? null
-      : await entity.list.renderView(rows, view, entityCtx);
+      : await entity.list.renderView(rows, view, entityCtx, search);
 
   const canWrite = entity.canWrite?.(ctx.session) ?? false;
   const usesPeriod = entity.usesPeriod;

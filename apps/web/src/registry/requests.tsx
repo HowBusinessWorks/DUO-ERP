@@ -85,9 +85,7 @@ const STATUS_TONES: Readonly<Record<string, 'neutral' | 'brand' | 'success' | 'w
   anulata: 'neutral',
 };
 
-async function objectiveOptions(
-  ctx: EntityContext,
-): Promise<{ value: string; label: string }[]> {
+async function objectiveOptions(ctx: EntityContext): Promise<{ value: string; label: string }[]> {
   const objectives = await listObjectives(ctx.actor, { limit: 1000 });
   return objectives.map((objective) => ({
     value: objective.id,
@@ -142,12 +140,22 @@ export const cereri = defineEntity<RequestRow>({
       { key: 'backlog', label: 'Backlog' },
       { key: 'rutare', label: 'Decizii de rutare' },
     ],
-    renderView: async (rows, view, ctx) => {
+    renderView: async (rows, view, ctx, search) => {
       if (view === 'inbox') {
         return <InboxView rows={rows} ctx={ctx} />;
       }
       if (view === 'backlog') {
-        return <BacklogView ctx={ctx} />;
+        // `?contract=…` vine din alerta de Delta de pe 10 si 20 (§3.6): omul
+        // aterizeaza pe contractul care are Delta neumpluta, nu pe primul din
+        // lista.
+        const wanted = typeof search.contract === 'string' ? search.contract : undefined;
+        return (
+          <BacklogView
+            ctx={ctx}
+            focusContractId={wanted}
+            showExpired={search.status === 'expired'}
+          />
+        );
       }
       return <DecisionJournalView ctx={ctx} />;
     },
@@ -282,15 +290,15 @@ export const cereri = defineEntity<RequestRow>({
                     Emailul original — dovada solicitării
                   </h2>
                   <p className="mt-1 text-sm text-ink">
-                    De la <strong>{email.fromAddress}</strong> ·{' '}
-                    {formatDateTime(email.receivedAt)}
+                    De la <strong>{email.fromAddress}</strong> · {formatDateTime(email.receivedAt)}
                   </p>
                   <p className="mt-0.5 text-sm font-medium text-ink">{email.subject ?? '—'}</p>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-ink">
                     {email.bodyText ?? 'Mesaj fără text.'}
                   </p>
                   <p className="mt-2 text-xs text-ink-subtle">
-                    `.eml`-ul integral rămâne permanent în R2, chiar dacă cererea e ulterior anulată.
+                    `.eml`-ul integral rămâne permanent în R2, chiar dacă cererea e ulterior
+                    anulată.
                   </p>
                 </section>
               )}
@@ -390,9 +398,7 @@ export const cereri = defineEntity<RequestRow>({
                 label: `${String(period.month)}/${String(period.year)}`,
               }))}
               lucrariCeilingFree={
-                context.lucrariCeilingFree === null
-                  ? null
-                  : context.lucrariCeilingFree.toDbString()
+                context.lucrariCeilingFree === null ? null : context.lucrariCeilingFree.toDbString()
               }
               individualTargets={individualTargets}
               proposal={routing.proposal}
@@ -474,10 +480,17 @@ export const cereri = defineEntity<RequestRow>({
             { label: 'Toate cererile', href: '/cereri' },
             ...(row.contractId === null
               ? []
-              : [{ label: `Contract ${row.contractCode ?? ''}`, href: `/contracte/${row.contractId}` }]),
+              : [
+                  {
+                    label: `Contract ${row.contractCode ?? ''}`,
+                    href: `/contracte/${row.contractId}`,
+                  },
+                ]),
             ...(row.objectiveId === null
               ? []
-              : [{ label: row.objectiveName ?? 'Obiectiv', href: `/obiective/${row.objectiveId}` }]),
+              : [
+                  { label: row.objectiveName ?? 'Obiectiv', href: `/obiective/${row.objectiveId}` },
+                ]),
           ],
         },
         {
@@ -495,7 +508,8 @@ export const cereri = defineEntity<RequestRow>({
     },
 
     quickActions: (row, ctx) => [
-      ...(canDecideRouting(ctx.session) && (row.status === 'neprocesata' || row.status === 'in_evaluare')
+      ...(canDecideRouting(ctx.session) &&
+      (row.status === 'neprocesata' || row.status === 'in_evaluare')
         ? [{ label: 'Decide rutarea', href: `/cereri/${row.id}/decizie`, tone: 'primary' as const }]
         : []),
       { label: 'Evaluează din catalog', href: `/cereri/${row.id}/evaluare` },
@@ -630,10 +644,20 @@ async function InboxView({
  * `deltaFreeForContract` pe toate contractele firmei ar fi fost zeci de
  * interogari pentru randuri pe care ecranul nu le arata.
  */
-async function BacklogView({ ctx }: { readonly ctx: EntityContext }) {
+async function BacklogView({
+  ctx,
+  focusContractId,
+  showExpired,
+}: {
+  readonly ctx: EntityContext;
+  readonly focusContractId?: string;
+  readonly showExpired: boolean;
+}) {
   const proposals = await listBacklogProposals(ctx.actor, {
     companyIds: ctx.app.selectedCompanyIds,
-    statuses: ['open'],
+    // O propunere expirata nu se sterge, dar nici nu sta in lista de umplere: ar
+    // fi ofertat un lucru pe care firma l-a lasat sa treaca. Se vede pe filtru.
+    statuses: showExpired ? ['expired'] : ['open'],
   });
 
   const contractIds = [...new Set(proposals.map((proposal) => proposal.contractId))];
@@ -655,25 +679,60 @@ async function BacklogView({ ctx }: { readonly ctx: EntityContext }) {
     }),
   );
 
+  const filterHref = (expired: boolean) =>
+    `/cereri?view=backlog${expired ? '&status=expired' : ''}${
+      focusContractId === undefined ? '' : `&contract=${focusContractId}`
+    }`;
+
   return (
-    <BacklogFill
-      canPromote={canDecideRouting(ctx.session)}
-      contracts={contracts}
-      proposals={proposals.map((proposal: BacklogRow) => ({
-        id: proposal.id,
-        title: proposal.title,
-        estimatedValue: proposal.estimatedValue,
-        objectiveName: proposal.objectiveName,
-        contractId: proposal.contractId,
-        contractCode: proposal.contractCode,
-        sourceKind: proposal.sourceKind,
-        status: proposal.status,
-        validUntil: proposal.validUntil,
-      }))}
-      blockedReason={
-        ctx.app.period.locked ? 'Luna selectată este închisă în bara de sus.' : undefined
-      }
-    />
+    <>
+      <nav className="mb-3 flex gap-2 text-sm" aria-label="Filtru de stare">
+        {[
+          { label: 'Deschise', expired: false },
+          { label: 'Expirate', expired: true },
+        ].map((option) => (
+          <Link
+            key={option.label}
+            href={filterHref(option.expired)}
+            aria-current={option.expired === showExpired ? 'page' : undefined}
+            className={
+              option.expired === showExpired
+                ? 'rounded-md bg-neutral-900 px-3 py-1 font-medium text-white'
+                : 'rounded-md px-3 py-1 text-neutral-600 hover:bg-neutral-100'
+            }
+          >
+            {option.label}
+          </Link>
+        ))}
+      </nav>
+      <BacklogFill
+        canPromote={canDecideRouting(ctx.session)}
+        contracts={contracts}
+        initialContractId={
+          contracts.some((candidate) => candidate.contractId === focusContractId)
+            ? focusContractId
+            : undefined
+        }
+        proposals={proposals.map((proposal: BacklogRow) => ({
+          id: proposal.id,
+          title: proposal.title,
+          estimatedValue: proposal.estimatedValue,
+          objectiveName: proposal.objectiveName,
+          contractId: proposal.contractId,
+          contractCode: proposal.contractCode,
+          sourceKind: proposal.sourceKind,
+          status: proposal.status,
+          validUntil: proposal.validUntil,
+        }))}
+        blockedReason={
+          showExpired
+            ? 'Propunerile expirate nu se promovează. Redeschide-le sau creează-le din nou.'
+            : ctx.app.period.locked
+              ? 'Luna selectată este închisă în bara de sus.'
+              : undefined
+        }
+      />
+    </>
   );
 }
 
@@ -991,8 +1050,8 @@ export const operatiuni = defineEntity<OperationRow>({
             <div className="space-y-3">
               <p className="max-w-prose text-sm text-ink-muted">
                 Cantitățile pentru <strong>o singură execuție</strong>. Lista e cantitativă, nu
-                valorică: prețurile de referință vin cu aprovizionarea, iar o sumă calculată dintr-un
-                preț inventat ar arăta la fel de sigură ca una reală.
+                valorică: prețurile de referință vin cu aprovizionarea, iar o sumă calculată
+                dintr-un preț inventat ar arăta la fel de sigură ca una reală.
               </p>
               <OperationMaterials
                 operationId={row.id}
@@ -1066,9 +1125,7 @@ export const operatiuni = defineEntity<OperationRow>({
                 caption="Realizat vs estimat, pe echipe"
                 rows={report.teams}
                 rowKey={(team) => team.teamId}
-                rowFlagged={(team) =>
-                  team.deviationPercent !== null && team.deviationPercent > 15
-                }
+                rowFlagged={(team) => team.deviationPercent !== null && team.deviationPercent > 15}
                 empty={<EmptyState title="Gol" body="Gol." size="sm" />}
                 columns={[
                   {

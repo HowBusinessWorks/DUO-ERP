@@ -13,15 +13,63 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Scris la finalul lui 08b (18 august 2026). Citește-l primul; restul fișierului e istoric.*
+*Scris la finalul lui 08b, completat pe 18 august 2026 cu decizia de a sări peste 08c.
+Citește-l primul; restul fișierului e istoric.*
 
 ### Unde s-a ajuns
 
 Pașii **01, 02, 04, 05, 06 și 07 sunt gata**. Pasul **08 e tăiat în sub-etape** (decizia
 utilizatorului, 18 august 2026, ca la 07): **08a — fundația** (schemă, domain pur, servicii cu
 creare atomică) și **08b — ecranele** (Inbox, Decizie, Backlog, jurnalul de decizii, Catalog de
-operațiuni) **sunt gata**. Rămâne **08c — inbox de email + cronuri** (IMAP, `.eml` în R2, filtrul de
-24h, alertele de Deltă pe 10/20, expirarea propunerilor).
+operațiuni) **sunt gata**. **08c e sărit dinadins** — vezi mai jos. **Următorul pas e 09 — fișe de
+lucru** (`Plan/09_Fise_De_Lucru.md`).
+
+---
+
+## 08c — SĂRIT dinadins (decizia utilizatorului, 18 august 2026)
+
+**Nu e uitat, e amânat.** Utilizatorul a ales să treacă direct la pasul 09 după ce s-a verificat
+concret că 09 nu depinde de nimic din ce rămâne nefăcut.
+
+### De ce se poate sări
+
+Tot ce cere 09 din 08 (`Plan/09_Fise_De_Lucru.md` §2, §3, verificările #4–#5) există deja din 08a/08b:
+`createRequest` pentru cererea tip „constatare" din punctele NOK, propunerile de backlog cu
+`source_kind='inspectie'`, catalogul de operațiuni cu `operation_actuals` pentru „consum așteptat vs
+real". 08c nu adaugă decât un **producător nou de cereri** (emailul) peste un model care e gata —
+deci se poate face oricând mai târziu **fără să se rescrie nimic din 09**.
+
+### Ce s-a făcut totuși, înainte de a trece mai departe
+
+Cele două bucăți din 08c care nu cereau nicio decizie de arhitectură:
+
+- **Verificarea #19 — expirarea propunerilor.** Coadă nouă `requests.expireBacklog` în
+  `packages/jobs/src/registry.ts`, cron zilnic **05:00** (înaintea alertelor de contract, ca
+  backlogul să fie deja curat când se uită cineva la el), handler în
+  `apps/worker/src/handlers/requests.ts`. Use-case-ul e `runBacklogExpiry(actor, asOf?)` din
+  `packages/services/src/requests.ts` — deschide tranzacția în jurul lui `expireBacklogProposals`,
+  care exista de la 08a fără să-l cheme nimeni. Ziua e **parametru, nu `now()` în SQL**.
+  Backlogul are acum și filtrul `?status=expired`: propunerea expirată **rămâne vizibilă**, nu se
+  șterge, dar nu mai stă în lista de umplere — și nu se poate promova.
+- **Verificarea #18 — linkul din alerta de Deltă.** `scanDeltaFill` trimite acum la
+  `/cereri?view=backlog&contract={id}`, nu la fișa contractului. Ca să fie posibil, **`renderView`
+  primește un al patrulea parametru, `search`** (`apps/web/src/registry/types.ts`), iar `BacklogFill`
+  are `initialContractId`. Regula generală, dacă mai apare cazul: **o selecție care trăiește doar în
+  starea componentei nu poate fi ținta unui link** — dacă vreo alertă trebuie să aterizeze pe un
+  ecran deja filtrat, filtrul se mută în URL.
+
+### Ce a rămas deschis din 08c
+
+| Rămas | Ce blochează |
+|---|---|
+| Coada `mail.ingest` — IMAP la 5 min, dedup pe `Message-ID`, `.eml` în R2, atașamente ca `file_versions` | verificările **#1, #2, #3**. ~80% din efortul pasului. Cere dependențe noi în `apps/worker` (client IMAP + parser). |
+| Credențialele cutiei, per firmă | **decizie de arhitectură nedată** — planul zice „Supabase Vault", dar nu există tabelă de conturi de email și nicio folosire de Vault în repo. Întreabă înainte să construiești. |
+| `request_id` pe `app.nodes` + rolul `request` în `node_role` | dosarul propriu al cererii. Până atunci tab-ul *Documente* al cererii duce la dosarul UL-ului create din ea. Migrare nouă, pe tiparul din `0021_files.sql`. |
+| Filtrul de 24h (cron zilnic 09:00) | **regula de business nu e specificată nicăieri** — §3.6 zice doar „curg automat mai departe, conform regulii lor", iar trimiterea din §1 e despre magazie, nu despre cereri. **Nu ghici**: alertă către PM? trecere automată în backlog? escaladare? |
+| Test E2E Playwright pe fluxul cap-coadă | „definiția de gata" a pasului 08. Playwright e neinstalat — datoria #4. |
+
+**Consecința de ținut minte:** „definiția de gata" a pasului 08 rămâne **nebifată**. E datorie
+curată și izolată, nu o crăpătură în fundație.
 
 ---
 
@@ -94,6 +142,10 @@ operațiuni) **sunt gata**. Rămâne **08c — inbox de email + cronuri** (IMAP,
   (pasul 09), care atașează trigger-ul pe `operation_actuals`.
 
 ### Ce urmează concret — 08c
+
+*(**Sărit.** Vezi secțiunea „08c — SĂRIT dinadins" de la începutul fișierului: două bucăți din
+tabelul de mai jos — expirarea propunerilor și linkul din #18 — au intrat totuși; restul e amânat.
+Recunoașterea de mai jos rămâne valabilă pentru sesiunea care îl va face.)*
 
 §3.4 și §3.6 din `Plan/08_Cereri_Rutare_Backlog.md`.
 

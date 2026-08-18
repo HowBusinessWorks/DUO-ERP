@@ -141,17 +141,21 @@ export async function evaluateRequest(
        * scoasa din catalog are tariful vechi, iar o evaluare facuta pe ea ar
        * intra in decizia de rutare cu o cifra pe care firma n-o mai practica.
        */
-      const operations = values.length === 0
-        ? []
-        : await tx
-            .select()
-            .from(schema.operationCatalog)
-            .where(
-              and(
-                inArray(schema.operationCatalog.id, values.map((v) => v.operationId)),
-                eq(schema.operationCatalog.isActive, true),
-              ),
-            );
+      const operations =
+        values.length === 0
+          ? []
+          : await tx
+              .select()
+              .from(schema.operationCatalog)
+              .where(
+                and(
+                  inArray(
+                    schema.operationCatalog.id,
+                    values.map((v) => v.operationId),
+                  ),
+                  eq(schema.operationCatalog.isActive, true),
+                ),
+              );
 
       const byId = new Map(operations.map((o) => [o.id, o]));
       const rows = values.map((v) => {
@@ -162,10 +166,17 @@ export async function evaluateRequest(
         const quantity = Number(v.quantity);
         const estimatedLabor = Money.fromDb(op.estimatedLabor).mul(quantity);
         const estimatedMaterial = Money.fromDb(op.estimatedMaterial).mul(quantity);
-        return { operationId: v.operationId, quantity: v.quantity, estimatedLabor, estimatedMaterial };
+        return {
+          operationId: v.operationId,
+          quantity: v.quantity,
+          estimatedLabor,
+          estimatedMaterial,
+        };
       });
 
-      await tx.delete(schema.requestEstimateLines).where(eq(schema.requestEstimateLines.requestId, requestId));
+      await tx
+        .delete(schema.requestEstimateLines)
+        .where(eq(schema.requestEstimateLines.requestId, requestId));
       if (rows.length > 0) {
         await tx.insert(schema.requestEstimateLines).values(
           rows.map((r) => ({
@@ -236,7 +247,10 @@ export async function decideRouting(
           sourceKind: 'amanata',
           validUntil: values.backlog.validUntil,
         });
-        await tx.update(schema.requests).set({ status: 'in_backlog' }).where(eq(schema.requests.id, values.requestId));
+        await tx
+          .update(schema.requests)
+          .set({ status: 'in_backlog' })
+          .where(eq(schema.requests.id, values.requestId));
       } else {
         if (values.creation === undefined) {
           throw new AppError('VALIDATION_FAILED', 'Lipsesc datele unității de lucru.');
@@ -267,7 +281,10 @@ export async function decideRouting(
           sourceRequestId: values.requestId,
         });
 
-        await tx.update(schema.requests).set({ status: 'decisa' }).where(eq(schema.requests.id, values.requestId));
+        await tx
+          .update(schema.requests)
+          .set({ status: 'decisa' })
+          .where(eq(schema.requests.id, values.requestId));
       }
 
       // `target_periods` sunt DATE calendaristice (prima zi a lunii), nu
@@ -277,7 +294,12 @@ export async function decideRouting(
         const periodRows = await tx
           .select({ id: schema.periods.id, year: schema.periods.year, month: schema.periods.month })
           .from(schema.periods)
-          .where(inArray(schema.periods.id, values.creation.allocations.map((a) => a.periodId)));
+          .where(
+            inArray(
+              schema.periods.id,
+              values.creation.allocations.map((a) => a.periodId),
+            ),
+          );
         const byId = new Map(periodRows.map((p) => [p.id, p]));
         targetPeriods = values.creation.allocations.map((a) => {
           const p = byId.get(a.periodId);
@@ -322,11 +344,7 @@ export async function decideRouting(
  * restul componentelor plafon de cost; `null` inseamna „nu s-a setat plafon pe
  * luna asta", si atunci nu exista cifra fata de care sa avertizezi.
  */
-async function freeRoom(
-  tx: ActorTx,
-  componentId: string,
-  periodId: string,
-): Promise<Money | null> {
+async function freeRoom(tx: ActorTx, componentId: string, periodId: string): Promise<Money | null> {
   const [ceiling] = await tx
     .select({
       costCeiling: schema.componentCeilings.costCeiling,
@@ -505,6 +523,18 @@ export async function expireBacklogProposals(tx: ActorTx, asOf: string): Promise
          where status = 'open' and valid_until is not null and valid_until < ${asOf}`,
   );
   return result.rowCount ?? 0;
+}
+
+/**
+ * Use-case-ul cronului zilnic de expirare (§3.6). Deschide tranzactia in jurul
+ * lui `expireBacklogProposals`, ca worker-ul sa nu stie nimic despre `ActorTx`.
+ *
+ * `asOf` e parametru, nu `now()` in SQL: asa se poate rula si pentru o zi
+ * anume, iar testul nu depinde de ceasul masinii.
+ */
+export async function runBacklogExpiry(actor: Actor, asOf?: string): Promise<number> {
+  const on = asOf ?? new Date().toISOString().slice(0, 10);
+  return withActor(actor, (tx) => expireBacklogProposals(tx, on));
 }
 
 // ── Citiri: ce alimenteaza ecranele pasului 08b ──────────────────────────────
@@ -965,7 +995,10 @@ export async function listRoutingDecisions(
       .from(schema.requestDecisions)
       .innerJoin(schema.requests, eq(schema.requestDecisions.requestId, schema.requests.id))
       .innerJoin(schema.persons, eq(schema.requestDecisions.decidedBy, schema.persons.id))
-      .leftJoin(schema.workUnits, eq(schema.requestDecisions.createdWorkUnitId, schema.workUnits.id))
+      .leftJoin(
+        schema.workUnits,
+        eq(schema.requestDecisions.createdWorkUnitId, schema.workUnits.id),
+      )
       .where(inArray(schema.requests.companyId, [...options.companyIds]))
       .orderBy(desc(schema.requestDecisions.decidedAt))
       .limit(options.limit ?? REQUEST_LIST_LIMIT),
@@ -991,7 +1024,10 @@ export async function listDecisionsForRequest(
       .from(schema.requestDecisions)
       .innerJoin(schema.requests, eq(schema.requestDecisions.requestId, schema.requests.id))
       .innerJoin(schema.persons, eq(schema.requestDecisions.decidedBy, schema.persons.id))
-      .leftJoin(schema.workUnits, eq(schema.requestDecisions.createdWorkUnitId, schema.workUnits.id))
+      .leftJoin(
+        schema.workUnits,
+        eq(schema.requestDecisions.createdWorkUnitId, schema.workUnits.id),
+      )
       .where(eq(schema.requestDecisions.requestId, requestId))
       .orderBy(desc(schema.requestDecisions.decidedAt)),
   );

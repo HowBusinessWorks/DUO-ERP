@@ -300,6 +300,7 @@ export {
   promoteBacklog,
   proposeRouting,
   routingContext,
+  runBacklogExpiry,
   suggestBacklogFill,
   triageRequest,
 } from './requests';

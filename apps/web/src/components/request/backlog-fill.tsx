@@ -60,6 +60,12 @@ export interface BacklogFillProps {
   readonly contracts: readonly BacklogContract[];
   readonly canPromote: boolean;
   readonly blockedReason?: string;
+  /**
+   * Contractul pe care se deschide ecranul, din `?contract=…`. Alerta de Delta
+   * de pe 10 si 20 trimite aici (§3.6) — fara asta, linkul ar ateriza pe primul
+   * contract din lista, adica pe alt contract decat cel din alerta.
+   */
+  readonly initialContractId?: string;
 }
 
 const SOURCE_LABELS: Readonly<Record<string, string>> = {
@@ -68,11 +74,17 @@ const SOURCE_LABELS: Readonly<Record<string, string>> = {
   amanata: 'amânată',
 };
 
-export function BacklogFill({ proposals, contracts, canPromote, blockedReason }: BacklogFillProps) {
+export function BacklogFill({
+  proposals,
+  contracts,
+  canPromote,
+  blockedReason,
+  initialContractId,
+}: BacklogFillProps) {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [contractId, setContractId] = useState(contracts[0]?.contractId ?? '');
+  const [contractId, setContractId] = useState(initialContractId ?? contracts[0]?.contractId ?? '');
   const contract = contracts.find((candidate) => candidate.contractId === contractId);
   const [periodId, setPeriodId] = useState(contract?.months[0]?.periodId ?? '');
   const [selected, setSelected] = useState<readonly string[]>([]);
@@ -221,7 +233,9 @@ export function BacklogFill({ proposals, contracts, canPromote, blockedReason }:
           onClick={autoFill}
           disabled={free.isZero() || visible.length === 0}
           disabledReason={
-            free.isZero() ? 'Luna asta n-are plafon de Deltă setat, deci n-are ce umple.' : undefined
+            free.isZero()
+              ? 'Luna asta n-are plafon de Deltă setat, deci n-are ce umple.'
+              : undefined
           }
         >
           Umple automat

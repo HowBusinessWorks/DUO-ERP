@@ -84,11 +84,19 @@ export interface EntityListConfig<Row> {
    * raman navigabile fara sa se creeze o a doua pagina de lista.
    */
   readonly views?: readonly ListView[];
-  /** Randeaza o vedere care nu e tabelul. Primeste ACELEASI randuri. */
+  /**
+   * Randeaza o vedere care nu e tabelul. Primeste ACELEASI randuri.
+   *
+   * `search` e query string-ul paginii, ca o vedere sa-si poata tine o selectie
+   * in URL — de asta are nevoie orice alerta care trimite pe un ecran deja
+   * filtrat (backlogul pe un contract anume, §3.6). O selectie care traieste
+   * doar in starea componentei nu poate fi tinta unui link.
+   */
   renderView?(
     rows: readonly Row[],
     view: string,
     ctx: EntityContext,
+    search: Readonly<Record<string, string | string[] | undefined>>,
   ): ReactNode | Promise<ReactNode>;
 }
 
