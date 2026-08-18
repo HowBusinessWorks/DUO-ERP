@@ -149,6 +149,7 @@ export {
 export type { CostQuery, MarginBasis, RecordCostInput, StornoCostInput } from './cost';
 
 export {
+  CHECKSUM_MAX_BYTES,
   completeUploadInputSchema,
   createFolderInputSchema,
   MAX_DOCUMENT_BYTES,
@@ -165,5 +166,7 @@ export {
   THUMBNAIL_WIDTHS,
   thumbnailVariant,
   UPLOAD_PART_BYTES,
+  uploadPartBytes,
+  uploadTtlSeconds,
 } from './files';
 export type { CompleteUploadInput, PresignUploadInput, ShareNodeInput } from './files';

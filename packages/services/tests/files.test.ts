@@ -37,6 +37,7 @@ const companyId = uuidv7();
 const clientId = uuidv7();
 const contractId = uuidv7();
 const objectiveId = uuidv7();
+const secondObjectiveId = uuidv7();
 
 let contractFolder = '';
 let userFolder = '';
@@ -66,6 +67,16 @@ beforeAll(async () => {
     await tx.execute(sql`
       insert into app.objectives (id, code, name, kind)
       values (${objectiveId}, ${`OSF-${objectiveId.slice(-8)}`}, 'Statie fisiere', 'statie_pompare')`);
+    await tx.execute(sql`
+      insert into app.objectives (id, code, name, kind)
+      values (${secondObjectiveId}, ${`OSF-${secondObjectiveId.slice(-8)}`}, 'Bazin fisiere',
+              'bazin_retentie')`);
+    // Doua obiective pe ACELASI contract — cazul care a scos la iveala bug-ul
+    // din `ensure_folder` reparat la 0024.
+    await tx.execute(sql`
+      insert into app.contract_objectives (id, contract_id, objective_id, valid_from)
+      values (${uuidv7()}, ${contractId}, ${objectiveId}, '2026-01-01'),
+             (${uuidv7()}, ${contractId}, ${secondObjectiveId}, '2026-01-01')`);
   });
 
   const found = await folderForEntity(actor(), { contractId }, 'contract_docs');
@@ -75,6 +86,27 @@ beforeAll(async () => {
 describe('organizarea arborelui', () => {
   it('folderul de contract exista deja, generat de trigger', () => {
     expect(contractFolder).not.toBe('');
+  });
+
+  /*
+   * Regresie pentru bug-ul reparat in migrarea 0024.
+   *
+   * `ensure_folder` cauta folderul existent fara `objective_id`, iar toate
+   * obiectivele unui contract au acelasi parinte si acelasi rol — deci al doilea
+   * obiectiv primea folderul primului. Nu dadea nicio eroare: dosarele se
+   * suprapuneau, si documentele a 20 de obiective ar fi ajuns intr-unul singur.
+   */
+  it('doua obiective pe acelasi contract au DOUA dosare, nu unul', async () => {
+    const first = await folderForEntity(actor(), { contractId, objectiveId }, 'objective');
+    const second = await folderForEntity(
+      actor(),
+      { contractId, objectiveId: secondObjectiveId },
+      'objective',
+    );
+
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(first).not.toBe(second);
   });
 
   it('creeaza un folder de utilizator, si el chiar e „de utilizator"', async () => {

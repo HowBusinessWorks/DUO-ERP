@@ -246,6 +246,7 @@ export {
   applyExif,
   breadcrumb,
   cleanupFiles,
+  companyRootFolder,
   completeUpload,
   createFolder,
   deriveSource,

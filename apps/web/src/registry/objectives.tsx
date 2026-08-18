@@ -11,9 +11,11 @@ import {
   type ObjectiveRow,
 } from '@damina/services';
 import { Badge, CellMeta, CellTitle, EmptyState, Money, Table } from '@damina/ui';
-import { History, MapPin } from 'lucide-react';
+import { Folder, FolderX, History, MapPin } from 'lucide-react';
+import Link from 'next/link';
 import { DefinitionList, Empty } from '../components/detail/definition-list';
 import { PhasePlaceholder } from '../components/detail/phase-placeholder';
+import { EntityDocuments } from '../components/files/entity-documents';
 import { ObjectiveMap, type MapPin as Pin } from '../components/objective/objective-map';
 import { defineEntity } from './types';
 
@@ -406,10 +408,86 @@ export const obiective = defineEntity<ObjectiveRow>({
           </div>
         ),
       },
+      /*
+       * Documentele obiectivului stau pe LEGATURA obiectiv x contract, nu pe
+       * obiectiv: acelasi bazin poate fi pe doua contracte, la doua firme, cu
+       * doua dosare care nu se amesteca. De aceea `objectives` nici n-are
+       * `root_node_id` — coloana a fost stearsa la 07a, ca sa nu poata alege
+       * cineva arbitrar unul dintre foldere si sa creada ca e „al obiectivului”.
+       *
+       * Cand obiectivul e pe un singur contract, alegerea se face singura si
+       * omul nu vede intrebarea. Cand e pe mai multe, o vede — pentru ca atunci
+       * chiar exista o intrebare.
+       */
       {
         slug: 'documente',
         label: 'Documente',
-        render: () => <PhasePlaceholder phase={1} what="Documentele obiectivului" />,
+        render: async (row, ctx, sub) => {
+          const contracts = await listContractsForObjective(ctx.actor, row.id);
+          if (contracts.length === 0) {
+            return (
+              <EmptyState
+                icon={<FolderX className="size-5" aria-hidden="true" />}
+                title="Obiectivul nu e legat de niciun contract"
+                body="Dosarul unui obiectiv trăiește pe legătura lui cu un contract. Leagă-l dintr-un contract și folderul apare singur, în aceeași tranzacție."
+              />
+            );
+          }
+
+          const chosen =
+            contracts.find((entry) => entry.contractId === sub[0]) ??
+            (contracts.length === 1 ? contracts[0] : undefined);
+
+          if (chosen === undefined) {
+            return (
+              <div className="space-y-3">
+                <p className="max-w-prose text-sm text-ink-muted">
+                  Obiectivul e pe {String(contracts.length)} contracte. Fiecare are dosarul lui —
+                  alege-l pe cel pe care îl deschizi.
+                </p>
+                <ul className="grid gap-2 sm:grid-cols-2">
+                  {contracts.map((entry) => (
+                    <li key={entry.contractId}>
+                      <Link
+                        href={`/obiective/${row.id}/documente/${entry.contractId}`}
+                        className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm hover:bg-surface-hover"
+                      >
+                        <Folder className="size-4 text-brand-600" aria-hidden="true" />
+                        <span>
+                          {entry.code} · {entry.companyName}
+                        </span>
+                        {entry.isCurrent ? null : <CellMeta>încheiat</CellMeta>}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          }
+
+          return (
+            <div className="space-y-3">
+              {contracts.length === 1 ? null : (
+                <p className="text-sm text-ink-muted">
+                  Dosarul de pe contractul {chosen.code} · {chosen.companyName}.{' '}
+                  <Link
+                    href={`/obiective/${row.id}/documente`}
+                    className="text-brand-600 underline underline-offset-2"
+                  >
+                    Schimbă contractul
+                  </Link>
+                </p>
+              )}
+              <EntityDocuments
+                ctx={ctx}
+                scope={{ objectiveId: row.id, contractId: chosen.contractId }}
+                role="objective"
+                basePath={`/obiective/${row.id}/documente/${chosen.contractId}`}
+                sub={sub.slice(1)}
+              />
+            </div>
+          );
+        },
       },
       {
         slug: 'poze',

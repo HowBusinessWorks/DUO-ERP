@@ -63,7 +63,15 @@ export async function createMultipartUpload(
  * Cate unul per parte, ca retry-ul sa fie PER PARTE, nu pe tot fisierul —
  * cerinta explicita pentru conexiunile proaste de santier.
  */
-export async function presignPart(upload: MultipartUpload, partNumber: number): Promise<string> {
+export async function presignPart(
+  upload: MultipartUpload,
+  partNumber: number,
+  /**
+   * Cat traieste URL-ul. Vine de sus, calculat din marimea fisierului: un video
+   * de 2 GB nu se termina de urcat in 15 minute pe o conexiune de santier.
+   */
+  ttlSeconds: number = UPLOAD_TTL_SECONDS,
+): Promise<string> {
   if (!Number.isInteger(partNumber) || partNumber < 1 || partNumber > 10_000) {
     throw new RangeError(`Numar de parte invalid: ${partNumber}.`);
   }
@@ -76,7 +84,7 @@ export async function presignPart(upload: MultipartUpload, partNumber: number): 
       UploadId: upload.uploadId,
       PartNumber: partNumber,
     }),
-    { expiresIn: UPLOAD_TTL_SECONDS },
+    { expiresIn: ttlSeconds },
   );
 }
 
@@ -194,7 +202,12 @@ export async function putObject(
   contentType: string,
 ): Promise<void> {
   await r2().send(
-    new PutObjectCommand({ Bucket: bucket(target), Key: key, Body: body, ContentType: contentType }),
+    new PutObjectCommand({
+      Bucket: bucket(target),
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    }),
   );
 }
 

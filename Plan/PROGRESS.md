@@ -13,15 +13,16 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Scris la finalul lui 07b (18 august 2026). Citește-l primul; restul fișierului e istoric.*
+*Scris la finalul lui 07c-1 (18 august 2026). Citește-l primul; restul fișierului e istoric.*
 
 ### Unde s-a ajuns
 
 Pașii **01, 02, 04, 05 și 06 sunt gata**. Pasul **03** e complet ca implementare, cu 4 verificări
-nerulate. Pasul **07 e la două treimi**: 07a și 07b sunt gata, cu CI verde propriu
-(**07a** `32105546165` · **07b** `32108456833`). **Următorul lucru de făcut e 07c — ecranele.**
+nerulate. Pasul **07**: 07a, 07b și **07c-1** sunt gata. **Următorul lucru de făcut e 07c-2 —
+galeria de poze, previzualizările și partajarea din interfață.**
 
-Ultimul commit pe `origin/main`: `16ac8a2`. Arborele de lucru e curat.
+Explorerul de fișiere, uploadul cu retry per parte și tab-ul *Documente* pe cele patru entități
+funcționează și sunt verificate pe dev.
 
 ### Ce trebuie să știi despre pasul 07, ca să nu recitești tot
 
@@ -29,7 +30,8 @@ Ultimul commit pe `origin/main`: `16ac8a2`. Arborele de lucru e curat.
 |---|---|
 | **07a** | `0021_files` — `nodes`, `file_versions`, `derived_assets`, `node_shares`; arborele din Anexa E.3 construit de **triggere**, în aceeași tranzacție cu entitatea; `app.can_access_node()`; backfill cu plasă |
 | **07b** | presign/complete cu retry per parte, descărcare prin `/api/files/[versionId]`, cozile `files.derive` (EXIF + 3 miniaturi WebP) și `files.cleanup`; `0022` + `0023` (reparații, vezi mai jos) |
-| **07c** | **neînceput** — explorer, tab *Documente* prin registry, coș de gunoi, galerie cu geotag |
+| **07c-1** | `/documente` (explorer + coș), tab *Documente* prin registry pe contract/obiectiv/UL/etapă, uploaderul cu retry per parte, video până la 4 GB; migrarea `0024` (dosare de obiectiv suprapuse) |
+| **07c-2** | **neînceput** — galeria cu geotag și oră, previzualizare imagine/PDF, partajarea (`node_shares`) din interfață, istoricul de versiuni |
 
 **Patru reguli ale arborelui, dacă nu citești altceva:**
 
@@ -45,31 +47,29 @@ Ultimul commit pe `origin/main`: `16ac8a2`. Arborele de lucru e curat.
 
 Detaliile sunt în `docs/files.md` (≤ 80 de linii).
 
-### Ce urmează concret — 07c
+### Ce urmează concret — 07c-2
 
-Rămân **3 verificări din 21**: #19 (tab *Documente* pe contract, obiectiv, UL, etapă), #20 (galerie
-cu 300 de poze, pe miniaturi), #21 (upload din teren, din UL-ul lui). Plus jumătatea din #7 —
-reluarea per parte e proiectată și presemnată, dar întreruperea reală de rețea cere clientul.
+Rămâne **verificarea #20** (galerie cu 300 de poze, pe miniaturi, cu geotag și oră vizibile pe
+fiecare) și jumătatea din **#7** — reluarea per parte există și merge, dar întreruperea reală de
+rețea cere Playwright.
 
 Ce e deja gata și te așteaptă:
 
-- **Serviciile există toate** în `packages/services/src/files.ts`: `listChildren`, `breadcrumb`,
-  `folderForEntity`, `createFolder`, `renameNode`, `moveNode`, `trashNode`, `restoreNode`,
-  `listTrash`, `shareNode`, `listVersions`, `thumbnailUrl`. Ecranele nu mai au de scris logică.
-- **Rutele API sunt gata**: `/api/files/presign`, `/api/files/complete`,
-  `/api/files/[versionId]`, `/api/files/[versionId]/thumb/[variant]`.
-- **Drepturile există**: `files.read`, `files.write`, `files.share`.
-- **Tab-ul *Documente*** e încă `PhasePlaceholder` pe unitate, pe etapă și pe contract. Locul lui e
-  în `entityRegistry`; se activează pentru toate entitățile deodată.
+- **`FileExplorer`** (`components/files/file-explorer.tsx`) — o componentă, două locuri. Primește
+  `rootId`, `nodeId` și `href` ca **funcție**, fiindcă `/documente` pune nodul în query, iar
+  tab-urile în segmente. Galeria e a treia montură a aceleiași idei: aceleași `listChildren`, altă
+  reprezentare — exact ca harta obiectivelor față de tabel.
+- **`thumbnailUrl(actor, versionId, variant)`** și ruta `/api/files/[versionId]/thumb/[variant]`,
+  cu TTL de 15 minute. Galeria **nu** cere originale, și nu importă `sharp`/`exifr` — alea trăiesc
+  doar în worker, dinadins.
+- **`NodeRow` poartă deja `capturedAt`, `geoLat`, `geoLng`, `geoSource`** din `listChildren`. Nu mai
+  e nevoie de nicio interogare nouă pentru geotag.
+- **`shareNode` / `unshareNode` / `listShares`** există în servicii, cu dreptul `files.share`.
+  Ecranul lipsește.
 
-**Două capcane de care să te ferești la 07c:**
-
-- **Tab-ul *Documente* pe obiectiv trebuie să aleagă contractul din context.** Folderul obiectivului
-  stă pe **legătura** obiectiv×contract (`contract_objectives.root_node_id`), nu pe obiectiv —
-  același bazin poate fi pe două contracte, cu două foldere. Coloana de pe `objectives` a fost
-  **ștearsă** la 07a exact ca să nu aleagă cineva arbitrar unul dintre ele.
-- **`sharp` și `exifr` sunt doar în `apps/worker`, dinadins.** Ecranele nu au voie să le importe;
-  miniaturile vin gata făcute, prin ruta de `thumb`.
+**Capcana de care să te ferești la galerie:** 300 de poze înseamnă 300 de semnături. Miniaturile au
+TTL lung exact pentru asta, dar semnarea se face pe server, la randare — nu cere o semnătură per
+derulare.
 
 ### Trei bug-uri vechi reparate la 07b — nu le reintroduce
 
@@ -87,6 +87,17 @@ Toate trei erau vii de dinainte, și toate trei erau **tăcute**:
    mărimea *declarate de client*. Reparat în `0023`, care se termină cu o plasă: migrarea cade dacă
    vreo tabelă de fișiere rămâne fără politică de scriere pentru birou.
 
+### Două bug-uri vechi reparate la 07c-1 — nu le reintroduce
+
+1. **`ensure_folder` suprapunea dosarele obiectivelor.** Căuta folderul existent pe
+   `(părinte, rol, work_unit_id, stage_id)`, fără `objective_id` — iar toate obiectivele unui
+   contract au același părinte și același rol. Al doilea obiectiv primea folderul primului: pe dev,
+   120 de legături și 40 de foldere. Reparat în `0024`, cu backfill și cu plasă. **O funcție
+   idempotentă care se uită la prea puține coloane nu face duplicate — face suprapuneri**, care
+   sunt mai greu de văzut și mai rele.
+2. **Mărimea anunțată nu era verificată** la `complete` (verificarea #8 din plan): se putea declara
+   1 KB și urca 6 MB. Plafonul pe tip prindea doar exagerările. Acum egalitate strictă.
+
 ### Verificări din pașii anteriori care NU sunt complet închise
 
 | Pas | # | Ce lipsește |
@@ -94,7 +105,8 @@ Toate trei erau vii de dinainte, și toate trei erau **tăcute**:
 | 06 | **11** | Drill-down-ul merge până la identitatea documentului. Documentele-sursă apar la 09–10. |
 | 06 | **19** | Comutatorul brut/net merge, dar **`overhead_snapshots` nu e populat de nimeni periodic**. Vezi datoria 2. |
 | 06 | **21** | Indexul de cursor măsurat la 10.000 de linii, nu la 100.000. Planul e însă independent de volum. |
-| 07 | **7** | Reluarea per parte e presemnată și proiectată; întreruperea reală de rețea cere clientul din 07c. |
+| 07 | **7** | Reluarea per parte există în client și merge; **întreruperea reală de rețea** cere Playwright. |
+| 07 | **20** | Galeria de poze — 07c-2. |
 
 ### Datorii deschise, în ordinea în care le-aș lua
 
@@ -102,10 +114,12 @@ Toate trei erau vii de dinainte, și toate trei erau **tăcute**:
 |---|---|---|
 | 1 | **Rotește `SUPABASE_SERVICE_ROLE_KEY`** (Project Settings → API) | A trecut printr-o fereastră de chat pe 17 august. Singurul cod care o folosește e `resetMfaFactors` din `apps/web/src/app/api/admin/service.ts`. |
 | 2 | **Jobul lunar de regie** | `recomputeOverheadSnapshot` există și e acordată doar lui `app_service`, dar n-o cheamă nimeni. Fără ea, marja netă e marjă brută cu altă etichetă. |
-| 3 | **Playwright** | Neinstalat. Blochează #13 din pasul 03, clicul pe hartă din 04b (#14) și partea de client din #7/#20 la 07c. |
-| 4 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Ori `grant select` pe `work_queue_items`/`notifications` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
-| 5 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
-| 6 | **Previzualizări pentru PDF și video** | `files.derive` produce miniaturi doar pentru imagini; pentru restul iese tăcut, dinadins. Se adaugă când apare nevoia reală (fișe la 09, raport la 10). |
+| 3 | **CORS pe bucket-ul R2 `docs`** | Uploadul din browser NU merge fără el: `PUT` de pe originea aplicației și **`ExposeHeaders: ETag`**. Fără ETag expus, clientul se oprește la prima parte — cu mesaj explicit, dar se oprește. Verificat până acum doar din Node, unde CORS nu se aplică. |
+| 4 | **`pnpm install` n-a mai rulat local de la 07b** | `sharp` și `exifr` lipsesc din `apps/worker/node_modules`, deci `pnpm typecheck` cade pe worker pe mașina asta. În CI, care instalează de la zero, nu se vede. |
+| 5 | **Playwright** | Neinstalat. Blochează #13 din pasul 03, clicul pe hartă din 04b (#14) și partea de client din #7 și #20. |
+| 6 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Ori `grant select` pe `work_queue_items`/`notifications` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
+| 7 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
+| 8 | **Previzualizări pentru PDF și video** | `files.derive` produce miniaturi doar pentru imagini; pentru restul iese tăcut, dinadins. Se adaugă când apare nevoia reală (fișe la 09, raport la 10). |
 
 **Datoria `pnpm db:generate` rămâne plătită.** Migrările `0016`–`0021` au fost **generate**. `0022` și
 `0023` sunt scrise de mână **pentru că nu schimbă schema** — doar funcții, politici și grant-uri;
@@ -114,7 +128,7 @@ migrări de mână când schimbi tabele** — scrie schema Drizzle, generează, 
 
 ### Starea bazei de dezvoltare
 
-- Migrările **`0017`–`0023` sunt aplicate** pe Supabase dev.
+- Migrările **`0017`–`0024` sunt aplicate** pe Supabase dev.
 - **pg-boss a fost pornit prima dată pe 18 august**: schema `jobs` există acum, cu cele 6 cozi
   (`system.ping`, `contracts.expiryScan`, `contracts.deltaFillScan`, `rollup.verify`, `files.derive`,
   `files.cleanup`). Înainte de asta nu exista deloc.
@@ -197,6 +211,18 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 - **`defineJob` rulează la ÎNCĂRCAREA modulului.** O validare care cade acolo nu strică un job, ci
   întregul `import '@damina/jobs'` — deci worker-ul nu mai pornește deloc, iar simptomul nu seamănă
   cu cauza. Merită ținut minte pentru orice validare pusă la nivel de modul.
+- **Într-o funcție „ensure", căutarea trebuie să compare EXACT valoarea pe care ar insera-o.**
+  `ensure_folder` inserează analitica moștenită din părinte (`coalesce(argument, părinte)`), dar
+  căuta după argument. Prima variantă a reparației din `0024` a picat imediat pe `Fișă`: se cheamă
+  cu `p_objective => null`, dar există în bază cu obiectivul moștenit. Cele două expresii trebuie
+  scrise o singură dată, în variabile, și folosite în amândouă locurile.
+- **Sesiunea de dezvoltare (`ALLOW_DEV_SESSION=1`) NU poate scrie fișiere.** `personId`-ul ei nu
+  există în `app.persons`, iar `nodes.created_by` are cheie străină — deci `presign` cade cu 500 și
+  `23503`. Ecranele se citesc cu ea, dar orice harness care **scrie** are nevoie de o sesiune
+  fabricată din grantul de parolă (rețeta e mai sus).
+- **ETag-ul unei părți e vizibil în browser doar dacă bucket-ul îl expune** (`ExposeHeaders: ETag`).
+  Din Node nu se vede problema — CORS nu se aplică acolo — deci uploadul poate arăta perfect în
+  harness și să se oprească la prima parte în browser. Clientul spune exact asta când se întâmplă.
 - **Un pachet pe care nimic din CI nu-l importă nu e testat, oricâte teste ar avea repo-ul.**
   `@damina/jobs` arunca la import de la pasul 04 și s-a aflat abia la 07b, când `files.ts` l-a adus
   în lanțul serviciilor.
@@ -260,7 +286,7 @@ smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bu
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
 | 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
-| 07 — File management (R2) | 🟨 în lucru (07a + 07b gata; rămân ecranele din 07c) | 2026-08-18 |
+| 07 — File management (R2) | 🟨 în lucru (07a + 07b + 07c-1 gata; rămâne 07c-2: galerie, previzualizări, partajare) | 2026-08-18 |
 | 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
 | 09 — Fișe de lucru | ⬜ neînceput | — |
 | 10 — Teren offline, raport lunar | ⬜ neînceput | — |
@@ -2085,6 +2111,74 @@ proiectată și presemnată, dar întreruperea reală de rețea cere clientul di
 teren, care cere ecranul).
 
 **Suite:** 162 de bază de date, 102 de servicii (92 + 10), plus 6 unitare noi.
+
+### 2026-08-18 — [status: gata] — 07c-1, explorerul, uploadul și tab-ul Documente
+
+**Ce a intrat**
+
+- **`/documente`** — explorerul: firimituri, navigare pe `?node=`, folder nou,
+  redenumire, mutare, ștergere, coș de gunoi cu restaurare. Când contextul are mai
+  multe firme, se alege firma întâi: arborele e al unei firme, nu al omului.
+- **`components/files/file-explorer.tsx`** — **o singură** componentă, montată în
+  două locuri. Se randează pe server (navigarea e navigare adevărată, iar HTML-ul
+  se poate verifica fără browser); client sunt doar zona de upload și dialogurile.
+- **Tab-ul `Documente`** pe contract, obiectiv, unitate de lucru și **etapă** —
+  prin registry, patru intrări, zero pagini noi. Verificarea #19.
+- **Uploaderul** (`upload-zone.tsx`): drag & drop, `presign` → PUT per parte →
+  `complete`, **retry per parte** (3 încercări, pauză crescătoare), progres real
+  cu `XMLHttpRequest`, renunțare cu `abort`.
+- **Video până la 4 GB** (era 500 MB): `uploadPartBytes` și `uploadTtlSeconds`
+  calculează partea (8/16/32 MB) și TTL-ul (15 min – 12 h) din mărimea fișierului.
+
+**Două bug-uri vechi, găsite de harness — nu le reintroduce**
+
+1. **Un contract cu 20 de obiective avea UN SINGUR folder de obiectiv.**
+   `app.ensure_folder` căuta pe `(părinte, rol, work_unit_id, stage_id)` — fără
+   `objective_id`. Toate obiectivele unui contract au același părinte și același
+   rol, deci al doilea primea folderul primului: pe dev, **120 de legături → 40 de
+   foldere**. Reparat în `0024`, cu backfill și cu plasă. Aceeași familie ca
+   bug-ul de RLS din `0023`: **n-a dat eroare nicăieri, doar a suprapus dosare.**
+   Plasa numără obiective distincte, nu legături — același obiectiv relegat de
+   același contract în două perioade e un singur dosar, corect.
+   **Prima variantă a reparației a picat pe testul de arbore**, și merită ținut minte de ce:
+   funcția inserează analitica *moștenită din părinte*, dar căuta după *argument*. `Fișă` se
+   creează cu `p_objective => null` și există în bază cu obiectivul moștenit — deci nu se mai
+   găsea. Acum ambele folosesc aceleași trei variabile.
+2. **Verificarea #8 nu trecea.** `complete` verifica plafonul pe tip, dar nu și
+   mărimea reală față de cea anunțată: se putea declara 1 KB și urca 6 MB.
+   Acum egalitate strictă — clientul știe exact cât are fișierul lui.
+
+**Decizii luate**
+
+- **`/documente` e pagină proprie, nu intrare în `entityRegistry`** (aprobat).
+  Pagina fractală randează liste de rânduri; asta e navigare într-un arbore, iar
+  `ListQuery` are căutare și vedere, nu un nod curent. Precedent: `panou/rapoarte`.
+- **Nodul curent stă în `?node=` pe `/documente`, dar în segmente pe tab-uri**
+  (`/activitate/{id}/documente/{nod}`): pagina fractală **nu primește
+  `searchParams`**, dar primește `sub`. De aici `FileExplorer` ia `href` ca funcție.
+- **Tab-ul obiectivului alege contractul.** Dosarul stă pe legătura
+  obiectiv×contract; cu un singur contract alegerea e tăcută, cu mai multe se cere.
+- **Suma de control doar sub 32 MB** (aprobat): peste, serverul ar descărca înapoi
+  din R2 tot ce s-a urcat, ca s-o verifice.
+- **Drag & drop înseamnă „trage fișiere din sistem"**, nu „trage un rând peste un
+  folder". Mutarea se face din dialog, cu părintele și folderele surori ca ținte.
+  Mutarea prin tragere cere înlocuirea componentei `Table` — nu merită încă.
+
+**Cum a fost verificat**
+
+- 15 verificări pe ecrane, fără browser (`next dev` + `curl`, afirmații pe HTML):
+  explorer, navigare, coș, tab-ul Documente pe toate cele patru entități,
+  navigarea în tab pe segmente, zero URL-uri R2 în HTML.
+- **#21**, ca `field`, cu sesiune fabricată din grantul de parolă: `presign` în
+  UL-ul lui → 200; într-o UL neasignată → **404, „Folderul inexistent"** (RLS,
+  zero rânduri — nu un `if` din aplicație).
+- Upload cap-coadă pe R2 real: 9 MB în 2 părți, `complete` → `image/jpeg`,
+  9.437.184 octeți. Și controlul care a scos bug-ul #2 de mai sus.
+- 11 teste de servicii pe fișiere (10 + regresia pentru dosarele suprapuse).
+
+**Verificări acoperite:** 19, 21, 8 (reparată). Rămân pentru 07c-2: **20**
+(galeria), partea de client a lui **7** (întreruperea reală de rețea cere
+Playwright), și partajarea din interfață.
 
 ---
 

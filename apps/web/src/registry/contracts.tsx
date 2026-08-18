@@ -59,6 +59,7 @@ import {
 } from '../components/contract/objective-link-dialog';
 import { DefinitionList, Empty } from '../components/detail/definition-list';
 import { PhasePlaceholder } from '../components/detail/phase-placeholder';
+import { EntityDocuments } from '../components/files/entity-documents';
 import { defineEntity, type EntityContext } from './types';
 
 /**
@@ -1123,7 +1124,16 @@ export const contracte = defineEntity<ContractRow>({
       {
         slug: 'documente',
         label: 'Documente',
-        render: () => <PhasePlaceholder phase={1} what="Dosarul de documente al contractului" />,
+        render: (row, ctx, sub) => (
+          <EntityDocuments
+            ctx={ctx}
+            scope={{ contractId: row.id }}
+            role="contract"
+            basePath={`/contracte/${row.id}/documente`}
+            sub={sub}
+            notice="Folderul contractului, cu tot ce atârnă de el: obiectivele legate și activitatea, lună cu lună."
+          />
+        ),
       },
 
       // ── Setări ────────────────────────────────────────────────────────────

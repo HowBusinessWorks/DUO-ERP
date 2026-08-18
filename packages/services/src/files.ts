@@ -9,7 +9,8 @@ import {
   presignUploadInputSchema,
   renameNodeInputSchema,
   shareNodeInputSchema,
-  UPLOAD_PART_BYTES,
+  uploadPartBytes,
+  uploadTtlSeconds,
 } from '@damina/contracts';
 import { schema, withActor, type Actor, type ActorTx } from '@damina/db';
 import { enqueue, filesDerive } from '@damina/jobs';
@@ -159,7 +160,21 @@ export async function breadcrumb(actor: Actor, nodeId: string): Promise<Crumb[]>
 /** Folderul unei entitati, cautat pe ROL — niciodata pe nume (Anexa E.3). */
 export async function folderForEntity(
   actor: Actor,
-  scope: { readonly workUnitId?: string; readonly contractId?: string; readonly stageId?: string },
+  scope: {
+    readonly workUnitId?: string;
+    readonly contractId?: string;
+    readonly stageId?: string;
+    /**
+     * Obiectivul, si niciodata singur.
+     *
+     * Folderul unui obiectiv sta pe LEGATURA obiectiv x contract: acelasi bazin
+     * poate fi pe doua contracte, cu doua foldere. De aceea `objectives` nici
+     * n-are coloana `root_node_id` — a fost stearsa la 07a, ca sa nu poata
+     * alege cineva arbitrar unul dintre ele. Fara `contractId` alaturi, cautarea
+     * de mai jos ar intoarce „primul gasit", adica exact greseala aia.
+     */
+    readonly objectiveId?: string;
+  },
   role = 'work_unit',
 ): Promise<string | null> {
   return withActor(actor, async (tx) => {
@@ -170,6 +185,25 @@ export async function folderForEntity(
          and (${scope.workUnitId ?? null}::uuid is null or work_unit_id = ${scope.workUnitId ?? null}::uuid)
          and (${scope.contractId ?? null}::uuid is null or contract_id = ${scope.contractId ?? null}::uuid)
          and (${scope.stageId ?? null}::uuid is null or stage_id = ${scope.stageId ?? null}::uuid)
+         and (${scope.objectiveId ?? null}::uuid is null or objective_id = ${scope.objectiveId ?? null}::uuid)
+       limit 1`);
+    return rows.rows[0]?.id ?? null;
+  });
+}
+
+/**
+ * Radacina de fisiere a unei firme — de unde porneste explorerul.
+ *
+ * Cautarea e pe rol, ca peste tot: numele afisat al radacinii e numele firmei si
+ * se poate schimba, rolul nu.
+ */
+export async function companyRootFolder(actor: Actor, companyId: string): Promise<string | null> {
+  return withActor(actor, async (tx) => {
+    const rows = await tx.execute<{ id: string }>(sql`
+      select id from app.nodes
+       where company_id = ${companyId}::uuid
+         and node_role = 'root_company'::app.node_role
+         and deleted_at is null
        limit 1`);
     return rows.rows[0]?.id ?? null;
   });
@@ -532,19 +566,24 @@ export async function presignUpload(
         createdBy: actor.personId,
       });
 
-      const partCount = Math.max(1, Math.ceil(values.size / UPLOAD_PART_BYTES));
+      // Marimea partii si durata de viata a URL-urilor se calculeaza AMANDOUA
+      // din marimea fisierului: la 4 GB, 8 MB pe parte ar insemna 512 de URL-uri
+      // intr-un raspuns, iar 15 minute de TTL ar expira la jumatatea uploadului.
+      const partSize = uploadPartBytes(values.size);
+      const ttlSeconds = uploadTtlSeconds(values.size);
+      const partCount = Math.max(1, Math.ceil(values.size / partSize));
       const partUrls: string[] = [];
       for (let part = 1; part <= partCount; part += 1) {
-        partUrls.push(await presignPart(upload, part));
+        partUrls.push(await presignPart(upload, part, ttlSeconds));
       }
 
       return {
         nodeId,
         versionId,
         uploadId: upload.uploadId,
-        partSize: UPLOAD_PART_BYTES,
+        partSize,
         partUrls,
-        expiresInSeconds: 15 * 60,
+        expiresInSeconds: ttlSeconds,
       };
     });
   } catch (error) {
@@ -599,6 +638,26 @@ export async function completeUpload(
     const realSize = await objectSize('docs', version.blobKey);
     if (realSize === undefined) {
       throw new AppError('VALIDATION_FAILED', 'Fișierul nu a ajuns în storage.');
+    }
+
+    /*
+     * Marimea DECLARATA la presign fata de cea reala.
+     *
+     * Verificarea #8 a pasului, si pana la 07c nu exista: se verifica doar
+     * plafonul pe tip, deci un client putea declara 1 KB si urca 6 MB fara ca
+     * nimic sa protesteze. Conteaza pentru ca `size` nu e o formalitate — din el
+     * ies marimea partii si durata URL-urilor presemnate, si tot el e cifra pe
+     * care s-ar sprijini oricand o cota de spatiu.
+     *
+     * Egalitate stricta, nu „sa nu depaseasca": clientul stie exact cat are
+     * fisierul lui. O nepotrivire, in orice sens, inseamna ca ce s-a urcat nu e
+     * ce s-a anuntat.
+     */
+    if (realSize !== version.size) {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        `Fișierul urcat are ${formatMb(realSize)}, dar s-a anunțat ${formatMb(version.size)}. Nu s-a salvat nimic.`,
+      );
     }
 
     const head = await getObjectBytes('docs', version.blobKey, MAGIC_BYTES_NEEDED);
@@ -807,11 +866,7 @@ export interface ExifFacts {
  * faptei — a o inlocui cu una scoasa dintr-un fisier care poate fi editat ar
  * slabi exact dovada pentru care exista campurile astea.
  */
-export async function applyExif(
-  actor: Actor,
-  versionId: string,
-  facts: ExifFacts,
-): Promise<void> {
+export async function applyExif(actor: Actor, versionId: string, facts: ExifFacts): Promise<void> {
   await withActor(actor, async (tx) => {
     const current = await tx
       .select({ geoSource: schema.fileVersions.geoSource })

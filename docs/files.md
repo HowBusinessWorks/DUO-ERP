@@ -26,7 +26,7 @@ Evenimentul care declanșează construcția e un trigger `after insert` pe entit
 - **Folderele de sistem** (`is_system`) nu se șterg, redenumesc sau mută.
   `app.guard_node_system` respinge, indiferent de calea de acces.
 - **Mutarea finanțării nu atinge arborele.** Arborele e construit pe analitica
-  „folosit". Rutarea unei unități pe alt contract, în schimb, îi *mută* folderul —
+  „folosit". Rutarea unei unități pe alt contract, în schimb, îi _mută_ folderul —
   aia chiar e o schimbare de „unde s-a executat".
 - **Ștergerea e `deleted_at`.** Numele redevine liber imediat (unicitatea e
   parțială), nu la golirea coșului.
@@ -35,10 +35,10 @@ Evenimentul care declanșează construcția e un trigger `after insert` pe entit
 
 `app.can_access_node(nod, permisiune)` — o singură poartă, trei surse:
 
-| Cine | Prin ce |
-|---|---|
-| birou | apartenența nodului la una din firmele lui |
-| teren | asignarea pe unitatea de lucru (până la `write`) |
+| Cine           | Prin ce                                                   |
+| -------------- | --------------------------------------------------------- |
+| birou          | apartenența nodului la una din firmele lui                |
+| teren          | asignarea pe unitatea de lucru (până la `write`)          |
 | subcontractant | **doar** `app.node_shares`, explicit. Nu moștenește nimic |
 
 Partajarea se moștenește în jos: pusă pe un folder, acoperă tot subarborele.
@@ -49,13 +49,30 @@ Serverul nu vede niciodată byte-ii.
 
 ```
 client → POST /api/files/presign  { parentId, filename, size, checksum? }
-       ← uploadId + un URL presemnat PER PARTE (8 MB), valabile 15 minute
+       ← uploadId + un URL presemnat PER PARTE
 client → PUT direct în R2, parte cu parte, retry PER PARTE
 client → POST /api/files/complete { versionId, parts[] }
 server → CompleteMultipartUpload, apoi verifică:
-           ContentLength real · magic bytes · sumă de control
+           mărimea reală = cea anunțată · magic bytes · sumă de control
        → state='ready', enqueue files.derive
 ```
+
+**Partea și TTL-ul se calculează din mărimea fișierului** (`uploadPartBytes`,
+`uploadTtlSeconds`). Filmările de șantier ajung la ~2 GB, iar limita e 4 GB: la
+8 MB pe parte ar fi însemnat 512 de URL-uri într-un răspuns, iar 15 minute de TTL
+ar fi expirat la jumătatea unui upload de 27 de minute. Partea crește la 16 și
+32 MB peste 1 și 2 GB (deci între 64 și 128 de părți, oricât de mare fișierul),
+iar TTL-ul presupune minimum 200 KB/s și se oprește la 12 ore — sub cele 24 h
+după care `files.cleanup` consideră uploadul abandonat.
+
+**Suma de control se calculează în browser doar sub 32 MB** (`CHECKSUM_MAX_BYTES`):
+`crypto.subtle` nu are hashing pe flux, deci cere fișierul întreg în memorie, iar
+serverul l-ar descărca înapoi din R2 ca să-l verifice. Peste prag rămân mărimea
+reală și magic bytes.
+
+**Bucket-ul `docs` are nevoie de CORS** ca browserul să poată urca: metoda `PUT`
+de pe originea aplicației, și `ExposeHeaders: ETag` — fără el, `xhr.getResponseHeader('ETag')`
+întoarce null și uploadul se oprește la prima parte, cu mesaj explicit.
 
 Până la `complete`, fișierul există în R2 dar nu e vizibil nicăieri: nodul n-are
 `current_version_id`, iar versiunea e `uploading`. Ce cade la o verificare nu

@@ -36,6 +36,7 @@ import { MarginScreen, ReconciliationScreen } from '../components/cost/money-scr
 import { PeriodCloseScreen } from '../components/cost/period-close-screen';
 import { AuditTrail } from '../components/detail/audit-trail';
 import { PhasePlaceholder } from '../components/detail/phase-placeholder';
+import { EntityDocuments } from '../components/files/entity-documents';
 import { ClosingChecklist } from '../components/work-unit/closing-checklist';
 import { FundingPanel, fundingSummary, monthLabel } from '../components/work-unit/funding-panel';
 import { StageTimeline } from '../components/work-unit/stage-timeline';
@@ -577,7 +578,16 @@ export const activitate = defineEntity<WorkUnitRow>({
       {
         slug: 'documente',
         label: 'Documente',
-        render: () => <PhasePlaceholder phase={1} what="Folderul unității din arborele de fișiere" />,
+        render: (row, ctx, sub) => (
+          <EntityDocuments
+            ctx={ctx}
+            scope={{ workUnitId: row.id }}
+            role="work_unit"
+            basePath={`/activitate/${row.id}/documente`}
+            sub={sub}
+            notice="Folderul unității stă sub luna în care s-a executat, în contractul pe care e rutată. Mutarea finanțării nu îl atinge."
+          />
+        ),
       },
       {
         slug: 'pv',
@@ -891,6 +901,20 @@ export const etape = defineEntity<StageWithWorkUnitRow>({
             ctx={ctx}
             scope={{ stageId: stage.id }}
             emptyBody="Pe etapa asta nu s-a înregistrat încă niciun cost. Liniile apar aici pe măsură ce documentele lor sunt validate."
+          />
+        ),
+      },
+      {
+        slug: 'documente',
+        label: 'Documente',
+        render: (stage, ctx, sub) => (
+          <EntityDocuments
+            ctx={ctx}
+            scope={{ stageId: stage.id }}
+            role="photo_phase"
+            basePath={`/etape/${stage.id}/documente`}
+            sub={sub}
+            notice="Etapa are un singur folder al ei — „Poze/Etapa N” din lucrare. Redenumirea etapei îl redenumește, dar căutarea lui merge pe rol, nu pe nume."
           />
         ),
       },
