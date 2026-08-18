@@ -13,81 +13,135 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Scris la finalul lui 06c (17 august 2026). Citește-l primul; restul fișierului e istoric.*
+*Scris la finalul lui 07b (18 august 2026). Citește-l primul; restul fișierului e istoric.*
 
 ### Unde s-a ajuns
 
-Pașii **01, 02, 04, 05 și 06 sunt gata**, fiecare cu CI verde. Pasul **03 e complet ca
-implementare**, dar are 4 verificări nerulate. Următorul pas de conținut neînceput e
-**07 — File management (R2)**.
+Pașii **01, 02, 04, 05 și 06 sunt gata**. Pasul **03** e complet ca implementare, cu 4 verificări
+nerulate. Pasul **07 e la două treimi**: 07a și 07b sunt gata, cu CI verde propriu
+(**07a** `32105546165` · **07b** `32108456833`). **Următorul lucru de făcut e 07c — ecranele.**
 
-Pasul 06 a fost tăiat în trei sub-etape (decizia utilizatorului, 17 august 2026), fiecare cu CI verde
-propriu: **06a** `32030892549` · **06b** `32033174957` · **06c** `32036049849`. Suitele au ajuns la
-**146** de teste de bază de date și **92** de servicii.
+Ultimul commit pe `origin/main`: `16ac8a2`. Arborele de lucru e curat.
 
-### Ce e în pasul 06, pe scurt — ca să nu recitești tot
+### Ce trebuie să știi despre pasul 07, ca să nu recitești tot
 
 | Sub-etapă | Ce a intrat |
 |---|---|
-| **06a** | `0017_cost_ledger` (28 de coloane, 4 triggere, RLS doar pentru birou, append-only) + `0018_rollups` (rollup întreținut prin trigger, `app.rollup_verify`) |
-| **06b** | `recordCost`, `stornoCost`, `listCostLines` (cursor), `costBreakdown`, `listReconciliation`; `moveFunding` rescrie acum liniile de cost; închiderea de lună cu checklist ca date; jobul `rollup.verify`; `0019_period_close_checks`; seed `--costs` cu 10.000 de linii |
-| **06c** | Tab-ul Costuri, Bani › Marjă / Reconciliere / Închidere, cifrele reale în Contract › Prezentare și Obiectiv › Istoric, Panou › Rapoarte; `0020_cost_cursor_index` |
+| **07a** | `0021_files` — `nodes`, `file_versions`, `derived_assets`, `node_shares`; arborele din Anexa E.3 construit de **triggere**, în aceeași tranzacție cu entitatea; `app.can_access_node()`; backfill cu plasă |
+| **07b** | presign/complete cu retry per parte, descărcare prin `/api/files/[versionId]`, cozile `files.derive` (EXIF + 3 miniaturi WebP) și `files.cleanup`; `0022` + `0023` (reparații, vezi mai jos) |
+| **07c** | **neînceput** — explorer, tab *Documente* prin registry, coș de gunoi, galerie cu geotag |
 
-**Cele trei reguli ale registrului, dacă nu citești altceva:**
+**Patru reguli ale arborelui, dacă nu citești altceva:**
 
-1. **Două analitici pe fiecare linie.** `used_*` nu se schimbă niciodată; `charged_*` se rescrie la
-   mutarea finanțării, și numai prin `app.recharge_cost_line`.
-2. **Append-only.** `update` și `delete` nu sunt acordate nimănui — nici lui `app_service`. Corecția
-   e `stornoCost`, care își ia suma din linia stornată și o inversează.
-3. **`period_id` se derivă** din `effect_date`, prin trigger. Aplicația nu-l scrie și nici nu poate.
+1. **Arborele se generează prin trigger**, nu din aplicație. Un import, un script sau o rută nouă îl
+   capătă fără să știe că există. La fel ca `period_id` pe registrul de cost.
+2. **Arborele e construit pe analitica „folosit".** Mutarea finanțării **nu** atinge niciun nod.
+   Rutarea unei unități pe alt contract, în schimb, îi *mută* folderul — un `update parent_id`.
+3. **Folderele de sistem nu se șterg, redenumesc, mută** (`is_system`), iar căutarea lor se face pe
+   `node_role`, niciodată pe nume.
+4. **Ștergerea e `deleted_at`**, iar numele redevine liber imediat. Rândurile pleacă din bază doar
+   prin jobul nocturn, la 30 de zile — și `delete` pe `app.nodes` nu e acordat nimănui în afara
+   worker-ului.
 
-Detaliile sunt în `docs/cost-ledger.md` (≤ 40 de linii) și în intrările de la pasul 06.
+Detaliile sunt în `docs/files.md` (≤ 80 de linii).
 
-### Verificări din pasul 06 care NU sunt complet închise
+### Ce urmează concret — 07c
 
-| # | Stare | Ce lipsește |
+Rămân **3 verificări din 21**: #19 (tab *Documente* pe contract, obiectiv, UL, etapă), #20 (galerie
+cu 300 de poze, pe miniaturi), #21 (upload din teren, din UL-ul lui). Plus jumătatea din #7 —
+reluarea per parte e proiectată și presemnată, dar întreruperea reală de rețea cere clientul.
+
+Ce e deja gata și te așteaptă:
+
+- **Serviciile există toate** în `packages/services/src/files.ts`: `listChildren`, `breadcrumb`,
+  `folderForEntity`, `createFolder`, `renameNode`, `moveNode`, `trashNode`, `restoreNode`,
+  `listTrash`, `shareNode`, `listVersions`, `thumbnailUrl`. Ecranele nu mai au de scris logică.
+- **Rutele API sunt gata**: `/api/files/presign`, `/api/files/complete`,
+  `/api/files/[versionId]`, `/api/files/[versionId]/thumb/[variant]`.
+- **Drepturile există**: `files.read`, `files.write`, `files.share`.
+- **Tab-ul *Documente*** e încă `PhasePlaceholder` pe unitate, pe etapă și pe contract. Locul lui e
+  în `entityRegistry`; se activează pentru toate entitățile deodată.
+
+**Două capcane de care să te ferești la 07c:**
+
+- **Tab-ul *Documente* pe obiectiv trebuie să aleagă contractul din context.** Folderul obiectivului
+  stă pe **legătura** obiectiv×contract (`contract_objectives.root_node_id`), nu pe obiectiv —
+  același bazin poate fi pe două contracte, cu două foldere. Coloana de pe `objectives` a fost
+  **ștearsă** la 07a exact ca să nu aleagă cineva arbitrar unul dintre ele.
+- **`sharp` și `exifr` sunt doar în `apps/worker`, dinadins.** Ecranele nu au voie să le importe;
+  miniaturile vin gata făcute, prin ruta de `thumb`.
+
+### Trei bug-uri vechi reparate la 07b — nu le reintroduce
+
+Toate trei erau vii de dinainte, și toate trei erau **tăcute**:
+
+1. **`defineJob` respingea `contracts.expiryScan`** (cerea segmente `[a-z0-9]`, numele are `S` mare).
+   Verificarea rulează la încărcarea modulului, deci `import '@damina/jobs'` arunca și **worker-ul nu
+   mai pornea deloc**. Nimic din CI nu importa pachetul, așa că nu se vedea.
+2. **`jobs.grant_queue_access()` nu dădea `usage` pe schema `jobs`** — deci enqueue-ul dintr-un rol
+   de aplicație n-a funcționat niciodată. Toate cozile de până acum porneau din cron, cu rolul
+   proprietar. Reparat în `0022`, prin rescrierea funcției (se aplică și pe bazele existente, fiindcă
+   worker-ul o cheamă la fiecare pornire).
+3. **`app.file_versions` n-avea politică de `update`.** Cu `force row level security`, un update fără
+   politică **nu dă eroare — atinge zero rânduri**. Fișierele rămâneau `uploading`, cu tipul și
+   mărimea *declarate de client*. Reparat în `0023`, care se termină cu o plasă: migrarea cade dacă
+   vreo tabelă de fișiere rămâne fără politică de scriere pentru birou.
+
+### Verificări din pașii anteriori care NU sunt complet închise
+
+| Pas | # | Ce lipsește |
 |---|---|---|
-| **11** | parțial | Drill-down-ul merge până la **identitatea** documentului (tip + număr). Documentele sursă — bon de consum, NIR, pontaj — apar la pașii 09–10; abia atunci ultima verigă are unde să ducă. Ecranul spune asta, nu dă link mort. |
-| **19** | închisă, cu o rezervă | Comutatorul brut/net funcționează, dar **`overhead_snapshots` nu e populat de nimeni periodic**. `recomputeOverheadSnapshot` există și e acordată doar worker-ului — trebuie legată la un job lunar. Până atunci marja netă arată regie zero și scrie „lună nerecalculată”. |
-| **21** | mecanism dovedit, nu la 100.000 | Indexul de cursor a fost adăugat **după măsurătoare** (5,35 ms → 0,108 ms la 10.000 de linii, `index scan` fără sortare). La 100.000 n-a fost rulat — planul e însă cel corect, adică independent de volum. |
-
-### Ce urmează — pasul 07, File management (R2)
-
-Nu e tăiat încă și nu l-am citit în sesiunea asta. Din ce se vede de aici: `app.nodes`,
-`app.file_versions`, `app.derived_assets`, `app.node_shares` (Anexa C.7), cu patru bucket-uri deja
-declarate în `.env.example` și cu politici de retenție diferite.
-
-Două legături care există deja și te așteaptă:
-
-- **`work_units.root_node_id`** e o coloană fără FK, din 05a — folderul auto-generat al unității.
-  FK-ul se pune la 07, când există `app.nodes`.
-- **Tab-ul *Documente*** e `PhasePlaceholder` pe unitate, pe etapă și pe contract. Locul lui e deja
-  în registry.
+| 06 | **11** | Drill-down-ul merge până la identitatea documentului. Documentele-sursă apar la 09–10. |
+| 06 | **19** | Comutatorul brut/net merge, dar **`overhead_snapshots` nu e populat de nimeni periodic**. Vezi datoria 2. |
+| 06 | **21** | Indexul de cursor măsurat la 10.000 de linii, nu la 100.000. Planul e însă independent de volum. |
+| 07 | **7** | Reluarea per parte e presemnată și proiectată; întreruperea reală de rețea cere clientul din 07c. |
 
 ### Datorii deschise, în ordinea în care le-aș lua
 
 | # | Ce | De ce contează |
 |---|---|---|
-| 1 | **Rotește `SUPABASE_SERVICE_ROLE_KEY`** (Project Settings → API) | A trecut printr-o fereastră de chat pe 17 august. Singurul cod care o folosește e `resetMfaFactors` din `apps/web/src/app/api/admin/service.ts`, deci rotația e ieftină. |
-| 2 | **Jobul lunar de regie** | `recomputeOverheadSnapshot` există, e acordată doar lui `app_service`, dar n-o cheamă nimeni. Fără ea, marja netă e marjă brută cu altă etichetă. |
-| 3 | **Playwright** | Neinstalat. Blochează #13 din pasul 03 și clicul pe hartă din 04b (#14). Vezi mai jos ce am aflat despre testarea fără el. |
-| 4 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Decizie deschisă: ori `grant select` pe `work_queue_items`/`notifications` către `authenticated` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
-| 5 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — atenție, `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
+| 1 | **Rotește `SUPABASE_SERVICE_ROLE_KEY`** (Project Settings → API) | A trecut printr-o fereastră de chat pe 17 august. Singurul cod care o folosește e `resetMfaFactors` din `apps/web/src/app/api/admin/service.ts`. |
+| 2 | **Jobul lunar de regie** | `recomputeOverheadSnapshot` există și e acordată doar lui `app_service`, dar n-o cheamă nimeni. Fără ea, marja netă e marjă brută cu altă etichetă. |
+| 3 | **Playwright** | Neinstalat. Blochează #13 din pasul 03, clicul pe hartă din 04b (#14) și partea de client din #7/#20 la 07c. |
+| 4 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Ori `grant select` pe `work_queue_items`/`notifications` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
+| 5 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
+| 6 | **Previzualizări pentru PDF și video** | `files.derive` produce miniaturi doar pentru imagini; pentru restul iese tăcut, dinadins. Se adaugă când apare nevoia reală (fișe la 09, raport la 10). |
 
-**Datoria `pnpm db:generate` e PLĂTITĂ de la 05a** și a rămas plătită: migrările `0016`–`0020` au fost
-toate **generate**, nu scrise de mână. **Nu scrie migrări de mână** — scrie schema Drizzle, generează,
-apoi completează dedesubt doar ce drizzle nu exprimă (triggere, politici, grant-uri pe coloană,
-`include` pe index, constrângeri `exclude`).
+**Datoria `pnpm db:generate` rămâne plătită.** Migrările `0016`–`0021` au fost **generate**. `0022` și
+`0023` sunt scrise de mână **pentru că nu schimbă schema** — doar funcții, politici și grant-uri;
+snapshot-urile lor sunt copii ale precedentului, ca lanțul drizzle-kit să rămână întreg. **Nu scrie
+migrări de mână când schimbi tabele** — scrie schema Drizzle, generează, apoi completează dedesubt.
 
 ### Starea bazei de dezvoltare
 
-Migrările `0017`–`0020` sunt **aplicate pe Supabase dev**. Seed-ul are, peste datele din 05:
-**10.000 de linii de cost** pe lunile deschise din 03–05/2026, plus datele lăsate de două harness-uri
-de smoke (firme cu nume `Smoke06b …`). Dacă vrei o bază curată: `pnpm db:reset` — `--force` **nu**
-mai poate reface seed-ul, pentru că nici alocările, nici liniile de cost nu se șterg.
+- Migrările **`0017`–`0023` sunt aplicate** pe Supabase dev.
+- **pg-boss a fost pornit prima dată pe 18 august**: schema `jobs` există acum, cu cele 6 cozi
+  (`system.ping`, `contracts.expiryScan`, `contracts.deltaFillScan`, `rollup.verify`, `files.derive`,
+  `files.cleanup`). Înainte de asta nu exista deloc.
+- Seed: 10.000 de linii de cost pe lunile deschise din 03–05/2026, plus arborele de fișiere
+  backfillat. Seed-ul leagă acum unitățile de lucru de contract (`contractObjectiveId`), deci
+  folderele lor stau sub `Activitate` al contractului, nu al firmei.
+- **Resturi de la harness-uri**: firme cu nume `Smoke06b …`, `Damina Fisiere …`, plus câteva foldere
+  și fișiere de probă în R2 (bucket-ul `docs`) și miniaturi în `derived`. Nu deranjează.
+- Bază curată: `pnpm db:reset`. `--force` nu mai poate reface seed-ul.
 
-`pnpm db:seed --costs` adaugă doar registrul peste un seed existent, și scrie **numai în lunile
-deschise**.
+### Cum rulezi testele fără Docker
+
+Mașina n-are Docker, deci până la 07a orice greșeală se afla abia în CI, șase minute mai târziu.
+Acum există o portiță, în `tests/global-setup.ts` din **ambele** pachete:
+
+```
+TEST_DATABASE_URL=<url-ul de session pooling>  pnpm exec vitest run
+```
+
+Suita rulează pe baza indicată în loc de container. **Ce NU verifică** e exact lucrul cel mai valoros
+al containerului — că migrările reconstruiesc baza de la zero — deci în CI variabila rămâne
+nesetată, și acolo se dă verdictul. Testele lasă în urmă rândurile lor, iar două presupun o bază
+goală și pică pe dev fără să fie stricate: „100 de alocări în paralel" (epuizează pool-ul către
+Supabase) și „metricile de integritate sunt zero" (dev are 10.000 de linii de cost).
+
+Pentru ce atinge R2 sau rețeaua nu există teste în CI, dinadins: se verifică prin harness-uri de
+smoke aruncabile, pe dev, cu bucket real. Așa au ieșit la iveală cele trei bug-uri de mai sus.
 
 ### Lucruri pe care le-am aflat greu și te scutesc de o zi
 
@@ -136,6 +190,26 @@ deschise**.
   pe vederea implicită. Așa a picat prima variantă de `?view=marja-neta`, și e garda bună — dar când
   o vezi, semnul e „lipsește din `views`", nu „e stricat ecranul".
 
+- **O politică RLS care lipsește la SCRIERE nu dă eroare — atinge zero rânduri.** Asta a ținut
+  `complete` nefuncțional la 07b: `app.file_versions` avea `select` și `insert`, dar nu `update`, iar
+  fișierele rămâneau tăcut `uploading` cu tipul declarat de client. Un `insert` fără `update` pe
+  aceeași tabelă e aproape sigur o scăpare. `0023` se termină cu o plasă care verifică asta.
+- **`defineJob` rulează la ÎNCĂRCAREA modulului.** O validare care cade acolo nu strică un job, ci
+  întregul `import '@damina/jobs'` — deci worker-ul nu mai pornește deloc, iar simptomul nu seamănă
+  cu cauza. Merită ținut minte pentru orice validare pusă la nivel de modul.
+- **Un pachet pe care nimic din CI nu-l importă nu e testat, oricâte teste ar avea repo-ul.**
+  `@damina/jobs` arunca la import de la pasul 04 și s-a aflat abia la 07b, când `files.ts` l-a adus
+  în lanțul serviciilor.
+- **În `sql` de la drizzle, o listă JS devine `(a, b, c)`, nu un array Postgres.** Deci `= any(${ids})`
+  dă `cannot cast type record to uuid[]`; forma corectă e `in ${ids}`. Cu `${ids}::uuid[]` doar muți
+  eroarea, n-o repari.
+- **Verificările de scară se scriu ca invariant, nu ca cronometru.** Mutarea unui folder cu 1.000 de
+  fișiere se testează prin „un singur rând atins", nu prin milisecunde: pe un container în CI, cifra
+  n-ar însemna nimic, dar invariantul cade dacă cineva rescrie mutarea ca parcurgere de subarbore.
+- **Un eșec de decodare e permanent, unul de rețea e trecător.** În `files.derive`, `catch`-ul e
+  strâns exact în jurul apelului `sharp`: citirea din R2 și scrierea în bază rămân în afara lui,
+  fiindcă alea chiar merită reîncercate. Fără separarea asta, o poză stricată se reia de trei ori.
+
 ### Reguli ale casei care nu se negociază
 
 - **Un modul nou = o intrare în `entityRegistry`**, nu fișiere de pagină. Lista și detaliul sunt
@@ -159,6 +233,17 @@ deschise**.
 - **Eticheta de analitică de pe un ecran cu bani se verifică odată cu cifra.** La 06c, Contract ›
   Prezentare scria „folosit" peste niște cifre care sunt pe „descărcat". O etichetă greșită e mai rea
   decât una lipsă: se citește ca fiind verificată.
+- **Tipul unui fișier se decide din conținut, nu din extensie și nu din ce declară browserul.**
+  `sniffMime` din `@damina/shared` e listă **albă**: ce nu e recunoscut se respinge. O listă neagră
+  se ocolește cu următorul format inventat.
+- **Antetele cu care se servește un fișier vin DIN BAZĂ**, acoperite de semnătura URL-ului. Un HTML
+  urcat ca „aviz.pdf" nu trebuie să poată fi servit ca HTML, oricât ar insista clientul.
+- **Coloanele derivate nu sunt evenimente de audit.** `audit.record_change` scoate `root_node_id` din
+  diferență înainte de verificarea „un UPDATE care nu schimbă nimic". Un jurnal în care jumătate din
+  intrări sunt scrise de sistem devine un jurnal pe care nu-l mai citește nimeni.
+- **Rulează smoke-ul pe dev înainte de push, nu CI-ul după.** La 06a și 07a am aflat greșeli în CI;
+  la 06b și 07b le-am prins înainte, cu ~100 de linii de script aruncabil, iar CI-ul a ieșit verde
+  din prima. Costul e mic, câștigul e de șase minute per greșeală.
 - Înainte de commit: `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets`.
   Ultimul cere un build proaspăt, iar build-ul cade dacă un `next dev` ține `.next` ocupat — oprește
   serverele de dezvoltare înainte.
@@ -201,14 +286,16 @@ citind codul. Se pierd la fiecare schimbare de sesiune dacă nu sunt scrise aici
 | Andrei nu mai are factor TOTP | L-am inrolat ca să testez #16 și l-am șters la final — cheia era la mine, iar lăsat acolo l-ar fi blocat în afara contului. **La următorul login va fi pus să configureze verificarea în doi pași** — ceea ce e chiar comportamentul cerut de #16 — **dacă `MFA_ENFORCED` nu e `0`** (vezi rândul de mai jos). |
 | Conturile de test | `andrei.ionescu@damina.test` (birou, pm+admin, 2 firme) · `marius.sef@damina.test` (teren, o singură firmă) · `contact@instalprest.test` (subcontractant) · `dispecerat@apanova.test` (client). Se recreează cu `pnpm db:seed && pnpm db:seed:users`. |
 | Portul 3000 poate avea un server pornit dinaintea lui 02c | Rulează cod vechi: `/login` dă **404** pe el, ceea ce arată exact ca o rută lipsă. Dacă apare, pornește pe alt port sau oprește-l. |
-| Prag de teste: **364** | 165 unitare (`shared` 39 · `domain` 82 · **`auth` 35** · `storage` 6 · `i18n` 3) + 125 `packages/db` + 74 `packages/services`. Cele 362 de dinainte au fost confirmate în CI `32024540915` pe `8f17b7b`; cele două în plus sunt testele de `MFA_ENFORCED`, rulate local (`auth` n-are nevoie de Docker). 05c n-a adăugat teste automate — ecranele s-au verificat pe aplicația care rulează. Testele de bază de date **și cele de servicii** rulează doar în CI — mașina n-are Docker. Praguri anterioare: 242 (02c′), 329 (05a). Dacă numărul scade fără explicație, s-a pierdut ceva. |
+| Prag de teste: **445** | 181 unitare (`shared` **45** · `domain` 82 · `auth` 35 · `storage` 6 · `i18n` 3, plus restul) + **162** `packages/db` + **102** `packages/services`. Confirmate în CI `32108456833` pe `16ac8a2`. Testele de bază de date **și cele de servicii** rulează în CI; local se pot rula cu `TEST_DATABASE_URL` (vezi „Cum rulezi testele fără Docker" din predare), dar atunci două pică fiindcă presupun o bază goală. Praguri anterioare: 242 (02c′), 329 (05a), 364 (06c). Dacă numărul scade fără explicație, s-a pierdut ceva. |
 | **`pnpm db:seed --force` nu mai poate șterge tot**, din 05b | Alocările de finanțare nu se șterg (trigger), iar prin FK nici contractul. Seed-ul verifică și **se oprește cu mesaj** dacă există unități de lucru de seed, trimițând la `pnpm db:reset`. Nu e un bug — e regula pasului 05, care ajunge și la unealta de dezvoltare. |
 | **Martie 2026 e ÎNCHISĂ la firma A pe Supabase dev**, din 05c | Închisă dinadins, ca ecranul de re-alocări să aibă ce arăta: mutarea finanțării intervenției `IV-000001` de acolo a emis `NRA-000001` în august. Dacă un ecran refuză o scriere pe martie, ăsta e motivul — nu un bug. |
 | **Aplicația e deployată pe Vercel**, pe același proiect Supabase (`cspjtesltraiaveypuya`) | Deci datele de pe dev sunt aceleași care se văd în aplicația deployată — inclusiv seed-ul și luna închisă de mai sus. `next.config.ts` încarcă `.env.local` din rădăcina repo-ului, fișier care pe Vercel **nu există**: toate variabilele trebuie puse în Project Settings. |
 | **`MFA_ENFORCED=0` pe deploy-ul de test** — pus în Vercel de utilizator și **confirmat că merge**, 17 august 2026 | Oprește **poarta** de al doilea factor, ca testarea să nu ceară un cod de 6 cifre la fiecare intrare. Nu atinge drepturile: `requiresMfa()` răspunde în continuare `true` pentru un admin. Cât timp e pornit, shell-ul de birou arată o **bandă roșie** pe fiecare ecran — dacă o vezi în capturi sau în HTML, nu e un bug de stil, e comutatorul. Detaliile în `docs/security.md`. |
 | Rolurile lui Andrei sunt `pm` + `admin` | Le-am dus temporar la `pm` la 05c, ca să pot trece de poarta de MFA fără TOTP, și **le-am restaurat la final**. Dacă găsești altceva, s-a oprit o sesiune la mijloc. |
 | **`git push` poate cădea cu „Repository not found"** deși repo-ul există | Remote-ul e **privat** (`SurviveANDcraft/DUO-ERP`) și e vizibil doar contului GitHub `SergioFir`. Mașina are două conturi în `gh`, iar git folosește Windows Credential Manager, **nu** tokenul lui `gh` — deci `gh auth switch` singur nu rezolvă, și nici `git -c credential.helper='!gh auth git-credential'`. GitHub nu distinge „n-ai acces" de „nu există", de aceea mesajul minte. **Nu trage concluzia că repo-ul a fost șters sau redenumit:** verifică `gh api user --jq .login`, apoi `gh repo view SurviveANDcraft/DUO-ERP --json name,visibility`. Fă commit local ca munca să fie în siguranță și cere utilizatorului să se logheze — o rezolvă în câteva secunde. |
-| Docker nu există pe mașina de dezvoltare | Testele de bază de date rulează **doar în CI**. Verificările pe date reale se fac pe Supabase dev, în blocuri anulate la final. |
+| Docker nu există pe mașina de dezvoltare | Testele rulează în CI. Local există portița `TEST_DATABASE_URL`, adăugată la 07a — vezi „Cum rulezi testele fără Docker" din predare. Verificările pe date reale se fac pe Supabase dev. |
+| **R2 e configurat real în `.env.local`**, verificat la 07b | Cele patru bucket-uri (`docs`, `derived`, `tmp`, `archive`) au credențiale valide, deci harness-urile de smoke urcă și descarcă efectiv. **CI-ul nu are credențiale R2 și nu trebuie să aibă**: nu există acolo teste care ating rețeaua, dinadins. |
+| **pg-boss a rulat prima dată pe dev pe 18 august 2026** | Schema `jobs` există acum, cu cele 6 cozi (`system.ping`, `contracts.expiryScan`, `contracts.deltaFillScan`, `rollup.verify`, `files.derive`, `files.cleanup`). Înainte nu exista deloc — de aceea nu se observase că enqueue-ul din aplicație era rupt. Worker-ul se pornește cu `pnpm --filter @damina/worker dev`. |
 
 ---
 
