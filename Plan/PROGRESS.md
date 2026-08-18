@@ -13,81 +13,81 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Scris la finalul lui 05a (17 august 2026). Citește-l primul; restul fișierului e istoric.*
+*Scris la finalul lui 06c (17 august 2026). Citește-l primul; restul fișierului e istoric.*
 
 ### Unde s-a ajuns
 
-Pașii **01, 02 și 04 sunt gata**. Pasul **03 e complet ca implementare**, dar are 4 verificări
-nerulate. Pasul **05 e gata**, tăiat în trei sub-etape (decizia utilizatorului, 17 august 2026), fiecare
-cu CI verde propriu. Pasul **06 e început**: **06a** (schema de cost + rollup-uri) e scris și rulat pe
-Supabase dev; urmează **06b** — `recordCost`, storno, extinderea lui `moveFunding`, jobul
-`rollup.verify`, registrul de check-uri de închidere și seed-ul de 10.000 de linii.
+Pașii **01, 02, 04, 05 și 06 sunt gata**, fiecare cu CI verde. Pasul **03 e complet ca
+implementare**, dar are 4 verificări nerulate. Următorul pas de conținut neînceput e
+**07 — File management (R2)**.
 
-### Tăierea pasului 05, și ce e în fiecare bucată
+Pasul 06 a fost tăiat în trei sub-etape (decizia utilizatorului, 17 august 2026), fiecare cu CI verde
+propriu: **06a** `32030892549` · **06b** `32033174957` · **06c** `32036049849`. Suitele au ajuns la
+**146** de teste de bază de date și **92** de servicii.
 
-| Sub-etapă | Conținut | Verificări din §6 | Stare |
-|---|---|---|---|
-| **05a** | Migrarea `0016_work_units` (5 tabele, 8 triggere, RLS, grant-uri pe coloană) + `packages/domain/funding` | 1, 2, 3, 9, 10, 12, 13, 16, 17, 18 | 🟩 gata, CI verde |
-| **05b** | `packages/services/work-units` + DTO-uri + seed | 4, 5, 6, 7, 8, 14, 19 | 🟩 gata, CI verde |
-| **05c** | Ecranele, cu skill-ul de design | 11, 15 (+ jumătatea de UI a #14) | 🟩 gata, CI verde |
+### Ce e în pasul 06, pe scurt — ca să nu recitești tot
 
-Motivul tăierii: pasul întreg are 19 verificări, 5 tabele, 6 use-case-uri și 7 ecrane — nu încape
-într-o sesiune fără să se rupă la mijloc.
-
-### Pasul 06 — tăierea, aprobată
-
-**Aprobată de utilizator pe 17 august 2026.** Motivul e același ca la 05, doar mai apăsat: pasul are
-**21 de verificări**, registrul de cost cu ~25 de coloane, rollup-uri întreținute prin trigger, un job
-de control, mașina de închidere cu checklist ca date, șase ecrane și ~20 de fișiere `.sql`.
-
-**06a și 06b sunt gata, cu CI verde** (rulările `32030892549` și `32033174957`). Rămâne **06c** — ecranele. Verificările au fost rulate întâi pe Supabase dev,
-pe Postgres 17.6 real, apoi confirmate de suita de bază de date în CI.
-
-| Sub-etapă | Conținut | Verificări din §6 |
-|---|---|---|
-| **06a** | `0017_cost_ledger` (append-only, triggere de `period_id` / `stage_id` / analitică, indecșii — inclusiv cel parțial de reconciliere) + `0018_rollups` (`component_period_rollup`, `overhead_snapshots`, întreținere prin trigger) | 1–8, 12, 20 |
-| **06b** | `recordCost`, storno, extinderea lui `moveFunding` (rescrie „descărcat" pe linii + liniile de re-alocare), jobul `rollup.verify`, registrul de check-uri de închidere, metricile de integritate, seed cu 10.000 de linii | 9, 13, 14, 16, 17, 18 |
-| **06c** | Ecranele: tab-ul Costuri cu drill-down până la document, *Marjă și plafoane* cu comutator brut/net, *Reconciliere folosit vs descărcat*, cifrele reale în Contract › Prezentare, Obiectiv › Istoric, Panou › Rapoarte | 10, 11, 15, 19, 21 |
-
-**Blocante în CI**, după §7 al pasului: 1–7, 12, 16–17. Restul se pot valida pe date reale.
-
-Două lucruri pe care le-am lăsat pregătite pentru 06 și care se pierd dacă nu le vezi:
-
-- **`moveFunding` are deja `costLineIds: []`** în planul de domain, cu un comentariu care spune de ce.
-  Când există linii de cost, ramura de lună deschisă le rescrie analitica „descărcat" — nu inventa un
-  al doilea mecanism, el e deja proiectat acolo.
-- **`app.assert_no_money_leak(text[])`** din 05a rămâne în bază pentru pașii următori. Registrul de
-  cost aduce `amount`, deci regexul îl prinde; dar dacă adaugi coloane de bani cu nume care nu conțin
-  `price|pret|cost|amount|margin|salary`, treci-le explicit în lista funcției.
-
-**Ce te așteaptă la pasul 06.** Toată structura de cost e deja pe ecran, cu eticheta corectă și
-cifra „—”:
-
-| Unde | Ce se umple din registrul de cost |
+| Sub-etapă | Ce a intrat |
 |---|---|
-| Vederea unificată, coloana *Consumat* | arată `—`, nu zero. Un zero inventat s-ar citi ca o cifră reală |
-| Prezentarea unei lucrări, **a doua bară** | „Consum financiar", acum 0 cu explicația „registrul de cost intră în pasul 06”. Divergența față de progresul fizic e semnalul de risc |
-| Tab-ul *Costuri*, pe unitate și pe etapă | `PhasePlaceholder` |
-| `moveFunding`, ramura de lună deschisă | `costLineIds` e listă goală. Planul din domain o cere deja; când liniile există, se rescrie analitica „descărcat" pe ele |
-| Checklist-ul de închidere, rândul *Retur la magazie* | `pending_module`, cu textul „se verifică din pasul 06” |
+| **06a** | `0017_cost_ledger` (28 de coloane, 4 triggere, RLS doar pentru birou, append-only) + `0018_rollups` (rollup întreținut prin trigger, `app.rollup_verify`) |
+| **06b** | `recordCost`, `stornoCost`, `listCostLines` (cursor), `costBreakdown`, `listReconciliation`; `moveFunding` rescrie acum liniile de cost; închiderea de lună cu checklist ca date; jobul `rollup.verify`; `0019_period_close_checks`; seed `--costs` cu 10.000 de linii |
+| **06c** | Tab-ul Costuri, Bani › Marjă / Reconciliere / Închidere, cifrele reale în Contract › Prezentare și Obiectiv › Istoric, Panou › Rapoarte; `0020_cost_cursor_index` |
 
-Nimic din ele nu cere rearanjarea ecranului: coloanele, barele și rândurile există la locul lor.
+**Cele trei reguli ale registrului, dacă nu citești altceva:**
+
+1. **Două analitici pe fiecare linie.** `used_*` nu se schimbă niciodată; `charged_*` se rescrie la
+   mutarea finanțării, și numai prin `app.recharge_cost_line`.
+2. **Append-only.** `update` și `delete` nu sunt acordate nimănui — nici lui `app_service`. Corecția
+   e `stornoCost`, care își ia suma din linia stornată și o inversează.
+3. **`period_id` se derivă** din `effect_date`, prin trigger. Aplicația nu-l scrie și nici nu poate.
+
+Detaliile sunt în `docs/cost-ledger.md` (≤ 40 de linii) și în intrările de la pasul 06.
+
+### Verificări din pasul 06 care NU sunt complet închise
+
+| # | Stare | Ce lipsește |
+|---|---|---|
+| **11** | parțial | Drill-down-ul merge până la **identitatea** documentului (tip + număr). Documentele sursă — bon de consum, NIR, pontaj — apar la pașii 09–10; abia atunci ultima verigă are unde să ducă. Ecranul spune asta, nu dă link mort. |
+| **19** | închisă, cu o rezervă | Comutatorul brut/net funcționează, dar **`overhead_snapshots` nu e populat de nimeni periodic**. `recomputeOverheadSnapshot` există și e acordată doar worker-ului — trebuie legată la un job lunar. Până atunci marja netă arată regie zero și scrie „lună nerecalculată”. |
+| **21** | mecanism dovedit, nu la 100.000 | Indexul de cursor a fost adăugat **după măsurătoare** (5,35 ms → 0,108 ms la 10.000 de linii, `index scan` fără sortare). La 100.000 n-a fost rulat — planul e însă cel corect, adică independent de volum. |
+
+### Ce urmează — pasul 07, File management (R2)
+
+Nu e tăiat încă și nu l-am citit în sesiunea asta. Din ce se vede de aici: `app.nodes`,
+`app.file_versions`, `app.derived_assets`, `app.node_shares` (Anexa C.7), cu patru bucket-uri deja
+declarate în `.env.example` și cu politici de retenție diferite.
+
+Două legături care există deja și te așteaptă:
+
+- **`work_units.root_node_id`** e o coloană fără FK, din 05a — folderul auto-generat al unității.
+  FK-ul se pune la 07, când există `app.nodes`.
+- **Tab-ul *Documente*** e `PhasePlaceholder` pe unitate, pe etapă și pe contract. Locul lui e deja
+  în registry.
 
 ### Datorii deschise, în ordinea în care le-aș lua
 
 | # | Ce | De ce contează |
 |---|---|---|
-| 1 | **Rotește `SUPABASE_SERVICE_ROLE_KEY`** (Project Settings → API) | A trecut printr-o fereastră de chat pe 17 august. După 02c′ singurul cod care o folosește e `resetMfaFactors` din `apps/web/src/app/api/admin/service.ts`, deci rotația e ieftină acum. |
-| 2 | **Playwright** | Neinstalat. Blochează #13 din pasul 03 și clicul pe hartă din 04b (#14). Vezi mai jos ce am aflat despre testarea fără el. |
-| 3 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Decizie deschisă: ori `grant select` pe `work_queue_items`/`notifications` către `authenticated` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
-| 4 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — atenție, `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
+| 1 | **Rotește `SUPABASE_SERVICE_ROLE_KEY`** (Project Settings → API) | A trecut printr-o fereastră de chat pe 17 august. Singurul cod care o folosește e `resetMfaFactors` din `apps/web/src/app/api/admin/service.ts`, deci rotația e ieftină. |
+| 2 | **Jobul lunar de regie** | `recomputeOverheadSnapshot` există, e acordată doar lui `app_service`, dar n-o cheamă nimeni. Fără ea, marja netă e marjă brută cu altă etichetă. |
+| 3 | **Playwright** | Neinstalat. Blochează #13 din pasul 03 și clicul pe hartă din 04b (#14). Vezi mai jos ce am aflat despre testarea fără el. |
+| 4 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Decizie deschisă: ori `grant select` pe `work_queue_items`/`notifications` către `authenticated` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
+| 5 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — atenție, `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
 
-**Datoria #5 de dinainte — `pnpm db:generate` blocat — e PLĂTITĂ la 05a.** Cauza era exact cea
-bănuită: `0013`–`0015` aveau `id`/`prevId` copiate din `0012`, deci trei snapshot-uri arătau spre
-același părinte. Reparat cu un lanț nou de `id`-uri; diff-ul e de 8 linii. `db:generate` merge din
-nou, iar migrarea `0016` a fost generată cu el, nu scrisă de mână. **Nu mai scrie migrări de mână** —
-scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu poate exprima
-(triggere, politici, grant-uri pe coloană, constrângeri `exclude`).
+**Datoria `pnpm db:generate` e PLĂTITĂ de la 05a** și a rămas plătită: migrările `0016`–`0020` au fost
+toate **generate**, nu scrise de mână. **Nu scrie migrări de mână** — scrie schema Drizzle, generează,
+apoi completează dedesubt doar ce drizzle nu exprimă (triggere, politici, grant-uri pe coloană,
+`include` pe index, constrângeri `exclude`).
+
+### Starea bazei de dezvoltare
+
+Migrările `0017`–`0020` sunt **aplicate pe Supabase dev**. Seed-ul are, peste datele din 05:
+**10.000 de linii de cost** pe lunile deschise din 03–05/2026, plus datele lăsate de două harness-uri
+de smoke (firme cu nume `Smoke06b …`). Dacă vrei o bază curată: `pnpm db:reset` — `--force` **nu**
+mai poate reface seed-ul, pentru că nici alocările, nici liniile de cost nu se șterg.
+
+`pnpm db:seed --costs` adaugă doar registrul peste un seed existent, și scrie **numai în lunile
+deschise**.
 
 ### Lucruri pe care le-am aflat greu și te scutesc de o zi
 
@@ -118,6 +118,24 @@ scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu
 - **Admin API-ul GoTrue nu poate deconecta pe cineva după id.** Dacă vreun pas viitor cere asta,
   răspunsul e `app.revoke_sessions()` din migrarea `0015`, nu Admin API.
 
+- **Harness-ul de smoke pe Supabase dev bate CI-ul ca viteză de învățare.** La 06a am dat push cu
+  două bug-uri de fixture și le-am aflat în CI, 6 minute mai târziu. La 06b am rulat întâi aceleași
+  scenarii printr-un script `tsx` peste use-case-urile reale, pe baza de dev: a prins ambele capcane
+  (o alocare scrisă direct într-o lună închisă; seria `NRA` lipsă) **înainte** de push, iar CI-ul a
+  ieșit verde din prima. Costul e ~80 de linii de script care se aruncă.
+- **`explain analyze` înainte de a adăuga un index, nu după.** Indexul de cursor din `0020` a apărut
+  dintr-o măsurătoare (`seq scan` + `top-N heapsort`, 5,35 ms la 10.000 de linii), nu dintr-o
+  presimțire. Aceeași măsurătoare a dat și cifra care justifică rollup-urile: 0,076 ms din rollup
+  față de 10–11 ms agregând registrul, la 5.000 de linii pe lună.
+- **Ecranele se pot verifica fără browser și fără sesiune Supabase**: pornești `next dev` cu
+  `ALLOW_DEV_SESSION=1` și `MFA_ENFORCED=0`, apoi ceri paginile cu `Invoke-WebRequest` și afirmi pe
+  HTML. Contextul de lună și de firmă se pune fabricând cookie-ul `damina_ctx` — e JSON simplu.
+  **Atenție la o capcană:** React sparge textul interpolat (`analitica: {x}`) cu comentarii HTML,
+  deci `Contains('analitica: folosit')` dă fals negativ. Caută bucăți care nu trec prin interpolare.
+- **`[module]/page.tsx` acceptă doar vederile DECLARATE** în `list.views`; una nedeclarată cade tăcut
+  pe vederea implicită. Așa a picat prima variantă de `?view=marja-neta`, și e garda bună — dar când
+  o vezi, semnul e „lipsește din `views`", nu „e stricat ecranul".
+
 ### Reguli ale casei care nu se negociază
 
 - **Un modul nou = o intrare în `entityRegistry`**, nu fișiere de pagină. Lista și detaliul sunt
@@ -134,6 +152,13 @@ scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu
 - **Comentariile din cod se scriu fără diacritice; textul de pe ecran, cu diacritice.**
 - **Există un agent de design** și utilizatorul a cerut explicit să fie folosit pentru ecrane.
 - **`MFA_ENFORCED=0` e o poartă oprită, nu un drept dat.** Nu construi nimic pe el: niciun cod nu trebuie să întrebe „e MFA oprit?" ca să decidă altceva decât banda de avertizare. Dacă un ecran începe să se comporte diferit după comutator, comutatorul a devenit o a doua configurație de securitate — exact ce nu trebuie.
+- **Un rând de checklist care nu poate cădea niciodată nu se pune pe ecran.** La 06b am scris o
+  verificare de închidere pe care `check`-ul din 0017 o face imposibilă; am aruncat-o. Oamenii învață
+  repede să nu mai citească rândurile care sunt mereu verzi, și atunci nu le mai citesc nici pe cele
+  care contează. Verificarea a rămas ca metrică de integritate, unde e la locul ei.
+- **Eticheta de analitică de pe un ecran cu bani se verifică odată cu cifra.** La 06c, Contract ›
+  Prezentare scria „folosit" peste niște cifre care sunt pe „descărcat". O etichetă greșită e mai rea
+  decât una lipsă: se citește ca fiind verificată.
 - Înainte de commit: `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets`.
   Ultimul cere un build proaspăt, iar build-ul cade dacă un `next dev` ține `.next` ocupat — oprește
   serverele de dezvoltare înainte.
@@ -149,7 +174,7 @@ scrie schema Drizzle, generează, apoi completează de mână doar ce drizzle nu
 | 03 — Shell UI, nomenclatoare | 🟨 în lucru (cod complet, 4 verificări de rulat: #8, #10, #13, #14) | 2026-08-15 |
 | 04 — Contracte, obiective | 🟩 gata, cu o excepție (clicul pe hartă, #14, neconfirmat în browser) | 2026-08-16 |
 | 05 — Unitate de Lucru, finanțare | 🟩 **gata** (05a + 05b + 05c; 18/19 — #17 cere ecranul de teren, pasul 10) | 2026-08-17 |
-| 06 — Registrul de cost, închidere | 🟨 în lucru (06a + 06b gata, CI verde; 06c neînceput) | 2026-08-17 |
+| 06 — Registrul de cost, închidere | 🟩 **gata** (06a + 06b + 06c, CI verde; #11 parțial — cere documentele din 09–10) | 2026-08-17 |
 | 07 — File management (R2) | ⬜ neînceput | — |
 | 08 — Cereri, rutare, backlog | ⬜ neînceput | — |
 | 09 — Fișe de lucru | ⬜ neînceput | — |
@@ -1739,7 +1764,7 @@ Rulate pe **Supabase dev (Postgres 17.6) real**, prin use-case-uri, nu prin SQL:
 
 ---
 
-### 2026-08-17 — [status: gata local, CI de confirmat] — 06c, ecranele
+### 2026-08-17 — [status: gata] — 06c, ecranele
 
 **Decizia utilizatorului:** ecranele s-au făcut **fără agentul de design**, pe tiparul din 05c.
 Regula casei („există un agent de design și se folosește pentru ecrane") rămâne valabilă; aici a fost
@@ -1783,7 +1808,13 @@ Rulate în browser-ul serverului (harness-ul de fetch peste `next dev`, cu sesiu
   `cost_lines_cursor_idx` (migrarea `0020`): **0,108 ms**, `index scan`, fără sortare. Cost de
   ~50× mai mic și, mai important, **constant pe pagină** în loc de proporțional cu tot ce e în urmă.
 - [x] `pnpm typecheck` 12/12 · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets` — verzi.
-- [ ] Testele de bază de date și de servicii — nemodificate la 06c, dar rulează la primul CI.
+- [x] **CI verde, toate 4 joburile** (run `32036049849`, commit `1a8fbbb`). Testele de bază de date și
+  de servicii n-au fost modificate la 06c (146 + 92), dar migrarea `0020` trece prin ele.
+
+**Notă de proces:** rezultatul CI n-a putut fi citit imediat — API-ul GitHub Actions a întors `404`
+pe `/actions/runs` și pe `/commits/{sha}` timp de câteva minute, deși `gh auth status` era valid și
+rate-limit-ul intact. `/commits/{sha}/status` răspundea în același timp cu `pending`. S-a rezolvat de
+la sine. **Dacă se repetă: nu e nimic stricat în repo — se reîncearcă peste câteva minute.**
 
 **Migrare nouă: `0020_cost_cursor_index`** — adăugată **după măsurătoare**, nu din precauție.
 
