@@ -22,3 +22,9 @@ Thumbs.db
 
 # Varianta fara punct, scapata o data din .gitignore.
 env.local
+
+# Playwright — rezultate si urme de rulare, refacute la fiecare rulare.
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/

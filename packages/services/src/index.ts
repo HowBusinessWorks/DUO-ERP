@@ -263,6 +263,7 @@ export {
   listVersions,
   moveNode,
   nodeSummary,
+  photoFolderFor,
   presignUpload,
   previewUrl,
   recordDerivedAsset,

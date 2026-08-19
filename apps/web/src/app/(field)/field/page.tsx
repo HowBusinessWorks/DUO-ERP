@@ -1,3 +1,4 @@
+import { QuickActions } from '../../../components/field/quick-actions';
 import { TodayList } from '../../../components/field/today-list';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,7 @@ export default function FieldTodayPage() {
       <p className="pt-2 text-center text-xs text-ink-subtle">
         Aplicația de teren nu arată prețuri. Niciodată.
       </p>
+      <QuickActions />
     </div>
   );
 }

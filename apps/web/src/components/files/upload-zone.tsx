@@ -5,6 +5,7 @@ import { Button, ProgressBar, cn } from '@damina/ui';
 import { CloudUpload, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState, type DragEvent } from 'react';
+import { putPart, readError, sha256Hex } from '../../lib/upload-part';
 
 /**
  * Uploadul din browser, direct in R2.
@@ -55,67 +56,6 @@ const STATE_LABELS: Readonly<Record<UploadState['state'], string>> = {
   canceled: 'anulat',
 };
 
-function putPart(
-  url: string,
-  body: Blob,
-  onProgress: (sent: number) => void,
-  register: (xhr: XMLHttpRequest) => void,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    register(xhr);
-    xhr.open('PUT', url, true);
-    xhr.upload.onprogress = (event) => {
-      onProgress(event.loaded);
-    };
-    xhr.onload = () => {
-      if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new Error(`R2 a răspuns cu ${String(xhr.status)}.`));
-        return;
-      }
-      const etag = xhr.getResponseHeader('ETag');
-      if (etag === null || etag === '') {
-        // Fara asta simptomul e mut: uploadul pare ca merge, dar `complete` cade
-        // cu „partea n-are eticheta". Cauza e intotdeauna aceeasi.
-        reject(
-          new Error(
-            'R2 nu a returnat eticheta părții (ETag). Bucket-ul are nevoie de „ExposeHeaders: ETag" în regulile CORS.',
-          ),
-        );
-        return;
-      }
-      resolve(etag);
-    };
-    xhr.onerror = () => {
-      reject(new Error('Conexiunea s-a întrerupt.'));
-    };
-    xhr.onabort = () => {
-      reject(new Error('anulat'));
-    };
-    xhr.send(body);
-  });
-}
-
-async function sha256Hex(file: File): Promise<string | undefined> {
-  if (file.size > CHECKSUM_MAX_BYTES) {
-    return undefined;
-  }
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', await file.arrayBuffer());
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function readError(response: Response): Promise<string> {
-  try {
-    const body: unknown = await response.json();
-    if (typeof body === 'object' && body !== null && 'error' in body) {
-      return String((body as { error: unknown }).error);
-    }
-  } catch {
-    /* raspunsul nu era JSON — ramane mesajul generic */
-  }
-  return `Serverul a răspuns cu ${String(response.status)}.`;
-}
-
 export function UploadZone({ parentId }: { readonly parentId: string }) {
   const router = useRouter();
   const [uploads, setUploads] = useState<readonly UploadState[]>([]);
@@ -135,7 +75,7 @@ export function UploadZone({ parentId }: { readonly parentId: string }) {
 
       try {
         patch(id, { state: 'hashing' });
-        const checksum = await sha256Hex(file);
+        const checksum = await sha256Hex(file, CHECKSUM_MAX_BYTES);
 
         patch(id, { state: 'uploading' });
         const presign = await fetch('/api/files/presign', {

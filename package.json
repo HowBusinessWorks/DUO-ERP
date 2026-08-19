@@ -20,10 +20,12 @@
     "db:reset": "pnpm --filter @damina/db db:reset",
     "db:seed": "pnpm --filter @damina/services db:seed",
     "db:seed:users": "pnpm --filter @damina/services db:seed:users",
-    "scan:secrets": "node tools/scripts/scan-bundle-secrets.mjs"
+    "scan:secrets": "node tools/scripts/scan-bundle-secrets.mjs",
+    "e2e": "playwright test"
   },
   "devDependencies": {
     "@damina/eslint-config": "workspace:*",
+    "@playwright/test": "^1.62.1",
     "dotenv": "^17.4.2",
     "eslint": "^9.28.0",
     "prettier": "^3.5.3",

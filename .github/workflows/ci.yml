@@ -100,6 +100,52 @@ jobs:
           DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
           DATABASE_URL_SESSION: postgresql://fake:fake@localhost:5432/fake
 
+  taps:
+    name: Bugetul de tapuri (teren)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Blocant dinadins (pasul 10, §0). Daca seful de santier are nevoie de 7
+      # tapuri ca sa comande material, da telefon la magazie si trasabilitatea
+      # ramane goala — o cerinta de UX fara masuratoare dispare la a treia
+      # iteratie. Jobul NU are baza de date: masoara ecranul, nu datele.
+      - name: Teste de tapuri
+        run: pnpm e2e
+        env:
+          CI: 'true'
+          # Aceleasi valori false ca la build: fara ele, `next build` cade la
+          # validarea de mediu. Nimic din ele nu e chemat — jobul n-atinge nici
+          # baza, nici R2.
+          SUPABASE_SERVICE_ROLE_KEY: sb-fake-service-role-key-for-ci-only
+          R2_ACCESS_KEY_ID: fake-r2-access-key-id-ci
+          R2_SECRET_ACCESS_KEY: fake-r2-secret-access-key-ci
+          DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
+          DATABASE_URL_SESSION: postgresql://fake:fake@localhost:5432/fake
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: urme-playwright
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   audit:
     name: Audit de dependente
     runs-on: ubuntu-latest

@@ -48,19 +48,36 @@ export interface OutboxRow {
   label: string;
 }
 
-/** O poză care așteaptă. Blob-ul stă în IndexedDB, nu în memorie. */
+/**
+ * O poză care așteaptă.
+ *
+ * Blob-ul stă în IndexedDB, nu în memorie: o zi de teren înseamnă zeci de poze,
+ * iar un tab reîncărcat n-are voie să le piardă.
+ *
+ * **Ține unitatea de lucru, nu folderul.** Id-ul folderului e o noțiune de
+ * server, iar poza se face în subsol, unde serverul nu se poate întreba nimic.
+ * Traducerea unitate → folder se face la urcare, când oricum există rețea.
+ */
 export interface MediaRow {
   readonly id: string;
-  readonly parentNodeId: string;
+  readonly workUnitId: string;
+  /** Faza, doar la lucrări: pozele „Înainte" și „După" au foldere separate. */
+  readonly phase?: 'inainte' | 'dupa';
   readonly filename: string;
+  readonly mime: string;
   readonly blob: Blob;
+  /** Când a fost făcută poza, nu când s-a urcat. Asta e dovada. */
   readonly createdAt: string;
   /** Coordonatele culese de aparat, dacă le-a dat. */
   readonly lat?: number;
   readonly lng?: number;
   readonly accuracy?: number;
   attempts: number;
-  /** Câte părți s-au urcat deja, ca progresul să nu o ia de la capăt. */
+  /**
+   * Cât s-a urcat din ea, în octeți. E progres de AFIȘAT, nu de reluat: la
+   * repornire se ia de la capăt, fiindcă URL-urile presemnate expiră și o poză
+   * de câțiva MB oricum încape într-o singură parte.
+   */
   uploadedParts: number;
   status: 'pending' | 'uploading' | 'failed';
   errorMessage?: string;
@@ -103,6 +120,18 @@ class FieldDatabase extends Dexie {
       media: 'id, createdAt, status',
       state: 'key',
     });
+
+    /*
+     * v2: poza tine `workUnitId`, nu `parentNodeId`. Magazia se goleste la
+     * migrare fiindca in v1 n-a apucat s-o scrie nimeni — ecranele care fac
+     * poze vin abia acum. Daca ar fi existat randuri reale, aici ar fi trebuit
+     * o traducere, nu o stergere: o poza pierduta nu se mai face a doua oara.
+     */
+    this.version(2)
+      .stores({ media: 'id, createdAt, status, workUnitId' })
+      .upgrade(async (tx) => {
+        await tx.table('media').clear();
+      });
   }
 }
 

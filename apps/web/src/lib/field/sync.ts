@@ -1,6 +1,7 @@
 import { MAX_MUTATIONS_PER_PUSH } from '@damina/contracts';
 import { fieldDb, hasIndexedDb, type MediaRow, type OutboxRow } from './db';
 import { deviceId } from './device';
+import { uploadPending } from './media';
 
 /**
  * Motorul de sincronizare, partea de client (pasul 10, §3.1).
@@ -313,5 +314,8 @@ export async function syncOnce(): Promise<SyncSummary> {
   }
   await push();
   await pull();
+  // Pozele la urma, si abia dupa ce felia e proaspata: daca reteaua se stinge
+  // la jumatatea lor, fisele sunt deja la birou.
+  await uploadPending();
   return summary();
 }

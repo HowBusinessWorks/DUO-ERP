@@ -58,6 +58,42 @@ mutații trăiește în IndexedDB și în `lib/field/sync.ts`, unde poate fi cit
 testat. `scope` e `/field`: aplicația de birou n-are voie servită din cache — ea
 arată bani și stări care se schimbă sub tine.
 
+## Cum pleacă pozele
+
+Poza **nu se urcă la apăsare.** Intră în coada `media` din IndexedDB, cu blob cu
+tot, și pleacă la primul ciclu de sincronizare — după fișe, niciodată înaintea
+lor. Din perspectiva omului, butonul răspunde la fel în subsol și în birou.
+
+Traducerea **unitate de lucru → folder** se face abia la urcare, prin
+`POST /api/field/media/target`. Telefonul nu poate ști id-uri de foldere: poza se
+face acolo unde nu există rețea, iar arborele e o noțiune de server. Ce reține
+ecranul e unitatea și, la lucrări, faza — „Înainte" sau „După".
+
+Bucla urcă **una câte una**, nu în paralel: pe o conexiune de șantier, trei poze
+deodată înseamnă trei transferuri care cad împreună la ieșirea din tunel, în loc
+de două reușite și una reluată.
+
+Distincția care ține toată logica în picioare e **rețea versus server**:
+
+| Ce s-a întâmplat | Ce se face | De ce |
+|---|---|---|
+| `fetch` a picat, sau trei încercări pe aceeași parte | poza rămâne în așteptare, bucla **se oprește** | următoarea ar pica la fel; nu se marchează nimic |
+| serverul a răspuns cu o eroare | poza e marcată **căzută**, bucla **merge mai departe** | e problema pozei ăleia, nu a zilei |
+| a urcat | rândul se **șterge**, cu blob cu tot | o zi de teren înseamnă sute de MB pe telefon |
+
+O poză căzută **nu oprește coada** — spre deosebire de o mutație blocată, de care
+pot depinde cele de după ea. Ea așteaptă omul pe `/field/poze`, cu miniatura,
+motivul și două butoane: trimite din nou, sau șterge.
+
+**Numele poartă id-ul pozei** (`teren-<uuid>.jpg`). Fără asta, două poze cu
+același nume în același folder ar fi devenit două *versiuni* ale aceluiași
+fișier, iar a doua ar fi ascuns-o pe prima — exact ce nu-ți dorești când dovada
+e vizuală.
+
+**Coordonatele se cer o dată pe serie**, cu trei secunde de așteptare și fără ele
+dacă întârzie. Fixul GPS în subsol nu vine niciodată; o poză fără coordonate e o
+dovadă mai slabă, dar o poză neluată nu e nicio dovadă.
+
 ## Cum se adaugă un tip nou de mutație
 
 Două locuri. Nu există un al treilea:

@@ -13,8 +13,9 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Rescris la finalul lui 10b, 18 august 2026. Citește-l pe tot; restul fișierului e istoricul
-fiecărui pas, util când ai o întrebare punctuală, nu ca lectură.*
+*Rescris la finalul lui 10b, 18 august 2026; actualizat la finalul lui 10c-1, 19 august. Citește-l
+pe tot; restul fișierului e istoricul fiecărui pas, util când ai o întrebare punctuală, nu ca
+lectură.*
 
 ### Ce e gata și ce nu
 
@@ -23,11 +24,11 @@ fiecărui pas, util când ai o întrebare punctuală, nu ca lectură.*
 | **01–07** | Gata. |
 | **08** | Gata pe **08a** (schemă, domain, servicii) și **08b** (ecrane). **08c e SĂRIT dinadins** — decizia utilizatorului, vezi secțiunea lui mai jos. Din 08c există doar expirarea propunerilor. |
 | **09** | **Gata, tot** — 09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon de consum · 09b-4 acoperire, istoric, validare în masă, seed. Toate cele 24 de verificări acoperite. |
-| **10** | **10a** (sincronizarea) și **10b** (PWA-ul offline) sunt gata. Rămân **10c, 10d, 10e**. |
+| **10** | **10a** (sincronizarea), **10b** (PWA-ul offline) și **10c-1** (pozele, ＋, Playwright) sunt gata. Rămân **10c-2, 10c-3, 10c-4, 10d, 10e**. |
 
-**Următorul lucru de făcut e 10c.**
+**Următorul lucru de făcut e 10c-2: ecranele `Inspecție` și `Intervenție`.**
 
-### Pasul 10, tăiat în cinci
+### Pasul 10, tăiat în cinci — iar 10c în patru
 
 Tăierea în bucăți mici a fost cerută explicit de utilizator, ca o sesiune să nu se termine la
 jumătatea unui pas. Aceeași convenție a mers la 09.
@@ -37,11 +38,17 @@ jumătatea unui pas. Aceeași convenție a mers la 09.
 - **10b — PWA-ul offline**: GATA. Felia de date (`pullFieldSnapshot`), IndexedDB prin Dexie
   (snapshot · outbox · media), service worker scris de mână, banda cu **două contoare**, ecranul de
   conflicte, `Azi` care citește din IndexedDB.
-- **10c — cele 8 ecrane de teren** + bugetul de tapuri. **Următorul lucru.**
+- **10c — cele 8 ecrane de teren** + bugetul de tapuri. Tăiat, la rândul lui, în patru:
+  - **10c-1**: GATA. Uploaderul de poze (coada `media` chiar se golește), butonul ＋ cu cele patru
+    acțiuni, rândurile de context pe `Azi`, ecranul `Poze`, `Inspecții`, și **Playwright instalat**
+    cu bugetul de tapuri blocant în CI.
+  - **10c-2**: `Inspecție` și `Intervenție`, offline complet. **Următorul lucru.**
+  - **10c-3**: `Necesar material` (în 3 tapuri), `Pontaj`, `Bon de consum`.
+  - **10c-4**: `Jurnal` (cu tabela lui), plus măsurarea bugetului pe toate cele patru acțiuni.
 - **10d — raportul lunar** către client: migrare, coadă cu progres real, versionare și îngheț.
 - **10e — panoul PM** cu gauge-ul Delta.
 
-### Ce trebuie să știi ca să începi 10c
+### Ce trebuie să știi ca să începi 10c-2
 
 **Ce ai deja, gata de folosit:**
 
@@ -54,36 +61,48 @@ jumătatea unui pas. Aceeași convenție a mers la 09.
   coadă, restul se întâmplă singur.
 - `useSync()` dă contoarele și `syncNow()`. Banda și pastila de conflicte sunt deja legate.
 - Felia locală se citește din `fieldDb()`; `TodayList` e exemplul de urmat.
+- **`<PhotoCapture workUnitId … phase? />`** — un buton, și poza e în coadă. Cere geolocația o
+  singură dată pe serie, scrie blob-ul în IndexedDB și pleacă singură la sincronizare. Ecranele de
+  la 10c-2 nu mai au nimic de scris pentru poze: pun componenta și gata.
+- **Ecranul `Poze`** (`/field/poze`) arată coada, cu miniatură, motiv și retrimitere.
 
-**Ce lipsește și trebuie construit la 10c** (§3.5 din plan):
+**Ce lipsește, ecran cu ecran** (§3.5 din plan):
 
-| Ecran | De făcut |
-|---|---|
-| `Azi` | Există lista. Lipsesc butonul **＋** cu cele 4 acțiuni frecvente și rândurile de context („2 linii de verificat"). |
-| `Inspecție` | Tot. Checklist offline, NOK cu ieșire **impusă și local** (#18), poze. |
-| `Intervenție` | Tot. Materiale din gestiunea echipei, ore, poze înainte/după. |
-| `Necesar material` | Tot, **în 3 tapuri** — pragul e blocant. |
-| `Pontaj` | Tot. Ziua împărțită pe mai multe UL. |
-| `Bon de consum` | Tot — **dar vezi decizia deschisă de mai jos**. |
-| `Jurnal` | Tot, **și n-are tabelă**. `journal.append` nu e în `MUTATION_TYPES` fiindcă n-are executant. Ori adaugi tabela, ori muți ecranul în faza 2 și spui asta în plan. |
-| `Utilaje și PV`, `Verificare SL` | Doar schelet cu `EmptyState`. Fazele 4 și 2. |
+| Ecran | De făcut | Când |
+|---|---|---|
+| `Azi` | **Gata.** Listă, ＋ cu cele 4 acțiuni, rânduri de context. | 10b + 10c-1 |
+| `Poze` | **Gata.** Coada, cu miniatură, progres, retrimitere, ștergere. | 10c-1 |
+| `Inspecții` | **Gata ca listă.** Checklist-ul propriu-zis lipsește. | 10c-1 / 10c-2 |
+| `Inspecție` | Tot. Checklist offline, NOK cu ieșire **impusă și local** (#18), poze. | 10c-2 |
+| `Intervenție` | Tot. Materiale din gestiunea echipei, ore, poze înainte/după. | 10c-2 |
+| `Necesar material` | Tot, **în 3 tapuri** — și din buget au rămas **două**, vezi mai jos. | 10c-3 |
+| `Pontaj` | Tot. Ziua împărțită pe mai multe UL. | 10c-3 |
+| `Bon de consum` | Tot, plus lărgirea de drept decisă mai jos. | 10c-3 |
+| `Jurnal` | Tot, **și tabela**. Decis: se face. | 10c-4 |
+| `Utilaje și PV`, `Verificare SL` | Schelet cu `EmptyState`. `Utilaje` există; `Verificare SL` nu. | 10c-1 / faza 2 |
 
-**Încărcarea pozelor nu e scrisă.** Coada `media` există în IndexedDB, cu progres per parte, dar
-uploader-ul care o golește prin presign-ul din pasul 07 rămâne de făcut la 10c. Contorul le
-numără deja separat de fișe.
+**Bugetul de tapuri e deja pe jumătate cheltuit înainte să se deschidă ecranul.** ＋ costă un tap,
+alegerea acțiunii încă unul. Ținta e 3, pragul de cădere 4. Deci `Necesar material` are voie la
+**două atingeri**, ceea ce înseamnă gestiune și produse **precompletate din felie**, nu formular
+gol. Testul din `e2e/field/tap-budget.spec.ts` măsoară azi doar drumul până la ecran; când ecranul
+există, se adaugă restul fluxului în același fișier.
 
 **Butonul „duplică drept fișă nouă"** din §3.3 lipsește din ecranul de conflicte, dinadins: are
-nevoie de ecranul fișei ca să deschidă o copie editabilă cu `id` nou. Se adaugă la 10c.
+nevoie de ecranul fișei ca să deschidă o copie editabilă cu `id` nou. Se adaugă la **10c-2**, odată
+cu fișele.
 
-### Trei decizii deschise, care nu sunt ale mele
+### Cele trei decizii deschise — luate pe 19 august
 
-1. **Bonul de consum pe teren.** §3.5 îl cere ca ecran de teren complet, dar `inventory.write` e
-   drept de **birou** din pasul 09. Ori se lărgește dreptul pentru gestiunea propriei echipe, ori
-   terenul emite consumul doar prin fișa de intervenție. E o decizie de model.
-2. **Jurnalul de șantier** — tabelă nouă acum, sau amânat în faza 2 (vezi tabelul de mai sus).
-3. **Playwright.** Bugetul de tapuri (#12–15) e **blocant în CI conform planului**, iar Playwright
-   nu e instalat. Ori se instalează la începutul lui 10c, ori se scrie explicit în plan că pragul
-   se măsoară mai târziu — dar nu se lasă „se face cândva".
+Utilizatorul a decis toate trei. Nu se redeschid fără el.
+
+1. **Bonul de consum pe teren: se lărgește dreptul, îngust.** Terenul va putea emite consum
+   **doar din gestiunea propriei echipe** (`locations.type = 'echipa'` cu `team_id` = echipa mea),
+   printr-o politică nouă. NU se dă `inventory.write` de birou pe teren. Migrarea și politica se
+   scriu la **10c-3**, împreună cu ecranul.
+2. **Jurnalul de șantier: se face acum**, nu în faza 2. Tabelă nouă (UL, etapă, om, text, dată,
+   poze), plus `journal.append` în `MUTATION_TYPES` cu executantul lui. Toate trei împreună, la
+   **10c-4** — un tip fără executant ar accepta mutații pe care nu le poate aplica nimeni.
+3. **Playwright: instalat la 10c-1.** Vezi mai jos ce măsoară azi și ce nu.
 
 ### Regula care a plătit de cinci ori la rând
 
@@ -120,7 +139,12 @@ drum până la ea**:
 - **Ecranele se verifică fără browser** cu un harness de ~150 de linii peste `next dev`. Vezi
   „Lucruri pe care le-am aflat greu".
 - **Ce atinge R2 sau rețeaua** se verifică prin smoke pe dev, cu bucket real. Nu în CI, dinadins.
+- **Bugetul de tapuri** se măsoară cu `pnpm e2e` (Playwright, doar Chromium, la dimensiunea unui
+  telefon). Jobul `taps` din CI e **blocant**. Ce măsoară azi: drumul de la `Azi` la ecranul unei
+  acțiuni frecvente (2 tapuri), cele patru acțiuni la un tap de ＋, coada de poze la un tap din bara
+  de jos. Ce NU măsoară încă: completarea și trimiterea, fiindcă ecranele vin la 10c-2 și 10c-3.
 - Înainte de commit: `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets`.
+  Plus `pnpm e2e` când ai atins ceva din `(field)`.
 
 ### Verificări din pașii anteriori care NU sunt complet închise
 
@@ -131,7 +155,8 @@ drum până la ea**:
 | 06 | **21** | Indexul de cursor măsurat la 10.000 de linii, nu la 100.000. Planul e însă independent de volum. |
 | 07 | **7** | Reluarea per parte există în client și merge; **întreruperea reală de rețea** cere Playwright. Singura verificare deschisă din pasul 07. |
 | 09 | — | Toate cele 24 sunt acoperite. |
-| 10 | **1–4, 8, 9, 12–15, 17–28** | Cer ecranele de teren (10c), raportul lunar (10d) și panoul PM (10e). Tapurile (#12–15) cer și Playwright. |
+| 10 | **1–4, 8, 9, 17–28** | Cer ecranele de teren (10c-2…4), raportul lunar (10d) și panoul PM (10e). |
+| 10 | **12–15** | Playwright e instalat și jobul e blocant, dar măsoară doar **drumul până la ecran**. Fluxul complet până la salvare se măsoară pe măsură ce apar ecranele. |
 
 ### Datorii deschise, în ordinea în care le-aș lua
 
@@ -140,10 +165,10 @@ drum până la ea**:
 | 1 | **Rotește `SUPABASE_SERVICE_ROLE_KEY`** (Project Settings → API) | A trecut printr-o fereastră de chat pe 17 august. Singurul cod care o folosește e `resetMfaFactors` din `apps/web/src/app/api/admin/service.ts`. |
 | 2 | **Jobul lunar de regie** | `recomputeOverheadSnapshot` există și e acordată doar lui `app_service`, dar n-o cheamă nimeni. Fără ea, marja netă e marjă brută cu altă etichetă. |
 | 3 | **CORS pe bucket-ul R2 `docs`** | Uploadul din browser NU merge fără el: `PUT` de pe originea aplicației și **`ExposeHeaders: ETag`**. Fără ETag expus, clientul se oprește la prima parte — cu mesaj explicit, dar se oprește. Verificat până acum doar din Node, unde CORS nu se aplică. |
-| 4 | **Playwright** | Neinstalat. Blochează #13 din pasul 03, clicul pe hartă din 04b (#14), partea de client din #7 și #20 ale pasului 07, și **bugetul de tapuri #12–15 din pasul 10, care e blocant în CI conform planului**. Devine urgent la 10c. |
+| 4 | **Playwright — instalat, dar folosit doar pentru tapuri** | Config, harness de tapuri și job de CI blocant există (10c-1). Rămân neacoperite verificările care cer un browser **cu baza de date în spate**: #13 din pasul 03, clicul pe hartă din 04b (#14), partea de client din #7 și #20 ale pasului 07. Jobul de tapuri e dinadins fără Postgres; alea au nevoie de altul, cu seed. |
 | 5 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Ori `grant select` pe `work_queue_items`/`notifications` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
 | 6 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
-| 7 | **Decizia despre bonul de consum pe teren** | §3.5 din pasul 10 cere `Bon de consum` ca ecran **de teren complet**, dar `inventory.write` e drept de **birou** din pasul 09. Ori se lărgește dreptul pentru gestiunea propriei echipe, ori terenul emite consumul doar prin fișa de intervenție. **E o decizie de model, nu de cod** — se ia înainte de 10c. |
+| 7 | ~~Decizia despre bonul de consum pe teren~~ — **luată pe 19 august** | Se lărgește dreptul, îngust: consum doar din gestiunea propriei echipe. Rămâne de **implementat** la 10c-3 (politică + migrare + ecran). |
 | 8 | **Miniaturi pentru video** | `files.derive` produce miniaturi doar pentru imagini; pentru restul iese tăcut, dinadins. PDF-ul se rezolvă acum prin previzualizarea `inline`, deci rămâne doar video. Se adaugă când apare nevoia reală (raportul lunar, pasul 10). |
 
 **Datoria `pnpm db:generate` rămâne plătită.** Toate migrările care ating tabele au fost
@@ -314,6 +339,80 @@ smoke aruncabile, pe dev, cu bucket real. **Așa au ieșit la iveală toate defe
 - Înainte de commit: `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets`.
   Ultimul cere un build proaspăt, iar build-ul cade dacă un `next dev` ține `.next` ocupat — oprește
   serverele de dezvoltare înainte.
+
+---
+
+## 10c-1 — pozele pleacă, ＋ există, tapurile se măsoară (19 august 2026)
+
+### Ce a intrat
+
+**Uploaderul de poze — coada `media` chiar se golește.**
+
+- `apps/web/src/lib/field/media.ts` — bucla care urcă pozele: rezolvă folderul, presign, părți cu
+  reluare, `complete`, apoi **șterge rândul cu blob cu tot**. O zi de teren înseamnă sute de MB;
+  o poză ajunsă la birou n-are ce mai căuta pe telefon.
+- `apps/web/src/lib/upload-part.ts` — `putPart`, `sha256Hex`, `readError`, scoase din `UploadZone`
+  și făcute comune. A doua copie ar fi rămas în urmă exact la mesajul de ETag, adică la singurul
+  simptom mut din tot lanțul de upload.
+- `POST /api/field/media/target` + `photoFolderFor()` — traducerea **unitate de lucru → folder**.
+  Telefonul nu poate ști id-uri de foldere: poza se face unde nu e rețea. Când faza cerută n-are
+  folder (o intervenție n-are „Înainte"/„După"), răspunsul e folderul „Poze", nu `null` — o poză
+  fără loc n-ar mai fi urcată niciodată.
+- `<PhotoCapture>` — un buton, geolocație cerută **o dată pe serie** cu 3 secunde de răbdare, blob
+  în IndexedDB. Ecranele de la 10c-2 n-au nimic de scris pentru poze.
+- `/field/poze` + `<MediaQueue>` — coada văzută de om: miniatură din `blob:` local (poza n-a ajuns
+  nicăieri încă), progres, motivul căderii, retrimitere, ștergere cu confirmare.
+- Dexie **v2**: `MediaRow` ține `workUnitId` + `phase`, nu `parentNodeId`. Magazia se golește la
+  migrare — în v1 n-apucase s-o scrie nimeni.
+
+**`Azi`, întreg.**
+
+- `<QuickActions>` — butonul ＋ cu cele patru acțiuni din §3.5, și rutele lor. `Utilaje` e scheletul
+  final de fază 4; celelalte trei spun cinstit ce urmează. O acțiune care duce în 404 e mai rea
+  decât una care spune ce vine.
+- Rândurile de context sub listă: fișe neîncepute, fișe care așteaptă semnal, poze de trimis, fișe
+  refuzate. **Niciun rând cu zero** — un tablou plin de zerouri se citește o săptămână.
+- `/field/inspectii` — aceeași listă, filtrată. Bara de jos arăta de la 10b două rute care nu
+  existau; acum există amândouă.
+
+**Playwright, pentru bugetul de tapuri.**
+
+- `playwright.config.ts`, `e2e/`, jobul `taps` din CI — **blocant**, un singur browser, la
+  dimensiunea unui telefon.
+- Contorul **măsoară**, nu declară: crește dintr-un `pointerdown` pe fereastră, cu captură, și
+  trăiește în `sessionStorage` ca o navigare completă să nu-l șteargă. Un test care ar aduna singur
+  câte `click()`-uri a scris ar fi măsurat intenția autorului.
+- Trei teste verzi: 2 tapuri de la `Azi` la ecranul unei acțiuni, cele 4 acțiuni la un tap de ＋,
+  coada de poze la un tap din bara de jos.
+
+### Capcana care a costat trei teste deodată
+
+Primele rulări au picat toate trei, cu **ecranul de login** în snapshot. Cauza: **Next înlocuiește
+`process.env` la BUILD, nu la rulare** — inclusiv în middleware, care rulează pe Edge. Steagul
+`ALLOW_DEV_SESSION` pus doar la pornirea serverului nu ajunge niciodată în bundle, deci middleware-ul
+trimitea la login orice cerere, cu cookie de dezvoltare cu tot.
+
+De aceea `tools/scripts/e2e-server.mjs` **construiește** înainte să pornească, cu steagul pus. Și de
+aceea build-ul ăla e al lui: un bundle care acceptă o sesiune fabricată dintr-un cookie **n-are voie
+într-un deploy**.
+
+A doua, mai banală: `reuseExistingServer` a reciclat un server rămas de la rularea anterioară, cu
+bundle-ul vechi. Testele au continuat să pice după ce cauza reală era deja reparată.
+
+### Cum a fost verificat
+
+- `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets` — toate verzi.
+- `pnpm e2e` — 3/3, cu build propriu.
+- Ce **nu** s-a verificat pe date reale: urcarea efectivă a unei poze din teren, cap-coadă, în R2.
+  Bucla e scrisă peste presign-ul pasului 07, care e verificat, dar drumul de teren (rol `app_field`,
+  folder rezolvat prin RLS) **n-a fost rulat pe dev**. E prima verificare de făcut la 10c-2, când
+  există un ecran care chiar face poze — și e exact tiparul care a scos zece defecte până acum.
+
+### Ce urmează la 10c-2
+
+`Inspecție` și `Intervenție`, offline complet, plus butonul „duplică drept fișă nouă" din ecranul de
+conflicte. `PhotoCapture` se pune direct; `saveInspection` și `saveIntervention` au deja mutații și
+teste.
 
 ---
 

@@ -243,6 +243,40 @@ export async function folderForEntity(
 }
 
 /**
+ * Unde aterizeaza o poza facuta pe teren.
+ *
+ * Terenul nu poate sti id-ul folderului: poza se face in subsol, iar arborele e
+ * o notiune de server. Ecranul retine unitatea de lucru si — la lucrari — faza,
+ * iar traducerea se face aici, la urcare, cand oricum exista retea.
+ *
+ * Cand faza ceruta n-are folder (o interventie n-are „Inainte"/„Dupa"), raspunsul
+ * e folderul „Poze" al unitatii, nu `null`: o poza fara loc n-ar mai fi urcata
+ * niciodata, si asta e cel mai scump esec posibil aici.
+ */
+export async function photoFolderFor(
+  actor: Actor,
+  workUnitId: string,
+  phase?: 'inainte' | 'dupa',
+): Promise<string | null> {
+  const photos = await folderForEntity(actor, { workUnitId }, 'photos');
+  if (photos === null || phase === undefined) {
+    return photos;
+  }
+
+  const name = phase === 'inainte' ? 'Înainte' : 'După';
+  return withActor(actor, async (tx) => {
+    const rows = await tx.execute<{ id: string }>(sql`
+      select id from app.nodes
+       where parent_id = ${photos}::uuid
+         and node_role = 'photo_phase'::app.node_role
+         and name = ${name}
+         and deleted_at is null
+       limit 1`);
+    return rows.rows[0]?.id ?? photos;
+  });
+}
+
+/**
  * Radacina de fisiere a unei firme — de unde porneste explorerul.
  *
  * Cautarea e pe rol, ca peste tot: numele afisat al radacinii e numele firmei si
