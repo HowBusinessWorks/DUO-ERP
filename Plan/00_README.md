@@ -1,4 +1,8 @@
-# Damina ERP — planul de execuție în 10 pași
+# Damina ERP — planul de execuție
+
+**Pașii 01–10 sunt fazele 0 și 1** (fundația + mentenanța). **Pașii 11–15 sunt faza 2** (lucrările:
+devize, pachete de subcontractant, situații de lucrări). Fazele 3–5 se planifică ca o a treia serie,
+după ce faza 2 e în producție.
 
 ## Cum se folosește folderul ăsta
 
@@ -45,9 +49,23 @@ Dacă apare o contradicție: **business > funcțional > tehnic**.
 09 Fișe de lucru: inspecții, intervenții, pontaj, consum
       ↓
 10 Aplicația de teren (PWA offline) + raportul lunar
+      ↓                                  ── aici se termină faza 1 ──
+11 Devizul client + intern, maparea N:M, biblioteca de articole normate
+      ↓
+12 Pachete de subcontractant + portalul lor (prima dată cu date reale)
+      ↓
+13 Situațiile de lucrări: declarare → verificare pe teren → aprobare → cod SL
+      ↓
+14 Suplimentări, garanții de bună execuție, SL-ul către client
+      ↓
+15 Execuția: Gantt, buget pe etapă, necesar pe etape, închiderea lucrării
 ```
 
 Pașii **nu se pot reordona**. Fiecare pas verifică la început precondițiile din pasul anterior și se oprește dacă nu sunt îndeplinite.
+
+**Faza 2 (11–15) e strict serială în interiorul ei** — devizul e sursa pachetului, pachetul e sursa
+situației de lucrări. Se poate executa însă **în paralel cu faza 4** (utilaje, unelte, PV), care nu
+depinde de nimic din ea.
 
 ## Lista pașilor
 
@@ -64,11 +82,25 @@ Pașii **nu se pot reordona**. Fiecare pas verifică la început precondițiile 
 | 09 | `09_Fise_De_Lucru.md` | inspecții + checklist, intervenții, pontaj, gestiune de echipă, bon de consum | Business §9, §17 · Funcțional §11.2–11.6 |
 | 10 | `10_Teren_Offline_Raport_Lunar.md` | PWA offline, sync, media, cele 8 ecrane de teren, raportul lunar | Tehnic §11 · Funcțional §26, §15.2 |
 
-## Ce e în afara celor 10 pași
+### Faza 2 — Lucrările
 
-Pașii 01–10 acoperă **faza 0 (fundația) și faza 1 (mentenanța)** din fazarea documentelor — adică un ERP funcțional cap-coadă pentru contractele de mentenanță. Fazele 2–5 (devize și SL cu subcontractanți, achiziții și stoc complet, flotă și PV, e-Factura și consolidare) se planifică ca o a doua serie de pași, după ce faza 1 e în producție.
+| # | Fișier | Ce livrează | Acoperă din planuri |
+|---|---|---|---|
+| 11 | `11_Deviz_Articole_Normate.md` | deviz client (versionat) + intern, maparea N:M, biblioteca de articole normate, cele 4 importatoare | Business §8 · Funcțional §12.1, §17 · Tehnic D.3 |
+| 12 | `12_Pachete_Portal_Subcontractant.md` | pachete din devizul intern, ofertare linie cu linie, portalul subcontractantului, provizionarea de conturi, costul `angajat` | Business §8.3, §10.3 · Funcțional §27.1 |
+| 13 | `13_Situatii_De_Lucrari.md` | SL lunară per pachet, cele 5 cumulate, verificarea de teren fără preț, aprobarea, codul SL | Business §10 · Funcțional §12.2 |
+| 14 | `14_Suplimentari_Garantii_SL_Client.md` | suplimentări atomice, garanții de bună execuție (ambele sensuri), intrarea din spate, SL-ul către client | Business §10.2 · Funcțional §12.2–12.3 |
+| 15 | `15_Executia_Lucrarii.md` | Gantt cu buget vs consum pe etapă, necesar de material pe etape, Înainte/După, închiderea lucrării | Business §9, §15 · Funcțional §11 |
 
-Motivul: fazele 2–5 înseamnă încă ~110 tabele; comprimate în aceiași 10 pași ar fi produs pași imposibil de executat corect într-o sesiune.
+**~22 de tabele, 14 sub-pași.** Numerele de migrare rezervate: **`0040`–`0069`**.
+
+## Ce e în afara pașilor 01–15
+
+Pașii 01–10 acoperă **faza 0 (fundația) și faza 1 (mentenanța)**; pașii 11–15 acoperă **faza 2 (lucrările)**. Rămân fazele 3–5 (achiziții și stoc complet, flotă și PV, e-Factura și consolidare), care se planifică ca o a treia serie de pași.
+
+Motivul pentru care nu sunt planificate încă: fazele 3–5 înseamnă încă ~66 de tabele, iar planificarea lor se face mai bine după ce faza 2 a arătat cât de mult din deviz e chiar folosit în practică — necesarul de material și analitica de PO ies direct din el.
+
+**Fazele 3 și 4 se pot executa în paralel** (§23 din documentul de business o spune explicit). Faza 5 are nevoie de date reale din 1–3, deci e ultima.
 
 ## Convenții valabile în toți pașii
 

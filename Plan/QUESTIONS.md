@@ -149,6 +149,77 @@ seed-ul trece dinadins prin servicii tocmai ca să nu creeze stări la care apli
 
 ---
 
+## Deciziile fazei 2 — luate înainte de a scrie planul (19 august 2026)
+
+Cele șase întrebări care blocau redactarea pașilor 11–15. **Toate închise de utilizator. Nu se
+redeschid fără el.**
+
+### D1 — Faza 2 se taie în cinci pași
+
+`11` deviz · `12` pachete + portal · `13` situații de lucrări · `14` suplimentări, garanții, SL client ·
+`15` execuția și închiderea. Fiecare cu 2–3 sub-pași, ca o sesiune să nu se termine la jumătate —
+convenția care a mers la 08, 09 și 10.
+
+### D2 — Etapa pe necesarul de material: precompletată, nu în plus
+
+Tensiunea: §9 cere `stage_id` obligatoriu pe necesar, dar bugetul de tapuri e 3 și blocant în CI, iar
+`＋` plus alegerea acțiunii consumă deja două.
+
+**Ales: varianta (a).** Etapa se precompletează cu **etapa curentă din grafic** și se schimbă dintr-un
+tap **opțional**. Obligatorie în date (trigger), precompletată pe ecran. Selectorul nu apare deloc dacă
+UL-ul nu e lucrare sau lucrarea n-are etape — exact ce face deja `Jurnal` de la 10c-4.
+**Pragul nu se urcă.** Dacă testul cade, se repară ecranul. Detalii în `15_Executia_Lucrarii.md` §0.
+
+### D3 — Stadiile de cost ale fazei 2
+
+`cost_stage` are `angajat | receptionat | consumat | facturat`.
+
+**Ales: pachet semnat → `angajat`; SL aprobată → `facturat`.** Manopera de subcontractant nu trece prin
+`receptionat` sau `consumat` — nu e marfă, nu intră în gestiune. `facturat` înseamnă aici „datorat și
+acceptat", nu „există o factură în sistem".
+
+**Nu se adaugă valori noi în enum**, fiindcă `cost_stage` și `cost_document_type` sunt structuri din
+faza 0, iar extinderea lor la fiecare document nou al fazei 2 ar însemna migrări pe fundație.
+Singura excepție prevăzută: dacă drill-down-ul de la pasul 06 nu poate distinge pachetul de SL doar din
+`document_id`, se adaugă `pachet_subc` — **verificat înainte de a scrie linia de cost**, nu după.
+
+### D4 — Importul Excel intră, ca sub-pas care se poate tăia
+
+Modul 4 din §8.2. Cere o dependență nouă (parser `.xlsx`), dar §10.3 confirmă că a fost testat pe fișiere
+reale, cu formatare inconsistentă. **Ales: intră ca `11c`**, ultimul sub-pas al pasului 11 — poziția din
+care se poate amâna fără să lase altceva neterminat.
+
+### D5 — Portalul de subcontractant nu cere MFA
+
+Sunt utilizatori externi, provizionați cu parolă temporară afișată o singură dată. **Ales: fără MFA pe
+`app_subcontractor`**, dar **schimbarea parolei la prima intrare e obligatorie** — asta înlocuiește al
+doilea factor. Nu se construiește nimic pe `MFA_ENFORCED`: e o poartă oprită, nu un drept dat.
+
+### D6 — SL-ul către client intră în faza 2, factura rămâne faza 5
+
+Anexa D.3 pune `sl_client` în faza 2, dar el produce factura, care e faza 5. **Ales: tabela și derivarea
+prin mapare intră acum** (pasul 6a din §10.1); emiterea facturii rămâne faza 5. Același tipar ca blocajul
+de facturare implementat la raportul lunar înainte să existe ecranul de facturare.
+
+### Contradicția rezolvată pe parcurs — cine vede devizul
+
+`PLAN_TEHNIC` §4.4 dă ca exemplu `GRANT SELECT (…) ON app.deviz_lines TO app_field`. §10.3 din business
+spune că șeful de șantier **nu vede devizul deloc**.
+
+**Câștigă business-ul** (ordinea din acest README: business > funcțional > tehnic). `app_field` nu
+primește niciun grant pe tabelele de deviz. §4.4 rămâne corect ca descriere a mecanismului; doar exemplul
+lui e ales nefericit. Terenul își ia cantitățile din `v_sl_lines_field` și `v_package_lines_field`.
+
+### Ce s-a construit mai devreme decât prevedea Anexa D.3
+
+- **`work_journal_entries`** (D.3, faza 2) = **`app.journal_entries`**, construită la **10c-4**, la cererea
+  utilizatorului. **Nu se dublează.** Faza 2 adaugă doar coloana `kind` pentru secțiunea fixă Înainte/După.
+- **`work_stages`** e completă din **pasul 05**. Faza 2 construiește Gantt-ul peste ea, nu tabela.
+- **`material_requirements`** (D.3, faza 2) **nu exista** — necesarul de teren de azi produce un `Request`
+  generic de tip `solicitare`, fără linii și fără etapă. Se construiește la pasul 15.
+
+---
+
 ## Închise
 
 ### Sentry — tăiat din pasul 01
