@@ -11,6 +11,7 @@
     "test": "vitest run --dir src --passWithNoTests",
     "test:db": "vitest run --config vitest.db.config.ts --dir tests",
     "db:seed": "tsx scripts/seed.ts",
+    "smoke:deviz": "tsx scripts/smoke-deviz.ts",
     "db:seed:users": "tsx scripts/seed-users.ts"
   },
   "dependencies": {

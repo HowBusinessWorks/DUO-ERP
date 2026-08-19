@@ -246,6 +246,20 @@
       "when": 1787126331288,
       "tag": "0034_monthly_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1787133092767,
+      "tag": "0040_devize",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1787133349113,
+      "tag": "0041_normed_articles",
+      "breakpoints": true
     }
   ]
 }

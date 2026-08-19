@@ -24,7 +24,16 @@ const OUTSIDE_OFFICE = [
   { persona: 'client', role: 'app_client' },
 ] as const;
 
-const MONEY_PATTERN = '(price|pret|cost|amount|margin|salary)';
+/*
+ * De la 11a incoace, `total` intra in tipar.
+ *
+ * Regexul initial prinde price/pret/cost/amount/margin/salary — dar
+ * `deviz_lines.total` si `deviz_versions.total` sunt tot bani, si tocmai
+ * cifrele pe care sec. 10.3 din business le tine departe de teren. Numele de
+ * coloana nu e un mecanism de securitate, e o euristica; cand euristica are o
+ * gaura vizibila, se astupa.
+ */
+const MONEY_PATTERN = '(price|pret|cost|amount|margin|salary|total)';
 
 describe('#1 izolarea pretului, generata din schema', () => {
   it('nicio coloana de bani nu e vizibila in afara biroului', async () => {

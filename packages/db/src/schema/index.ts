@@ -19,3 +19,5 @@ export * from './timesheets';
 export * from './field-sync';
 export * from './journal';
 export * from './reports';
+export * from './deviz';
+export * from './normed-articles';

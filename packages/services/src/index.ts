@@ -491,3 +491,36 @@ export type {
   ReportSheetRow,
   ReportVersionRow,
 } from './monthly-reports';
+
+export {
+  addDevizCategory,
+  addDevizLine,
+  adoptAsInternal,
+  checkDevizMapping,
+  createDeviz,
+  createNormedArticle,
+  deleteDevizLine,
+  freezeClientDeviz,
+  listDevizTemplates,
+  listDevizeForWorkUnit,
+  listNormedArticles,
+  mapDevizLines,
+  moveDevizLine,
+  putNormedArticleIntoDeviz,
+  readDeviz,
+  saveAsNormedArticle,
+  unmapDevizLines,
+  updateDevizLine,
+  updateDevizMarkup,
+} from './deviz';
+export type {
+  AdoptResult,
+  DevizCategoryRow,
+  DevizHead,
+  DevizLineRow,
+  DevizTotals,
+  DevizView,
+  FrozenVersion,
+  NormedArticleUsage,
+  PutNormedArticleInput,
+} from './deviz';

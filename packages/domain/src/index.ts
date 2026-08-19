@@ -127,3 +127,27 @@ export {
   reportTransition,
 } from './reports';
 export type { ReportAction, ReportProgress, ReportStatus, ReportTransition } from './reports';
+
+export {
+  deriveOneToOne,
+  explodeNormedArticle,
+  rollupDeviz,
+  validateMapping,
+} from './deviz';
+export type {
+  AdoptableClientLine,
+  DevizAmounts,
+  DevizCategoryLike,
+  DevizCategoryRollup,
+  DevizLineLike,
+  DevizRollup,
+  DevizRollupInput,
+  ExplodedDevizLine,
+  MappingCheck,
+  MappingCoefficientProblem,
+  MappingLike,
+  NormedArticleLike,
+  NormedComponentKind,
+  NormedComponentLike,
+  OneToOneDraft,
+} from './deviz';

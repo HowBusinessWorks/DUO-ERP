@@ -41,9 +41,11 @@ Detaliile, în intrările de jurnal ale fiecărei bucăți.
 | **08** | Gata pe **08a** (schemă, domain, servicii) și **08b** (ecrane). **08c e SĂRIT dinadins** — decizia utilizatorului, vezi secțiunea lui mai jos. Din 08c există doar expirarea propunerilor. |
 | **09** | **Gata, tot** — 09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon de consum · 09b-4 acoperire, istoric, validare în masă, seed. Toate cele 24 de verificări acoperite. |
 | **10** | **Gata, tot** — 10a, 10b, 10c (inclusiv 10c-4), **10d raportul lunar** și 10e. Cu asta **faza 1 e completă**. |
+| **11** | **Faza 2 a început.** `11a` gata: migrările `0040`–`0041`, domeniul, serviciile, RLS-ul și grant-urile, cu 25/25 verificări pe dev. Urmează `11b` (ecranele) și `11c` (importul Excel). |
 
-**Pasul 10 e închis.** Următoarea serie de pași acoperă fazele 2–5: devize și situații de lucrări,
-achiziții și stoc, flotă și procese verbale, facturare și consolidare.
+**Pasul 10 e închis, iar faza 2 e planificată și pornită.** Pașii 11–15 sunt scriși în `Plan/`
+(devize, pachete și portal de subcontractant, situații de lucrări, suplimentări și garanții,
+execuția lucrării), cu migrările `0040`–`0069` rezervate. Din ei, `11a` e gata.
 
 ### Pasul 10, tăiat în cinci — iar 10c în patru
 
@@ -3621,6 +3623,92 @@ drepturi noi. Smoke pe Supabase dev: 21 de verificări, toate verde. Ecranele (�
 ## Pasul 10 — Teren offline, raport lunar
 
 *(nicio sesiune n-a lucrat încă aici)*
+
+---
+
+## Pasul 11 — Devizul și biblioteca de articole normate
+
+### 2026-08-19 — 11a, fundația [status: gata]
+
+**Ce a intrat**
+
+- **Migrarea `0040_devize`** — cinci tabele: `devize` (unic pe lucrare × fel),
+  `deviz_versions` (istoricul devizului CLIENT, imutabil), `deviz_categories`
+  (arbore pe două niveluri), `deviz_lines` (aici stau prețurile),
+  `deviz_line_mappings` (N:M client ↔ intern). RLS prin `work_unit_in_scope`,
+  grant-uri doar pentru `app_office` și citire pentru `app_service`, plus
+  `revoke all` scris explicit pentru teren, subcontractant și client.
+- **Migrarea `0041_normed_articles`** — `normed_articles`,
+  `normed_article_components`, `deviz_templates`. Vizibilitate pe firmă, nu pe
+  lucrare: biblioteca trăiește *între* lucrări.
+- **Trei reguli impuse prin trigger**, nu prin ecran: arborele are două
+  niveluri; `total` se calculează (`cantitate × preț unitar`, iar pe devizul
+  intern prețul unitar e suma celor patru componente); maparea leagă o poziție
+  client cu una internă, de pe aceeași lucrare.
+- **`packages/domain/src/deviz/`** — `rollupDeviz`, `explodeNormedArticle`,
+  `validateMapping`, `deriveOneToOne`, cu 13 teste fără Postgres.
+- **`packages/services/src/deviz.ts`** — cele nouă use-case-uri din §3.4, plus
+  citirea devizului cu totaluri, `checkDevizMapping` și
+  `putNormedArticleIntoDeviz`.
+- **`packages/contracts/src/deviz.ts`** — schemele Zod, cu procentele ca
+  fracții (0,08 = 8%), aceeași convenție ca `work_stages.pct_of_work`.
+
+**Decizii luate**
+
+- **`total` intră în tiparul de bani al testului generic** (`rls.test.ts`).
+  Regexul prindea price/pret/cost/amount/margin/salary, dar `deviz_lines.total`
+  e tot bani. Aceeași listă a fost dată și porții din migrare
+  (`assert_no_money_leak(array['total'])`).
+- **Componentele articolului normat NU cer legătură către nomenclator.**
+  Planul cerea `product_id?`/`qualification_id?`; prima variantă a schemei le
+  făcuse obligatorii pe material și manoperă, ceea ce ar fi închis exact drumul
+  prin care biblioteca crește singură: butonul „salvează poziția ca articol
+  normat", apăsat peste o linie scrisă liber. Rămâne o singură regulă: o
+  componentă arată ori către marfă, ori către om, niciodată către amândouă.
+- **„Preia ca deviz intern" pornește costurile de la zero**, nu de la prețul
+  ofertat. Prețul clientului conține indirecte și profit; copiat în coloana de
+  cost, ar face marja să arate ca zero — și, mai rău, ar arăta ca *calculată*.
+- **Prețul unitar intern nu se scrie de om.** Îl calculează triggerul ca sumă a
+  celor patru componente. Scris separat de ele, ar fi a doua sursă de adevăr
+  pentru același număr, și prima care rămâne în urmă la o corecție de manoperă.
+- **Numerele de migrare s-au forțat pe `0040`/`0041`.** Drizzle ar fi generat
+  `0035`; fișierele și `meta/_journal.json` s-au renumerotat, ca rezervarea
+  `0040`–`0069` a fazei 2 să rămână valabilă pentru pașii 12–15.
+
+**Cum a fost verificat**
+
+`pnpm --filter @damina/services smoke:deviz` — **25/25 pe Supabase dev**,
+acoperind verificările 1–13, 16 și 20 ale pasului, plus cele trei triggere.
+Rulat din **rolul restrâns** (`app_office` cu rol de business `pm`, fără drept
+financiar), înainte de orice ecran — regula casei care a plătit de treisprezece
+ori. Aceleași scenarii există și ca suită de teste
+(`packages/services/tests/deviz.test.ts`), pentru CI, unde Testcontainers chiar
+pornește.
+
+Trei lucruri s-au aflat abia rulând:
+
+1. **Oracolul verificării #1 era greșit, nu codul.** Prima variantă compara
+   totalul cu `Math.round(q * p * 100) / 100` și pica cu un ban: 2,5 × 12,33 =
+   30,825, pe care `numeric` și `Money` îl rotunjesc la 30,83, iar float-ul la
+   30,82, fiindcă îl ține ca 30,8249999999. Oracolul e acum suma făcută de
+   Postgres peste coloana `total`. Un test scris cu float ar fi impus greșeala
+   codului.
+2. **Biroul chiar n-are `delete` pe bibliotecă** — curățenia de după probă a
+   picat pe `permission denied for table deviz_templates`, ceea ce înseamnă că
+   grant-urile țin. Ștergerea se face acum pe conexiunea de întreținere.
+3. **`session_replication_role = replica` oprește și cascadele de cheie
+   străină**, nu doar triggerele de business. Prima curățenie a lăsat în urmă 24
+   de devize orfane, cu `work_unit_id` către rânduri inexistente. Se aprinde
+   acum doar cât se șterg nodurile de folder și se stinge imediat.
+
+**Ce rămâne**
+
+- **11b** — editorul de deviz, panoul de mapare N:M, bara de trasabilitate,
+  modulul `articole-normate` (intrarea există în `navigation.ts` cu `phase: 2`,
+  i se schimbă faza pe `0`). Verificările 14–16, 19.
+- **11c** — importul Excel, migrarea `0042_deviz_import`.
+- **Rămâne deschisă D7 din `QUESTIONS.md`** (utilaj/transport în pachetul de
+  subcontractant). Nu blochează 11b, blochează 12a.
 
 ---
 
