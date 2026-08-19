@@ -16,7 +16,7 @@
     "@damina/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "pg-boss": "^10.3.2",
-    "zod": "^3.25.56"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@damina/tsconfig": "workspace:*",
