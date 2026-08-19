@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@damina/tsconfig": "workspace:*",
-    "@testcontainers/postgresql": "^11.0.3",
+    "@testcontainers/postgresql": "^12.1.0",
     "@types/node": "^22.15.30",
     "@types/pg": "^8.15.4",
     "drizzle-kit": "^0.31.1",
