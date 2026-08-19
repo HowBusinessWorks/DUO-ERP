@@ -12,10 +12,18 @@ export type ConnectionMode = 'pooled' | 'session';
 
 export type Db = NodePgDatabase<typeof schema>;
 
-const pools = (globalThis as typeof globalThis & { __daminaPools?: Map<ConnectionMode, pg.Pool> }).__daminaPools
-  ?? ((globalThis as typeof globalThis & { __daminaPools?: Map<ConnectionMode, pg.Pool> }).__daminaPools = new Map());
-const databases = (globalThis as typeof globalThis & { __daminaDatabases?: Map<ConnectionMode, Db> }).__daminaDatabases
-  ?? ((globalThis as typeof globalThis & { __daminaDatabases?: Map<ConnectionMode, Db> }).__daminaDatabases = new Map());
+const pools =
+  (globalThis as typeof globalThis & { __daminaPools?: Map<ConnectionMode, pg.Pool> })
+    .__daminaPools ??
+  ((
+    globalThis as typeof globalThis & { __daminaPools?: Map<ConnectionMode, pg.Pool> }
+  ).__daminaPools = new Map());
+const databases =
+  (globalThis as typeof globalThis & { __daminaDatabases?: Map<ConnectionMode, Db> })
+    .__daminaDatabases ??
+  ((
+    globalThis as typeof globalThis & { __daminaDatabases?: Map<ConnectionMode, Db> }
+  ).__daminaDatabases = new Map());
 
 function createPool(mode: ConnectionMode): pg.Pool {
   const env = loadDbEnv(mode === 'session' ? { requireSession: true } : { requirePooled: true });

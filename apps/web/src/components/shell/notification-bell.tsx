@@ -125,10 +125,7 @@ export function NotificationBell({
                       >
                         {item.title}
                       </p>
-                      <time
-                        dateTime={item.createdAt}
-                        className="shrink-0 text-xs text-ink-subtle"
-                      >
+                      <time dateTime={item.createdAt} className="shrink-0 text-xs text-ink-subtle">
                         {timeFormat.format(new Date(item.createdAt))}
                       </time>
                     </div>

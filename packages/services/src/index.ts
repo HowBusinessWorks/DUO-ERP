@@ -455,3 +455,39 @@ export type { InspectionBlocker, InspectionValidationCheck, VarianceResult } fro
 
 export { readPmPanel } from './pm-panel';
 export type { PmApproval, PmApprovalKind, PmContractCard, PmPanel, PmRiskRow } from './pm-panel';
+
+export {
+  applyReportProgress,
+  approveMonthlyReport,
+  attachReportArtifact,
+  completeReportVersion,
+  failReport,
+  freezeMonthlyReport,
+  listMonthlyReports,
+  maintenanceInvoiceGate,
+  newReportToken,
+  readMonthlyReport,
+  readPublicReport,
+  readReportBuildHead,
+  readReportComposition,
+  readReportJournal,
+  readReportPhotos,
+  readReportSheets,
+  requestMonthlyReport,
+  resolvePublicReportPhoto,
+  sendMonthlyReport,
+} from './monthly-reports';
+export type {
+  AttachReportArtifactInput,
+  CompleteReportVersionInput,
+  GenerationRequested,
+  MonthlyReportView,
+  PublicReportVersion,
+  ReportComposition,
+  ReportJournalRow,
+  ReportListRow,
+  ReportPhotoRow,
+  ReportSheetDetail,
+  ReportSheetRow,
+  ReportVersionRow,
+} from './monthly-reports';

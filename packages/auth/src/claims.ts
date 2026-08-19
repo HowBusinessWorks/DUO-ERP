@@ -40,7 +40,9 @@ function asString(value: unknown): string | null {
 }
 
 function asStringArray(value: unknown): readonly string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
 }
 
 export function sessionFromClaims(claims: unknown): ClaimsResult {

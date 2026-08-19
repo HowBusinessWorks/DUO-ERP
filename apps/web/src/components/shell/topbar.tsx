@@ -1,5 +1,9 @@
 import { countUnreadNotifications, listNotifications } from '@damina/services';
-import { setConsolidation, setPeriod, setSelectedCompanies } from '../../app/(office)/context-actions';
+import {
+  setConsolidation,
+  setPeriod,
+  setSelectedCompanies,
+} from '../../app/(office)/context-actions';
 import { markAllRead, markRead } from '../../app/(office)/notification-actions';
 import type { AppContext } from '../../lib/context';
 import { NAVIGATION } from '../../registry/navigation';

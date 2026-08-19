@@ -97,10 +97,7 @@ export interface AuditFeedEntry extends AuditEntry {
  * eroare. Ecranul verifica dreptul separat, ca sa spuna de ce lista e goala —
  * verificarea #19 din pas cere ambele jumatati.
  */
-export async function listRecentAuditEntries(
-  actor: Actor,
-  limit = 100,
-): Promise<AuditFeedEntry[]> {
+export async function listRecentAuditEntries(actor: Actor, limit = 100): Promise<AuditFeedEntry[]> {
   const rows = await withActor(actor, async (tx) =>
     tx.execute<{
       id: string;

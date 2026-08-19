@@ -1,7 +1,12 @@
 import 'server-only';
 
 import { type Actor, type Session } from '@damina/auth';
-import { getPeriodContext, listCompanies, type CompanyOption, type PeriodContext } from '@damina/services';
+import {
+  getPeriodContext,
+  listCompanies,
+  type CompanyOption,
+  type PeriodContext,
+} from '@damina/services';
 import { cookies } from 'next/headers';
 import { requireActor, requireSession } from './session';
 

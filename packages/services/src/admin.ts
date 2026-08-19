@@ -169,10 +169,7 @@ export async function listPersons(
       .select(selection())
       .from(schema.persons)
       .leftJoin(schema.qualifications, eq(schema.persons.qualificationId, schema.qualifications.id))
-      .leftJoin(
-        schema.subcontractors,
-        eq(schema.persons.subcontractorId, schema.subcontractors.id),
-      )
+      .leftJoin(schema.subcontractors, eq(schema.persons.subcontractorId, schema.subcontractors.id))
       .leftJoin(schema.clients, eq(schema.persons.clientId, schema.clients.id))
       .where(
         and(
@@ -198,10 +195,7 @@ export async function getPerson(actor: Actor, id: string): Promise<PersonRow> {
       .select(selection())
       .from(schema.persons)
       .leftJoin(schema.qualifications, eq(schema.persons.qualificationId, schema.qualifications.id))
-      .leftJoin(
-        schema.subcontractors,
-        eq(schema.persons.subcontractorId, schema.subcontractors.id),
-      )
+      .leftJoin(schema.subcontractors, eq(schema.persons.subcontractorId, schema.subcontractors.id))
       .leftJoin(schema.clients, eq(schema.persons.clientId, schema.clients.id))
       .where(eq(schema.persons.id, id))
       .limit(1);
@@ -290,11 +284,11 @@ export async function setOfficeRoles(
       );
     }
 
-    await tx.delete(schema.personOfficeRoles).where(eq(schema.personOfficeRoles.personId, personId));
+    await tx
+      .delete(schema.personOfficeRoles)
+      .where(eq(schema.personOfficeRoles.personId, personId));
     if (unique.length > 0) {
-      await tx
-        .insert(schema.personOfficeRoles)
-        .values(unique.map((role) => ({ personId, role })));
+      await tx.insert(schema.personOfficeRoles).values(unique.map((role) => ({ personId, role })));
     }
     return { id: personId };
   });

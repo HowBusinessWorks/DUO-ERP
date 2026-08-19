@@ -25,7 +25,9 @@ const CONTROL_HEIGHT = 'h-9';
 
 /** Rosu doar cand campul chiar e gresit — nu la fiecare tasta apasata. */
 const invalidClass = (invalid: boolean): string =>
-  invalid ? 'border-danger-600 hover:border-danger-700' : 'border-border hover:border-border-strong';
+  invalid
+    ? 'border-danger-600 hover:border-danger-700'
+    : 'border-border hover:border-border-strong';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   readonly invalid?: boolean;
@@ -101,7 +103,13 @@ export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement
  * ecran, cu 800 de produse in lista. Cand chiar avem nevoie de cautare in
  * lista, se face un `SearchSelect` dedicat — nu se strica cel simplu.
  */
-export function Select({ options, invalid = false, placeholder, className, ...props }: SelectProps) {
+export function Select({
+  options,
+  invalid = false,
+  placeholder,
+  className,
+  ...props
+}: SelectProps) {
   return (
     <span className="relative block">
       <select

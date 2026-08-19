@@ -14,13 +14,7 @@
 export type WorkUnitType = 'inspectie' | 'interventie' | 'lucrare';
 
 export type WorkUnitStatus =
-  | 'draft'
-  | 'planificata'
-  | 'in_executie'
-  | 'suspendata'
-  | 'finalizata'
-  | 'inchisa'
-  | 'anulata';
+  'draft' | 'planificata' | 'in_executie' | 'suspendata' | 'finalizata' | 'inchisa' | 'anulata';
 
 export interface PromotableWorkUnit {
   readonly type: WorkUnitType;

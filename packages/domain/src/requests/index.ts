@@ -12,8 +12,4 @@ export {
   type RoutingProposal,
   type RouteRequestInput,
 } from './routing';
-export {
-  selectBacklogToFill,
-  type BacklogProposalLike,
-  type BacklogSelection,
-} from './backlog';
+export { selectBacklogToFill, type BacklogProposalLike, type BacklogSelection } from './backlog';

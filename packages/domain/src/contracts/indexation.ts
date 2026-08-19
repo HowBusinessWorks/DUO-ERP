@@ -169,7 +169,10 @@ export function buildContractYears(input: ContractYearsInput): ContractYear[] {
 }
 
 /** In ce an contractual cade o data. `null` daca e in afara contractului. */
-export function contractYearAt(years: readonly ContractYear[], date: BusinessDate): ContractYear | null {
+export function contractYearAt(
+  years: readonly ContractYear[],
+  date: BusinessDate,
+): ContractYear | null {
   return (
     years.find(
       (year) => compareDates(date, year.startsOn) >= 0 && compareDates(date, year.endsOn) <= 0,

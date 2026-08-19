@@ -46,8 +46,7 @@ const mustChange = process.argv.includes('--must-change');
  * Parola temporara. Din `SEED_USER_PASSWORD` daca exista — altfel una generata,
  * afisata o singura data la final, ca pe ecranul PM-ului din §3.5.
  */
-const PASSWORD =
-  process.env.SEED_USER_PASSWORD ?? `Damina-${randomBytes(9).toString('base64url')}`;
+const PASSWORD = process.env.SEED_USER_PASSWORD ?? `Damina-${randomBytes(9).toString('base64url')}`;
 
 interface SeedUser {
   readonly personId: string;

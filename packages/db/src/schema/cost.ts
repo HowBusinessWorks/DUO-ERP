@@ -195,7 +195,10 @@ export const costLines = app.table(
       'cost_lines_charged_component_has_contract',
       sql`${t.chargedComponentId} is null or ${t.chargedContractId} is not null`,
     ),
-    check('cost_lines_not_reallocation_of_self', sql`${t.reallocationOfId} is distinct from ${t.id}`),
+    check(
+      'cost_lines_not_reallocation_of_self',
+      sql`${t.reallocationOfId} is distinct from ${t.id}`,
+    ),
   ],
 );
 

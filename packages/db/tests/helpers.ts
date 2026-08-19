@@ -76,10 +76,7 @@ export function actorFor(
  * explicit rolul), iar fara firme n-ar avea ce testa. Testele care verifica ce
  * NU poate face un birou obisnuit isi construiesc actorul lor.
  */
-export const officeActor = (
-  reason?: string,
-  options: Omit<ActorOptions, 'reason'> = {},
-): Actor =>
+export const officeActor = (reason?: string, options: Omit<ActorOptions, 'reason'> = {}): Actor =>
   actorFor('office', 'app_office', {
     officeRoles: ['admin'],
     ...options,

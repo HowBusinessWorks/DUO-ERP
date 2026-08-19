@@ -41,7 +41,10 @@ export async function registerFilesDerive(boss: PgBoss): Promise<void> {
   await boss.work(filesCleanup.name, async (jobs) => {
     for (const job of jobs) {
       const report = await cleanupFiles(serviceActor(filesCleanup.name));
-      logger.info({ use_case: filesCleanup.name, job_id: job.id, ...report }, 'curatenie terminata');
+      logger.info(
+        { use_case: filesCleanup.name, job_id: job.id, ...report },
+        'curatenie terminata',
+      );
     }
   });
 }
@@ -53,7 +56,10 @@ async function deriveOne(versionId: string, jobId: string): Promise<void> {
   if (source === null) {
     // Versiunea a disparut sau n-a ajuns niciodata `ready`. Nu e o eroare: e
     // exact ce se intampla cand `complete` a picat pe checksum si a curatat.
-    logger.info({ use_case: filesDerive.name, job_id: jobId, version_id: versionId }, 'nimic de prelucrat');
+    logger.info(
+      { use_case: filesDerive.name, job_id: jobId, version_id: versionId },
+      'nimic de prelucrat',
+    );
     return;
   }
 
@@ -103,7 +109,15 @@ async function extractExif(
         : {}),
       // Doar campurile utile, nu tot blocul: EXIF-ul brut al unui telefon are
       // sute de chei si ar umfla `jsonb`-ul fara ca nimeni sa-l citeasca.
-      raw: pick(data, ['Make', 'Model', 'LensModel', 'Orientation', 'ISO', 'FNumber', 'ExposureTime']),
+      raw: pick(data, [
+        'Make',
+        'Model',
+        'LensModel',
+        'Orientation',
+        'ISO',
+        'FNumber',
+        'ExposureTime',
+      ]),
     };
 
     await applyExif(actor, versionId, facts);

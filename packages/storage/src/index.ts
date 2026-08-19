@@ -13,7 +13,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { bucket, r2 } from './client';
 import type { BucketName } from './keys';
 
-export { blobKey, derivedKey, tmpKey } from './keys';
+export { blobKey, derivedKey, reportKey, tmpKey } from './keys';
 export type { BucketName } from './keys';
 export { closeStorage } from './client';
 

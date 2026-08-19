@@ -92,22 +92,20 @@ export function FieldInterventionSheet({ unit, copyOf }: FieldInterventionSheetP
       const source =
         copyOf === undefined
           ? null
-          : ((await db.outbox.get(copyOf))?.payload as
+          : (((await db.outbox.get(copyOf))?.payload as
               | {
                   description?: string | null;
                   declaredHours?: string | null;
                   materials?: { productId: string; quantity: string }[];
                   hours?: { personId: string; hours: string; workDate: string }[];
                 }
-              | undefined) ?? null;
+              | undefined) ?? null);
 
       if (source !== null) {
         // Copia porneste din ce a scris OMUL, nu din ce stie serverul.
         setDescription(source.description ?? '');
         setDeclaredHours(source.declaredHours ?? '');
-        setMaterials(
-          (source.materials ?? []).map((row) => ({ key: uuidv7(), ...row })),
-        );
+        setMaterials((source.materials ?? []).map((row) => ({ key: uuidv7(), ...row })));
         setHours((source.hours ?? []).map((row) => ({ key: uuidv7(), ...row })));
       } else if (found !== undefined) {
         setDescription(found.description ?? '');
@@ -303,9 +301,7 @@ export function FieldInterventionSheet({ unit, copyOf }: FieldInterventionSheetP
                       aria-label="Șterge linia"
                       disabled={readOnly}
                       onClick={() => {
-                        setMaterials((current) =>
-                          current.filter((entry) => entry.key !== row.key),
-                        );
+                        setMaterials((current) => current.filter((entry) => entry.key !== row.key));
                       }}
                     >
                       <Trash2 className="size-4" aria-hidden />
@@ -321,7 +317,9 @@ export function FieldInterventionSheet({ unit, copyOf }: FieldInterventionSheetP
                 className="min-h-12 w-full"
                 disabled={stock.length === 0}
                 disabledReason={
-                  stock.length === 0 ? 'Gestiunea echipei e goală în felia de pe telefon.' : undefined
+                  stock.length === 0
+                    ? 'Gestiunea echipei e goală în felia de pe telefon.'
+                    : undefined
                 }
                 onClick={() => {
                   setMaterials((current) => [

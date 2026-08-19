@@ -28,22 +28,20 @@ const optionalText = (max: number): z.ZodType<string | null> =>
 
 export const CHECKLIST_ANSWERS = ['ok', 'nok', 'na'] as const;
 
-export const CHECKLIST_ANSWER_LABELS: Readonly<
-  Record<(typeof CHECKLIST_ANSWERS)[number], string>
-> = {
-  ok: 'OK',
-  nok: 'NOK',
-  na: 'Nu se aplică',
-};
+export const CHECKLIST_ANSWER_LABELS: Readonly<Record<(typeof CHECKLIST_ANSWERS)[number], string>> =
+  {
+    ok: 'OK',
+    nok: 'NOK',
+    na: 'Nu se aplică',
+  };
 
 export const FINDING_OUTCOMES = ['rezolvat_pe_loc', 'interventie', 'propunere'] as const;
 
-export const FINDING_OUTCOME_LABELS: Readonly<Record<(typeof FINDING_OUTCOMES)[number], string>> =
-  {
-    rezolvat_pe_loc: 'Rezolvat pe loc',
-    interventie: 'Creează intervenție',
-    propunere: 'Propunere pentru mai târziu',
-  };
+export const FINDING_OUTCOME_LABELS: Readonly<Record<(typeof FINDING_OUTCOMES)[number], string>> = {
+  rezolvat_pe_loc: 'Rezolvat pe loc',
+  interventie: 'Creează intervenție',
+  propunere: 'Propunere pentru mai târziu',
+};
 
 // ── Inspectia ────────────────────────────────────────────────────────────────
 

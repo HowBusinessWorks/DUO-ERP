@@ -121,7 +121,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     // altfel ecranul asta ar deveni o unealta de preluat conturi existente.
     const authUser = created.data.user ?? (await findByEmail(supabase, person.email));
     if (authUser === null) {
-      throw new Error(`Contul nu a putut fi creat: ${created.error?.message ?? 'motiv necunoscut'}`);
+      throw new Error(
+        `Contul nu a putut fi creat: ${created.error?.message ?? 'motiv necunoscut'}`,
+      );
     }
 
     await linkAuthUser(actor, person.id, authUser.id);

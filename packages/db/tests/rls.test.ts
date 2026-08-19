@@ -167,17 +167,13 @@ describe('#4 filtrarea de randuri pe firma', () => {
     });
 
     const asStranger = await withActor(fieldActor({ companyIds: [uuidv7()] }), async (tx) => {
-      const result = await tx.execute(
-        sql`select code from app.contracts where id = ${contractId}`,
-      );
+      const result = await tx.execute(sql`select code from app.contracts where id = ${contractId}`);
       return result.rows;
     });
     expect(asStranger).toHaveLength(0);
 
     const asOwner = await withActor(fieldActor({ companyIds: [companyId] }), async (tx) => {
-      const result = await tx.execute(
-        sql`select code from app.contracts where id = ${contractId}`,
-      );
+      const result = await tx.execute(sql`select code from app.contracts where id = ${contractId}`);
       return result.rows;
     });
     expect(asOwner).toHaveLength(1);

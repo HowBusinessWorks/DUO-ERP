@@ -82,8 +82,13 @@ export async function listObjectives(
   actor: Actor,
   options: ListObjectivesOptions = {},
 ): Promise<ObjectiveRow[]> {
-  const { query, kind, includeInactive = false, withCoordinatesOnly = false, limit = DEFAULT_LIMIT } =
-    options;
+  const {
+    query,
+    kind,
+    includeInactive = false,
+    withCoordinatesOnly = false,
+    limit = DEFAULT_LIMIT,
+  } = options;
 
   return withActor(actor, async (tx) => {
     const rows = await tx
@@ -128,7 +133,10 @@ export async function getObjective(actor: Actor, id: string): Promise<ObjectiveR
   return { ...row.objective, activeContractCount: Number(row.activeContractCount) };
 }
 
-export async function createObjective(actor: Actor, input: ObjectiveInput): Promise<{ id: string }> {
+export async function createObjective(
+  actor: Actor,
+  input: ObjectiveInput,
+): Promise<{ id: string }> {
   const values = objectiveInputSchema.parse(input);
   try {
     return await withActor(actor, async (tx) => {
@@ -224,7 +232,8 @@ export async function listContractObjectives(
       objectiveName: row.objectiveName,
       objectiveKind: row.objectiveKind,
       profileName: row.profileName,
-      isCurrent: row.link.validFrom <= today && (row.link.validTo === null || row.link.validTo > today),
+      isCurrent:
+        row.link.validFrom <= today && (row.link.validTo === null || row.link.validTo > today),
     }));
   });
 }
@@ -276,7 +285,10 @@ export async function unlinkObjective(
   reason: string,
 ): Promise<{ id: string }> {
   if (reason.trim() === '') {
-    throw new AppError('VALIDATION_FAILED', 'Scoaterea unui obiectiv din contract cere un motiv scris.');
+    throw new AppError(
+      'VALIDATION_FAILED',
+      'Scoaterea unui obiectiv din contract cere un motiv scris.',
+    );
   }
 
   return withActor({ ...actor, reason }, async (tx) => {
@@ -335,7 +347,10 @@ export async function listChecklists(actor: Actor): Promise<ChecklistRow[]> {
   });
 }
 
-export async function createChecklist(actor: Actor, input: ChecklistInput): Promise<{ id: string }> {
+export async function createChecklist(
+  actor: Actor,
+  input: ChecklistInput,
+): Promise<{ id: string }> {
   const values = checklistInputSchema.parse(input);
   try {
     return await withActor(actor, async (tx) => {
@@ -350,7 +365,10 @@ export async function createChecklist(actor: Actor, input: ChecklistInput): Prom
     });
   } catch (error) {
     if (sqlstate(error) === '23505') {
-      throw new AppError('CONFLICT', `Există deja o fișă cu codul ${values.code} în versiunea asta.`);
+      throw new AppError(
+        'CONFLICT',
+        `Există deja o fișă cu codul ${values.code} în versiunea asta.`,
+      );
     }
     throw error;
   }
@@ -451,7 +469,10 @@ export async function addProfileItem(
     });
   } catch (error) {
     if (sqlstate(error) === '23505') {
-      throw new AppError('CONFLICT', 'Fișa e deja în profil. Schimbă-i frecvența în loc s-o adaugi din nou.');
+      throw new AppError(
+        'CONFLICT',
+        'Fișa e deja în profil. Schimbă-i frecvența în loc s-o adaugi din nou.',
+      );
     }
     throw error;
   }

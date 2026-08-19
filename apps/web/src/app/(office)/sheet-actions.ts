@@ -89,9 +89,7 @@ export async function createInspectionAction(
  * constatarile lor; o actiune „salveaza punctul 7" ar fi lasat fisa si iesirile
  * ei nesincronizate exact in secunda in care cade reteaua pe teren.
  */
-export async function saveInspectionAction(
-  raw: unknown,
-): Promise<
+export async function saveInspectionAction(raw: unknown): Promise<
   ActionResult<{
     readonly createdRequestIds: readonly string[];
     readonly createdProposalIds: readonly string[];

@@ -4,12 +4,12 @@ Confuzia dintre ele e cea mai comună greșeală din ERP-uri. Stau în trei tabe
 separate, cu API-uri deliberat diferite în `@damina/services`, ca să nu poată fi
 apelate din greșeală unul în locul altuia.
 
-| | `app.work_queue_items` | `app.notifications` | `app.alerts` |
-|---|---|---|---|
-| **Ce e** | obiect care așteaptă **acțiunea mea** | eveniment punctual, spus **o dată** | prag depășit, **persistă** |
-| **Unde apare** | badge în sidebar + card în Panou | clopoțel | banner pe entitate + card în Panou |
-| **Cum dispare** | prin **acțiune** | prin citire | când **condiția** dispare |
-| **Cine scrie** | use-case-ul, ca `app_service` | use-case-ul | resolver-ul, ca `app_service` |
+|                 | `app.work_queue_items`                | `app.notifications`                 | `app.alerts`                       |
+| --------------- | ------------------------------------- | ----------------------------------- | ---------------------------------- |
+| **Ce e**        | obiect care așteaptă **acțiunea mea** | eveniment punctual, spus **o dată** | prag depășit, **persistă**         |
+| **Unde apare**  | badge în sidebar + card în Panou      | clopoțel                            | banner pe entitate + card în Panou |
+| **Cum dispare** | prin **acțiune**                      | prin citire                         | când **condiția** dispare          |
+| **Cine scrie**  | use-case-ul, ca `app_service`         | use-case-ul                         | resolver-ul, ca `app_service`      |
 
 ## Câte un exemplu concret
 
@@ -30,8 +30,13 @@ Stă pe contract până când cineva mărește plafonul sau consumul scade.
 
 ```ts
 await raiseAlert('budget.check', {
-  companyId, scopeType: 'contract', scopeId, kind: 'buget_80',
-  severity: 'warning', title: 'Buget la 84%', href: `/contracte/${scopeId}/costuri`,
+  companyId,
+  scopeType: 'contract',
+  scopeId,
+  kind: 'buget_80',
+  severity: 'warning',
+  title: 'Buget la 84%',
+  href: `/contracte/${scopeId}/costuri`,
 });
 ```
 

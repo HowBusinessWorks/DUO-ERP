@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  canPromote,
-  PROMOTION_ADDS,
-  PROMOTION_PRESERVES,
-  type WorkUnitStatus,
-} from './promotion';
+import { canPromote, PROMOTION_ADDS, PROMOTION_PRESERVES, type WorkUnitStatus } from './promotion';
 
 describe('canPromote', () => {
   it('interventie in lucru: se poate promova', () => {

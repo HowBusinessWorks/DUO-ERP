@@ -55,6 +55,13 @@ const PUBLIC_PREFIXES = [
   '/auth/',
   // Deocamdata doar `/api/health`, chemat de monitorizare fara cont.
   '/api/',
+  /*
+   * Raportul lunar deschis de client prin link tokenizat (pasul 10, §3.6).
+   * Tokenul E autorizarea: are 32 de octeti aleatori, expira, si da acces la o
+   * singura versiune de raport si la pozele ei. Un cont ar fi insemnat sa
+   * deschidem porti in ERP pentru cineva care are de citit o singura hartie.
+   */
+  '/raport/',
 ] as const;
 
 /** Unde aterizeaza fiecare persona dupa login. */

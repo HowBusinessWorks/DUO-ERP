@@ -212,7 +212,9 @@ export function FieldSet({
   className?: string;
 }) {
   return (
-    <fieldset className={cn('space-y-4 border-t border-border pt-4 first:border-0 first:pt-0', className)}>
+    <fieldset
+      className={cn('space-y-4 border-t border-border pt-4 first:border-0 first:pt-0', className)}
+    >
       <legend className="sr-only">{legend}</legend>
       <div>
         <p className="text-base font-semibold text-ink">{legend}</p>

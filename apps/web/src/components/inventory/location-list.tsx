@@ -202,7 +202,9 @@ export function LocationList({ companyId, locations, teams, canWrite }: Location
                 setForm({ ...form, code: event.target.value });
               }}
             />
-            <span className="block text-xs text-ink-subtle">Apare pe documente. Unic pe firmă.</span>
+            <span className="block text-xs text-ink-subtle">
+              Apare pe documente. Unic pe firmă.
+            </span>
           </label>
 
           <div className="flex justify-end gap-2 pt-2">

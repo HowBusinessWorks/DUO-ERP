@@ -46,9 +46,7 @@ describe('sessionFromClaims', () => {
   it('nu da roluri de birou unei persone care nu e de birou', () => {
     // Un rand ramas din greseala in `person_office_roles` nu trebuie sa devina
     // drept. Hook-ul nu-l emite; parserul il ignora si daca ajunge aici.
-    const result = sessionFromClaims(
-      officeClaims({ persona: 'field', office_roles: ['admin'] }),
-    );
+    const result = sessionFromClaims(officeClaims({ persona: 'field', office_roles: ['admin'] }));
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;

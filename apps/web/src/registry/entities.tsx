@@ -154,9 +154,7 @@ const produse = defineEntity<ProductRow>({
       badges: [
         { label: row.code, tone: 'brand' },
         { label: row.uom, tone: 'outline' },
-        ...(row.isStockItem
-          ? []
-          : [{ label: 'Nu intră în gestiune', tone: 'neutral' as const }]),
+        ...(row.isStockItem ? [] : [{ label: 'Nu intră în gestiune', tone: 'neutral' as const }]),
         ...(row.isActive ? [] : [{ label: 'Inactiv', tone: 'warning' as const }]),
       ],
       meta: [
@@ -239,7 +237,13 @@ const produse = defineEntity<ProductRow>({
       ]),
     quickActions: (row, ctx) => [
       ...(canEditNomenclature(ctx.session)
-        ? [{ label: 'Modifică produsul', href: `/produse?edit=${row.id}`, tone: 'primary' as const }]
+        ? [
+            {
+              label: 'Modifică produsul',
+              href: `/produse?edit=${row.id}`,
+              tone: 'primary' as const,
+            },
+          ]
         : []),
       {
         label: 'Comandă material',
@@ -375,7 +379,11 @@ const furnizori = defineEntity<SupplierRow>({
         header: 'Stare',
         width: '6rem',
         cell: (row) =>
-          row.isActive ? <Badge tone="success">Activ</Badge> : <Badge tone="neutral">Inactiv</Badge>,
+          row.isActive ? (
+            <Badge tone="success">Activ</Badge>
+          ) : (
+            <Badge tone="neutral">Inactiv</Badge>
+          ),
       },
     ],
   },
@@ -586,7 +594,11 @@ const clienti = defineEntity<ClientRow>({
         header: 'Stare',
         width: '6rem',
         cell: (row) =>
-          row.isActive ? <Badge tone="success">Activ</Badge> : <Badge tone="neutral">Inactiv</Badge>,
+          row.isActive ? (
+            <Badge tone="success">Activ</Badge>
+          ) : (
+            <Badge tone="neutral">Inactiv</Badge>
+          ),
       },
     ],
   },
@@ -648,7 +660,13 @@ const clienti = defineEntity<ClientRow>({
       ]),
     quickActions: (row, ctx) => [
       ...(canEditNomenclature(ctx.session)
-        ? [{ label: 'Modifică clientul', href: `/clienti?edit=${row.id}`, tone: 'primary' as const }]
+        ? [
+            {
+              label: 'Modifică clientul',
+              href: `/clienti?edit=${row.id}`,
+              tone: 'primary' as const,
+            },
+          ]
         : []),
       { label: 'Contract nou', disabledReason: 'Contractele vin în faza 1.' },
     ],
@@ -765,7 +783,11 @@ const subcontractanti = defineEntity<SubcontractorRow>({
         header: 'Stare',
         width: '6rem',
         cell: (row) =>
-          row.isActive ? <Badge tone="success">Activ</Badge> : <Badge tone="neutral">Inactiv</Badge>,
+          row.isActive ? (
+            <Badge tone="success">Activ</Badge>
+          ) : (
+            <Badge tone="neutral">Inactiv</Badge>
+          ),
       },
     ],
   },
@@ -935,7 +957,11 @@ const calificari = defineEntity<QualificationRow>({
         header: 'Stare',
         width: '6rem',
         cell: (row) =>
-          row.isActive ? <Badge tone="success">Activ</Badge> : <Badge tone="neutral">Inactiv</Badge>,
+          row.isActive ? (
+            <Badge tone="success">Activ</Badge>
+          ) : (
+            <Badge tone="neutral">Inactiv</Badge>
+          ),
       },
     ],
   },
@@ -1105,7 +1131,8 @@ const tarife = defineEntity<RateCardRow>({
         width: '14rem',
         cell: (row) => (
           <CellMeta>
-            {formatDate(row.validFrom)} → {row.validTo === null ? 'fără sfârșit' : formatDate(row.validTo)}
+            {formatDate(row.validFrom)} →{' '}
+            {row.validTo === null ? 'fără sfârșit' : formatDate(row.validTo)}
           </CellMeta>
         ),
       },
@@ -1165,7 +1192,10 @@ const tarife = defineEntity<RateCardRow>({
     loadLookups: async (ctx: EntityContext) => {
       const qualifications = await listQualifications(ctx.actor, { limit: 500 });
       return {
-        qualifications: qualifications.map((q) => ({ value: q.id, label: `${q.name} (${q.code})` })),
+        qualifications: qualifications.map((q) => ({
+          value: q.id,
+          label: `${q.name} (${q.code})`,
+        })),
       };
     },
     fields: (lookups) => [
@@ -1237,7 +1267,9 @@ function RateCardTimeline({ rows }: { rows: readonly RateCardRow[] }) {
           <div
             key={row.id}
             className={`rounded-lg border px-4 py-3 ${
-              phase === 'current' ? 'border-success-200 bg-success-50/50' : 'border-border bg-surface'
+              phase === 'current'
+                ? 'border-success-200 bg-success-50/50'
+                : 'border-border bg-surface'
             }`}
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">

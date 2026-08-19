@@ -92,6 +92,31 @@ export default async function ReportsPage() {
           </p>
         </header>
 
+        {/*
+         * Raportul lunar sta DEASUPRA celorlalte si separat de ele, pentru ca
+         * nu e acelasi fel de lucru: celelalte sunt vederi peste cifrele
+         * existente, asta e documentul pe baza caruia clientul plateste. Are
+         * stare, versiuni si un moment de inghet — pasul 10, §3.6.
+         */}
+        <Card className="mb-4">
+          <CardHeader
+            title="Raportul lunar către client"
+            actions={<Badge tone="brand">document, nu vedere</Badge>}
+          />
+          <CardBody>
+            <p className="text-sm text-ink-muted">
+              Fișele validate ale lunii, jurnalele și fotografiile, într-un document versionat și
+              înghețat la emitere. Factura de mentenanță așteaptă aprobarea lui internă.
+            </p>
+            <Link
+              href="/panou/rapoarte/lunar"
+              className="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline"
+            >
+              Deschide rapoartele lunare →
+            </Link>
+          </CardBody>
+        </Card>
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {REPORTS.map((report) => (
             <Card key={report.title}>

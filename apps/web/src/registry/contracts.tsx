@@ -53,10 +53,7 @@ import { cache } from 'react';
 import { AuditTrail } from '../components/detail/audit-trail';
 import { CeilingDialog } from '../components/contract/ceiling-dialog';
 import { MonthNav } from '../components/contract/month-nav';
-import {
-  LinkObjectiveDialog,
-  LinkRowActions,
-} from '../components/contract/objective-link-dialog';
+import { LinkObjectiveDialog, LinkRowActions } from '../components/contract/objective-link-dialog';
 import { DefinitionList, Empty } from '../components/detail/definition-list';
 import { PhasePlaceholder } from '../components/detail/phase-placeholder';
 import { EntityDocuments } from '../components/files/entity-documents';
@@ -137,11 +134,10 @@ function ComponentBandCard({
 }) {
   const { component } = band;
   const href = `/contracte/${contractId}/componente/${component.id}`;
-  const ceilingBlocked =
-    !canEditCeilings
-      ? 'Plafoanele conțin valori comerciale. Rolul tău nu le poate modifica.'
-      : (blockedReason ??
-        (periodId === null ? 'Luna nu e deschisă încă la firma contractului.' : undefined));
+  const ceilingBlocked = !canEditCeilings
+    ? 'Plafoanele conțin valori comerciale. Rolul tău nu le poate modifica.'
+    : (blockedReason ??
+      (periodId === null ? 'Luna nu e deschisă încă la firma contractului.' : undefined));
 
   return (
     <article className="rounded-lg border border-border bg-surface">
@@ -407,7 +403,11 @@ export const contracte = defineEntity<ContractRow>({
         align: 'right',
         width: '10rem',
         cell: (row) =>
-          row.monthlyValue === null ? <Empty /> : <Money value={MoneyValue.fromDb(row.monthlyValue)} />,
+          row.monthlyValue === null ? (
+            <Empty />
+          ) : (
+            <Money value={MoneyValue.fromDb(row.monthlyValue)} />
+          ),
       },
       {
         key: 'year',
@@ -506,8 +506,7 @@ export const contracte = defineEntity<ContractRow>({
           { label: 'PM', value: row.ownerName ?? '—' },
           {
             label: 'Abonamentul lunii',
-            value:
-              overview.monthlyValue === null ? '—' : <Money value={overview.monthlyValue} />,
+            value: overview.monthlyValue === null ? '—' : <Money value={overview.monthlyValue} />,
           },
         ],
         // MAXIM DOUA bare, si sunt cele pe care se ia decizia: cat s-a consumat
@@ -586,11 +585,7 @@ export const contracte = defineEntity<ContractRow>({
                 <Stat
                   label="Abonament lunar"
                   value={
-                    overview.monthlyValue === null ? (
-                      '—'
-                    ) : (
-                      <Money value={overview.monthlyValue} />
-                    )
+                    overview.monthlyValue === null ? '—' : <Money value={overview.monthlyValue} />
                   }
                   context={
                     overview.contractYear === null
@@ -753,10 +748,7 @@ export const contracte = defineEntity<ContractRow>({
                             Luna {monthLabel}
                           </p>
                           <dl className="mt-1.5 space-y-1 text-sm">
-                            <Pair
-                              label="Venit alocat"
-                              value={monthly?.allocatedRevenue ?? null}
-                            />
+                            <Pair label="Venit alocat" value={monthly?.allocatedRevenue ?? null} />
                             <Pair
                               label={component.isFillTarget ? 'Plafon de venit' : 'Plafon de cost'}
                               value={
@@ -801,7 +793,10 @@ export const contracte = defineEntity<ContractRow>({
                             </p>
                             <dl className="mt-1.5 space-y-1 text-sm">
                               <Pair label="Venit alocat" value={annual?.allocatedRevenue ?? null} />
-                              <Pair label="Plafon anual de cost" value={annual?.costCeiling ?? null} />
+                              <Pair
+                                label="Plafon anual de cost"
+                                value={annual?.costCeiling ?? null}
+                              />
                             </dl>
                             {canEdit && currentYear !== undefined ? (
                               <div className="mt-2">
@@ -1076,9 +1071,7 @@ export const contracte = defineEntity<ContractRow>({
                     header: 'Valoare anuală',
                     align: 'right',
                     width: '11rem',
-                    cell: (year) => (
-                      <Money value={MoneyValue.fromDb(year.monthlyValue).mul(12)} />
-                    ),
+                    cell: (year) => <Money value={MoneyValue.fromDb(year.monthlyValue).mul(12)} />,
                   },
                 ]}
               />
@@ -1091,9 +1084,9 @@ export const contracte = defineEntity<ContractRow>({
                   {net
                     ? `Venit − cost direct − regie (${formatPercent(row.overheadPct)}). Regia se aplică peste costul direct.`
                     : 'Venit − cost direct. Fără regie.'}{' '}
-                  Cumulatele pe an contractual se adună din rollup-urile lunilor lui — ecranul
-                  vine cu exporturile, în faza 3. Marja lunii curente e mai sus, iar cea pe contract
-                  în Bani › Marjă și plafoane.
+                  Cumulatele pe an contractual se adună din rollup-urile lunilor lui — ecranul vine
+                  cu exporturile, în faza 3. Marja lunii curente e mai sus, iar cea pe contract în
+                  Bani › Marjă și plafoane.
                 </p>
                 <dl className="mt-3 grid gap-4 sm:grid-cols-4">
                   <Pair label="Venit cumulat" value={null} />
@@ -1102,7 +1095,8 @@ export const contracte = defineEntity<ContractRow>({
                   <Pair label={net ? 'Marjă netă' : 'Marjă brută'} value={null} />
                 </dl>
                 <p className="mt-3 text-xs text-ink-subtle">
-                  Analitica: <strong>folosit</strong>. Marja: <strong>{net ? 'netă' : 'brută'}</strong>.
+                  Analitica: <strong>folosit</strong>. Marja:{' '}
+                  <strong>{net ? 'netă' : 'brută'}</strong>.
                 </p>
               </div>
             </div>
@@ -1194,7 +1188,10 @@ export const contracte = defineEntity<ContractRow>({
                 {
                   label: 'Regie (pentru marja netă)',
                   value: row.overheadPct === null ? <Empty /> : formatPercent(row.overheadPct),
-                  hint: row.overheadPct === null ? 'Fără regie, marja netă nu se calculează.' : undefined,
+                  hint:
+                    row.overheadPct === null
+                      ? 'Fără regie, marja netă nu se calculează.'
+                      : undefined,
                 },
                 {
                   label: 'Șablon de raport lunar',
@@ -1486,9 +1483,7 @@ async function FundedWorkUnits({
     ...(periodId === null ? {} : { periodId }),
   });
 
-  const allocationGroups = await Promise.all(
-    rows.map((row) => listAllocations(ctx.actor, row.id)),
-  );
+  const allocationGroups = await Promise.all(rows.map((row) => listAllocations(ctx.actor, row.id)));
 
   // Doar alocarile active de pe ACEASTA componenta si ACEASTA luna.
   const contributions = rows.map((row, index) => {
@@ -1500,7 +1495,9 @@ async function FundedWorkUnits({
     );
     return {
       row,
-      amount: MoneyValue.sum(own.map((allocation) => MoneyValue.fromDb(allocation.allocatedAmount))),
+      amount: MoneyValue.sum(
+        own.map((allocation) => MoneyValue.fromDb(allocation.allocatedAmount)),
+      ),
     };
   });
 
@@ -1617,7 +1614,11 @@ function CoverageSection({
             header: 'Profil',
             hideBelow: 'md',
             cell: (row) =>
-              row.profileName === null ? <Badge tone="neutral">fără profil</Badge> : <CellMeta>{row.profileName}</CellMeta>,
+              row.profileName === null ? (
+                <Badge tone="neutral">fără profil</Badge>
+              ) : (
+                <CellMeta>{row.profileName}</CellMeta>
+              ),
           },
           {
             key: 'checklist',
@@ -1708,16 +1709,34 @@ function CeilingsOverview({ rows }: { rows: readonly ContractRow[] }) {
         rowHref={(row) => `/contracte/${row.id}/componente`}
         empty={<EmptyState title="Nimic" body="Nimic de arătat." size="sm" />}
         columns={[
-          { key: 'code', header: 'Cod', width: '7rem', cell: (row) => <span className="font-mono text-xs">{row.code}</span> },
-          { key: 'client', header: 'Client', cell: (row) => <CellTitle>{row.clientName}</CellTitle> },
-          { key: 'company', header: 'Firmă', hideBelow: 'md', cell: (row) => <CellMeta>{row.companyName}</CellMeta> },
+          {
+            key: 'code',
+            header: 'Cod',
+            width: '7rem',
+            cell: (row) => <span className="font-mono text-xs">{row.code}</span>,
+          },
+          {
+            key: 'client',
+            header: 'Client',
+            cell: (row) => <CellTitle>{row.clientName}</CellTitle>,
+          },
+          {
+            key: 'company',
+            header: 'Firmă',
+            hideBelow: 'md',
+            cell: (row) => <CellMeta>{row.companyName}</CellMeta>,
+          },
           {
             key: 'monthly',
             header: 'Abonament lunar',
             align: 'right',
             width: '11rem',
             cell: (row) =>
-              row.monthlyValue === null ? <Empty /> : <Money value={MoneyValue.fromDb(row.monthlyValue)} />,
+              row.monthlyValue === null ? (
+                <Empty />
+              ) : (
+                <Money value={MoneyValue.fromDb(row.monthlyValue)} />
+              ),
           },
         ]}
       />
@@ -1769,8 +1788,17 @@ function PortfolioByYear({ rows }: { rows: readonly ContractRow[] }) {
             rowFlagged={(row) => isUnindexed(row)}
             empty={<EmptyState title="Gol" body="Gol." size="sm" />}
             columns={[
-              { key: 'code', header: 'Cod', width: '7rem', cell: (row) => <span className="font-mono text-xs">{row.code}</span> },
-              { key: 'client', header: 'Client', cell: (row) => <CellTitle>{row.clientName}</CellTitle> },
+              {
+                key: 'code',
+                header: 'Cod',
+                width: '7rem',
+                cell: (row) => <span className="font-mono text-xs">{row.code}</span>,
+              },
+              {
+                key: 'client',
+                header: 'Client',
+                cell: (row) => <CellTitle>{row.clientName}</CellTitle>,
+              },
               {
                 key: 'indexation',
                 header: 'Indexare',

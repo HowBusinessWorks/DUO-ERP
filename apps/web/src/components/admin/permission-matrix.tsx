@@ -45,7 +45,11 @@ function groupByGroup(matrix: readonly CapabilitySpec[]): readonly GroupedRows[]
   return order.map((group) => ({ group, specs: byGroup.get(group) ?? [] }));
 }
 
-export function PermissionMatrix({ matrix, officeRoles, highlightRoles = [] }: PermissionMatrixProps) {
+export function PermissionMatrix({
+  matrix,
+  officeRoles,
+  highlightRoles = [],
+}: PermissionMatrixProps) {
   if (matrix.length === 0) {
     return (
       <Card>

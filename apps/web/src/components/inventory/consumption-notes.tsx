@@ -131,9 +131,9 @@ export function ConsumptionNotes({
     <div className="space-y-4 p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-prose text-sm text-ink-muted">
-          Bonul scoate materialul din gestiune la <span className="font-medium text-ink">CMP-ul
-          zilei</span> și scrie costul în registru, într-o singură tranzacție. Cel emis de o
-          intervenție validată apare tot aici.
+          Bonul scoate materialul din gestiune la{' '}
+          <span className="font-medium text-ink">CMP-ul zilei</span> și scrie costul în registru,
+          într-o singură tranzacție. Cel emis de o intervenție validată apare tot aici.
         </p>
         {canWrite ? (
           <Button
@@ -291,10 +291,7 @@ export function ConsumptionNotes({
               {lines.map((line, index) => {
                 const pick = available.find((entry) => entry.productId === line.productId);
                 return (
-                  <div
-                    key={line.key}
-                    className="grid gap-2 sm:grid-cols-[1fr_9rem_auto]"
-                  >
+                  <div key={line.key} className="grid gap-2 sm:grid-cols-[1fr_9rem_auto]">
                     <Select
                       options={available.map((entry) => ({
                         value: entry.productId,
@@ -305,9 +302,7 @@ export function ConsumptionNotes({
                       onChange={(event) => {
                         setLines(
                           lines.map((current, at) =>
-                            at === index
-                              ? { ...current, productId: event.target.value }
-                              : current,
+                            at === index ? { ...current, productId: event.target.value } : current,
                           ),
                         );
                       }}

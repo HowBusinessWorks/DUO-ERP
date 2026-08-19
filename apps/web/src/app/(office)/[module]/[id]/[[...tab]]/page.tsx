@@ -102,10 +102,7 @@ export default async function EntityDetailPage({
         tabs={visibleTabs.map((definition) => ({
           key: definition.slug,
           label: definition.label,
-          href:
-            definition.slug === ''
-              ? `/${module}/${id}`
-              : `/${module}/${id}/${definition.slug}`,
+          href: definition.slug === '' ? `/${module}/${id}` : `/${module}/${id}/${definition.slug}`,
           count: definition.count?.(record),
         }))}
       />
@@ -124,8 +121,7 @@ function Denied({ reason }: { reason?: string }) {
       <EmptyState
         title="Nu ai acces la această secțiune"
         body={
-          reason ??
-          'Rolul tău nu o deschide — cere-i unui administrator dreptul dacă îți trebuie.'
+          reason ?? 'Rolul tău nu o deschide — cere-i unui administrator dreptul dacă îți trebuie.'
         }
       />
     </div>

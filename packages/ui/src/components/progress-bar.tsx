@@ -34,7 +34,8 @@ export function ProgressBar({
   size = 'md',
 }: ProgressBarProps) {
   const clamped = Math.max(0, Math.min(100, value));
-  const resolvedTone: ProgressTone = tone ?? (value > 100 ? 'danger' : value >= 80 ? 'warning' : 'brand');
+  const resolvedTone: ProgressTone =
+    tone ?? (value > 100 ? 'danger' : value >= 80 ? 'warning' : 'brand');
   const rounded = Math.round(value);
 
   return (

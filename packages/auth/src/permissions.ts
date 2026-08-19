@@ -58,6 +58,14 @@ export const CAPABILITIES = [
   'inventory.read',
   /** Creeaza gestiuni si emite bonuri de consum manuale. */
   'inventory.write',
+  /**
+   * Genereaza, aproba, ingheata si trimite raportul lunar catre client.
+   *
+   * Drept separat de `financials.read`, si diferenta e chiar mizele lor: unul
+   * inseamna „vede cifre", celalalt „semneaza hartia in baza careia se
+   * plateste". Al doilea are consecinta in afara firmei.
+   */
+  'reports.emit',
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -253,6 +261,15 @@ export const PERMISSION_MATRIX: readonly CapabilitySpec[] = [
     personas: OFFICE_ONLY,
     officeRoles: ['admin', 'pm', 'magazie', 'achizitii'],
   },
+  {
+    key: 'reports.emit',
+    group: 'Raportare',
+    label: 'Generează, aprobă și trimite raportul lunar către client',
+    // Doar biroul, si nu tot: raportul e documentul pe baza caruia clientul
+    // plateste. Aceeasi greutate ca validarea fiselor sau inchiderea lunii.
+    personas: OFFICE_ONLY,
+    officeRoles: ['admin', 'pm', 'financiar'],
+  },
 ];
 
 const BY_KEY: ReadonlyMap<Capability, CapabilitySpec> = new Map(
@@ -336,6 +353,10 @@ export function canValidateSheets(session: Session): boolean {
 }
 
 /** Poate vedea stocul si gestiunile? Si terenul poate — cantitatile, nu CMP-ul. */
+export function canEmitReports(session: Session): boolean {
+  return can(session, 'reports.emit');
+}
+
 export function canReadInventory(session: Session): boolean {
   return can(session, 'inventory.read');
 }

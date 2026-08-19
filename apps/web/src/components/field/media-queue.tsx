@@ -95,7 +95,11 @@ export function MediaQueue() {
       {failed.length > 0 ? (
         <Banner
           tone="warning"
-          title={failed.length === 1 ? 'O poză n-a putut fi urcată' : `${String(failed.length)} poze n-au putut fi urcate`}
+          title={
+            failed.length === 1
+              ? 'O poză n-a putut fi urcată'
+              : `${String(failed.length)} poze n-au putut fi urcate`
+          }
           body="Nu e semnalul: serverul le-a refuzat. Citește motivul de sub fiecare, rezolvă-l și trimite-le din nou. Restul cozii n-a fost oprită de ele."
         />
       ) : null}
@@ -104,10 +108,7 @@ export function MediaQueue() {
         {rows.map((row) => {
           const sent = live[row.id] ?? row.uploadedParts ?? NOT_STARTED;
           return (
-            <li
-              key={row.id}
-              className="flex gap-3 rounded-lg border border-border bg-surface p-3"
-            >
+            <li key={row.id} className="flex gap-3 rounded-lg border border-border bg-surface p-3">
               <Thumbnail row={row} />
 
               <div className="min-w-0 flex-1">

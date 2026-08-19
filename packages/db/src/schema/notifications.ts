@@ -23,8 +23,7 @@ const id = () =>
     .primaryKey()
     .$defaultFn(() => uuidv7());
 
-const createdAt = () =>
-  timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
+const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
 /**
  * Coada de lucru personala. Un rand = un obiect care asteapta de la mine.
@@ -129,7 +128,9 @@ export const outboxEvents = app.table(
     error: text('error'),
   },
   (t) => [
-    index('outbox_events_unprocessed_idx').on(t.createdAt).where(sql`processed_at is null`),
+    index('outbox_events_unprocessed_idx')
+      .on(t.createdAt)
+      .where(sql`processed_at is null`),
   ],
 );
 

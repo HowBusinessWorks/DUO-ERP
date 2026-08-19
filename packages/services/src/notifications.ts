@@ -132,9 +132,7 @@ export async function countUnreadNotifications(actor: Actor, personId: string): 
     tx
       .select({ count: sql<string>`count(*)::text` })
       .from(schema.notifications)
-      .where(
-        and(eq(schema.notifications.personId, personId), isNull(schema.notifications.readAt)),
-      ),
+      .where(and(eq(schema.notifications.personId, personId), isNull(schema.notifications.readAt))),
   );
   return Number(rows[0]?.count ?? '0');
 }
@@ -153,9 +151,7 @@ export async function markAllNotificationsRead(actor: Actor, personId: string): 
     await tx
       .update(schema.notifications)
       .set({ readAt: new Date() })
-      .where(
-        and(eq(schema.notifications.personId, personId), isNull(schema.notifications.readAt)),
-      );
+      .where(and(eq(schema.notifications.personId, personId), isNull(schema.notifications.readAt)));
   });
 }
 
@@ -180,7 +176,9 @@ export async function listOpenAlerts(
         and(
           inArray(schema.alerts.companyId, [...companyIds]),
           isNull(schema.alerts.resolvedAt),
-          options.scopeType === undefined ? undefined : eq(schema.alerts.scopeType, options.scopeType),
+          options.scopeType === undefined
+            ? undefined
+            : eq(schema.alerts.scopeType, options.scopeType),
           options.scopeId === undefined ? undefined : eq(schema.alerts.scopeId, options.scopeId),
         ),
       )

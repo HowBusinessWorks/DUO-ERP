@@ -75,8 +75,12 @@ async function ground(): Promise<Ground> {
   const today = now.toISOString().slice(0, 10);
 
   await withActor(officeActor('pregatire teren de test'), async (tx) => {
-    await tx.execute(sql`insert into app.companies (id, name) values (${companyId}, ${`Firma ${tag}`})`);
-    await tx.execute(sql`insert into app.clients (id, name) values (${clientId}, ${`Client ${tag}`})`);
+    await tx.execute(
+      sql`insert into app.companies (id, name) values (${companyId}, ${`Firma ${tag}`})`,
+    );
+    await tx.execute(
+      sql`insert into app.clients (id, name) values (${clientId}, ${`Client ${tag}`})`,
+    );
     await tx.execute(sql`
       insert into app.contracts (id, company_id, client_id, code, type, starts_on, ends_on, status)
       values (${contractId}, ${companyId}, ${clientId}, ${`C-${tag}`},
@@ -308,9 +312,7 @@ describe('felia de date a terenului', () => {
     const answer = await seedAnswer(base);
     const snapshot = await pullFieldSnapshot(fieldFor(base.personId, base.companyId));
 
-    const found = snapshot.answers.find(
-      (row) => row.checklistItemId === answer.checklistItemId,
-    );
+    const found = snapshot.answers.find((row) => row.checklistItemId === answer.checklistItemId);
     expect(found?.answer).toBe('nok');
     expect(found?.outcome).toBe('interventie');
     // Iesirea vine fara valoarea estimata: `app_field` n-are grant pe coloana.

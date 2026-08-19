@@ -131,10 +131,18 @@ export const nodes = app.table(
       .on(t.companyId)
       .where(sql`node_role = 'root_company' and deleted_at is null`),
     // Listarea copiilor unui folder — interogarea explorer-ului, de zece ori pe minut.
-    index('nodes_parent_idx').on(t.parentId).where(sql`deleted_at is null`),
-    index('nodes_work_unit_idx').on(t.workUnitId).where(sql`deleted_at is null`),
-    index('nodes_contract_idx').on(t.contractId).where(sql`deleted_at is null`),
-    index('nodes_objective_idx').on(t.objectiveId).where(sql`deleted_at is null`),
+    index('nodes_parent_idx')
+      .on(t.parentId)
+      .where(sql`deleted_at is null`),
+    index('nodes_work_unit_idx')
+      .on(t.workUnitId)
+      .where(sql`deleted_at is null`),
+    index('nodes_contract_idx')
+      .on(t.contractId)
+      .where(sql`deleted_at is null`),
+    index('nodes_objective_idx')
+      .on(t.objectiveId)
+      .where(sql`deleted_at is null`),
     /*
      * Cautarea folderului de sistem: `where work_unit_id = X and node_role = 'pv'`.
      * Partial pe `is_system`, pentru ca folderele utilizatorului au toate rolul
@@ -144,7 +152,9 @@ export const nodes = app.table(
       .on(t.nodeRole, t.workUnitId)
       .where(sql`is_system and deleted_at is null`),
     // Cosul de gunoi si jobul de curatenie: „ce s-a sters, si cand".
-    index('nodes_deleted_idx').on(t.companyId, t.deletedAt).where(sql`deleted_at is not null`),
+    index('nodes_deleted_idx')
+      .on(t.companyId, t.deletedAt)
+      .where(sql`deleted_at is not null`),
 
     check('nodes_name_not_blank', sql`length(btrim(${t.name})) > 0`),
     // Numele de fisier nu are voie sa contina separator de cale: altfel un nod
@@ -152,16 +162,10 @@ export const nodes = app.table(
     check('nodes_name_no_slash', sql`${t.name} !~ '[/\\\\]'`),
     check('nodes_not_own_parent', sql`${t.parentId} is distinct from ${t.id}`),
     // Doar fisierele au versiuni. Un folder cu `current_version_id` e un bug.
-    check(
-      'nodes_version_only_on_files',
-      sql`${t.kind} = 'file' or ${t.currentVersionId} is null`,
-    ),
+    check('nodes_version_only_on_files', sql`${t.kind} = 'file' or ${t.currentVersionId} is null`),
     // Folderele de sistem au intotdeauna un rol; rolul `user` nu e de sistem.
     check('nodes_system_has_role', sql`${t.isSystem} = (${t.nodeRole} <> 'user')`),
-    check(
-      'nodes_deleted_pair',
-      sql`num_nonnulls(${t.deletedAt}, ${t.deletedBy}) <> 1`,
-    ),
+    check('nodes_deleted_pair', sql`num_nonnulls(${t.deletedAt}, ${t.deletedBy}) <> 1`),
   ],
 );
 
@@ -203,20 +207,24 @@ export const fileVersions = app.table(
     // Istoricul de versiuni al unui fisier, cea mai noua prima.
     index('file_versions_node_idx').on(t.nodeId, sql`created_at desc`),
     // Harta pozelor de teren: doar cele geotagate, in ordine de captura.
-    index('file_versions_geo_idx').on(t.capturedAt).where(sql`geo_lat is not null`),
+    index('file_versions_geo_idx')
+      .on(t.capturedAt)
+      .where(sql`geo_lat is not null`),
     // Jobul de curatenie: upload-uri abandonate.
-    index('file_versions_state_idx').on(t.state).where(sql`state = 'uploading'`),
+    index('file_versions_state_idx')
+      .on(t.state)
+      .where(sql`state = 'uploading'`),
 
     check('file_versions_size_non_negative', sql`${t.size} >= 0`),
     check('file_versions_lat_range', sql`${t.geoLat} is null or ${t.geoLat} between -90 and 90`),
     check('file_versions_lng_range', sql`${t.geoLng} is null or ${t.geoLng} between -180 and 180`),
     check('file_versions_geo_pair', sql`num_nonnulls(${t.geoLat}, ${t.geoLng}) <> 1`),
     // Coordonate fara sursa nu se pot cantari: EXIF-ul e dovada, „manual" nu e.
+    check('file_versions_geo_has_source', sql`${t.geoLat} is null or ${t.geoSource} is not null`),
     check(
-      'file_versions_geo_has_source',
-      sql`${t.geoLat} is null or ${t.geoSource} is not null`,
+      'file_versions_checksum_length',
+      sql`${t.checksumSha256} is null or length(${t.checksumSha256}) = 32`,
     ),
-    check('file_versions_checksum_length', sql`${t.checksumSha256} is null or length(${t.checksumSha256}) = 32`),
   ],
 );
 

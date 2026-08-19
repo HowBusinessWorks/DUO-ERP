@@ -279,7 +279,9 @@ export function InterventionSheet({
 
   return (
     <div className="space-y-5">
-      {error === undefined ? null : <Banner tone="danger" title="Nu s-a putut salva" body={error} />}
+      {error === undefined ? null : (
+        <Banner tone="danger" title="Nu s-a putut salva" body={error} />
+      )}
 
       {validated ? (
         <Banner
@@ -409,7 +411,14 @@ function FisaSection({
   readonly saving: boolean;
   readonly dirty: boolean;
   readonly validateBlockedReason: string | undefined;
-  readonly onHeader: (patch: Partial<{ description: string; declaredHours: string; operationId: string; teamId: string }>) => void;
+  readonly onHeader: (
+    patch: Partial<{
+      description: string;
+      declaredHours: string;
+      operationId: string;
+      teamId: string;
+    }>,
+  ) => void;
   readonly onSeries: (value: string) => void;
   readonly onEffectDate: (value: string) => void;
   readonly onSave: () => void;
@@ -462,9 +471,7 @@ function FisaSection({
               onHeader({ teamId: event.target.value });
             }}
           />
-          <span className="block text-xs text-ink-subtle">
-            Materialele ies din gestiunea ei.
-          </span>
+          <span className="block text-xs text-ink-subtle">Materialele ies din gestiunea ei.</span>
         </label>
 
         <label className="space-y-1">
@@ -693,7 +700,9 @@ function MaterialsSection({
                 />
                 <div className="flex items-center gap-3">
                   {withMoney && cost !== null ? (
-                    <span className="text-xs text-ink-muted">{cost} lei/{option?.uom ?? 'u.m.'}</span>
+                    <span className="text-xs text-ink-muted">
+                      {cost} lei/{option?.uom ?? 'u.m.'}
+                    </span>
                   ) : null}
                   {editable ? (
                     <Button
@@ -746,13 +755,14 @@ function HoursSection({
 }) {
   const total = lines.reduce((sum, line) => sum + (Number(decimal(line.hours)) || 0), 0);
   const declared = Number(decimal(declaredHours));
-  const mismatch = declaredHours !== '' && !Number.isNaN(declared) && Math.abs(total - declared) > 0.01;
+  const mismatch =
+    declaredHours !== '' && !Number.isNaN(declared) && Math.abs(total - declared) > 0.01;
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-ink-muted">
-        Fiecare linie e o persoană într-o zi. Tariful se ia din ziua lucrată, nu din cel de azi —
-        de asta data contează chiar și când toate orele sunt din aceeași zi.
+        Fiecare linie e o persoană într-o zi. Tariful se ia din ziua lucrată, nu din cel de azi — de
+        asta data contează chiar și când toate orele sunt din aceeași zi.
       </p>
 
       {mismatch ? (

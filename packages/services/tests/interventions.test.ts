@@ -69,8 +69,12 @@ async function ground(): Promise<Ground> {
   const workDate = `${String(year)}-${String(month).padStart(2, '0')}-15`;
 
   await withActor(officeActor('pregatire teren de test'), async (tx) => {
-    await tx.execute(sql`insert into app.companies (id, name) values (${companyId}, ${`Firma ${tag}`})`);
-    await tx.execute(sql`insert into app.clients (id, name) values (${clientId}, ${`Client ${tag}`})`);
+    await tx.execute(
+      sql`insert into app.companies (id, name) values (${companyId}, ${`Firma ${tag}`})`,
+    );
+    await tx.execute(
+      sql`insert into app.clients (id, name) values (${clientId}, ${`Client ${tag}`})`,
+    );
     await tx.execute(sql`
       insert into app.contracts (id, company_id, client_id, code, type, starts_on, ends_on, status)
       values (${contractId}, ${companyId}, ${clientId}, ${`C-${tag}`},

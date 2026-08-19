@@ -14,7 +14,7 @@ sunt consecințe.
    validată; consumul, după ce există fișa. Două telefoane ale aceluiași om au
    cozi și cursoare independente.
 3. **Coada se oprește la prima eroare de business**, nu sare peste ea. Cele de
-   după pot depinde de cea care a picat. Erorile de *rețea* nu intră aici: ele nu
+   după pot depinde de cea care a picat. Erorile de _rețea_ nu intră aici: ele nu
    ajung să fie înregistrate, deci se reiau de la sine.
 
 ## Ce ține telefonul
@@ -22,11 +22,11 @@ sunt consecințe.
 Trei magazii în IndexedDB (`apps/web/src/lib/field/db.ts`), cu roluri care nu se
 amestecă:
 
-| Magazie | Ce e | Ce se întâmplă dacă se pierde |
-|---|---|---|
-| `snapshot` | felia mea de date, **doar cantități** | se ia din nou la primul pull |
-| `outbox` | mutațiile care așteaptă | **s-a pierdut o zi de teren** |
-| `media` | pozele care așteaptă, cu progresul lor | pozele nu mai ajung niciodată |
+| Magazie    | Ce e                                   | Ce se întâmplă dacă se pierde |
+| ---------- | -------------------------------------- | ----------------------------- |
+| `snapshot` | felia mea de date, **doar cantități**  | se ia din nou la primul pull  |
+| `outbox`   | mutațiile care așteaptă                | **s-a pierdut o zi de teren** |
+| `media`    | pozele care așteaptă, cu progresul lor | pozele nu mai ajung niciodată |
 
 Felia se **rescrie întreagă** la fiecare pull, nu se îmbină: e mică (câteva KB
 comprimat), iar o îmbinare ar fi cerut tombstones pe șase tabele ca să se vadă ce
@@ -49,7 +49,7 @@ minor al framework-ului, iar ce ne trebuie încape în două strategii.
 
 - assets cu hash (`/_next/static/`): **cache-first** — sunt imutabile prin nume;
 - restul: **network-first**, cu cache-ul ca plasă. În subsol rețeaua nu răspunde
-  cu eroare, ci *atârnă* — de aia contează ordinea;
+  cu eroare, ci _atârnă_ — de aia contează ordinea;
 - `/api/**`: **niciodată în cache.** Un răspuns de `/api/field/sync` servit din
   cache ar spune telefonului că a primit felia, fără s-o fi primit.
 
@@ -75,18 +75,18 @@ de două reușite și una reluată.
 
 Distincția care ține toată logica în picioare e **rețea versus server**:
 
-| Ce s-a întâmplat | Ce se face | De ce |
-|---|---|---|
-| `fetch` a picat, sau trei încercări pe aceeași parte | poza rămâne în așteptare, bucla **se oprește** | următoarea ar pica la fel; nu se marchează nimic |
-| serverul a răspuns cu o eroare | poza e marcată **căzută**, bucla **merge mai departe** | e problema pozei ăleia, nu a zilei |
-| a urcat | rândul se **șterge**, cu blob cu tot | o zi de teren înseamnă sute de MB pe telefon |
+| Ce s-a întâmplat                                     | Ce se face                                             | De ce                                            |
+| ---------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------ |
+| `fetch` a picat, sau trei încercări pe aceeași parte | poza rămâne în așteptare, bucla **se oprește**         | următoarea ar pica la fel; nu se marchează nimic |
+| serverul a răspuns cu o eroare                       | poza e marcată **căzută**, bucla **merge mai departe** | e problema pozei ăleia, nu a zilei               |
+| a urcat                                              | rândul se **șterge**, cu blob cu tot                   | o zi de teren înseamnă sute de MB pe telefon     |
 
 O poză căzută **nu oprește coada** — spre deosebire de o mutație blocată, de care
 pot depinde cele de după ea. Ea așteaptă omul pe `/field/poze`, cu miniatura,
 motivul și două butoane: trimite din nou, sau șterge.
 
 **Numele poartă id-ul pozei** (`teren-<uuid>.jpg`). Fără asta, două poze cu
-același nume în același folder ar fi devenit două *versiuni* ale aceluiași
+același nume în același folder ar fi devenit două _versiuni_ ale aceluiași
 fișier, iar a doua ar fi ascuns-o pe prima — exact ce nu-ți dorești când dovada
 e vizuală.
 
@@ -125,7 +125,7 @@ Două locuri. Nu există un al treilea:
 
 > **Rezultatul se convertește explicit.** `Money` și `Quantity` puse direct în
 > `jsonb` ajung acolo ca structurile interne ale bibliotecii de zecimale, deci
-> telefonul care primește răspunsul *memorat* ar vedea `{c:[8],e:0,s:1}` acolo
+> telefonul care primește răspunsul _memorat_ ar vedea `{c:[8],e:0,s:1}` acolo
 > unde cel care a prins execuția vede `"8.0000"`. Două răspunsuri diferite pentru
 > aceeași mutație. Fiecare executant își declară forma de pe sârmă.
 
@@ -191,7 +191,7 @@ Se întâmplă și singur, la 90 de zile: `field.pruneMutations` (duminica, 01:0
 șterge jurnalul mai vechi de atât și cursoarele care n-au mai vorbit de atunci.
 
 **Prețul retenției, spus pe față:** după uitare, o mutație retrimisă se
-*reexecută*. Unde nu doare e la `timesheet.save`, `inspection.save` și
+_reexecută_. Unde nu doare e la `timesheet.save`, `inspection.save` și
 `intervention.save`: toate trei **rescriu** setul lor de linii, deci a doua
 execuție dă exact același rezultat. Unde ar durea e `material.request`, care ar
 naște a doua cerere în coada biroului — supărător, dar vizibil și reversibil, nu

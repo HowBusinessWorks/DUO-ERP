@@ -65,7 +65,9 @@ function translateDbError(error: unknown): never {
   const message = pgMessage(error);
 
   if (state === 'P0001') {
-    const raised = /(?:PERIOD_CLOSED|VALIDATION_FAILED|AUTHORIZATION_EXPIRED):\s*(.+)/.exec(message);
+    const raised = /(?:PERIOD_CLOSED|VALIDATION_FAILED|AUTHORIZATION_EXPIRED):\s*(.+)/.exec(
+      message,
+    );
     if (raised?.[1] !== undefined) {
       const code = message.startsWith('PERIOD_CLOSED') ? 'PERIOD_CLOSED' : 'VALIDATION_FAILED';
       throw new AppError(code, capitalize(raised[1].trim()));
@@ -255,7 +257,10 @@ export async function createContract(
     });
   } catch (error) {
     if (sqlstate(error) === '23505') {
-      throw new AppError('CONFLICT', `Există deja un contract cu codul ${values.code} la firma asta.`);
+      throw new AppError(
+        'CONFLICT',
+        `Există deja un contract cu codul ${values.code} la firma asta.`,
+      );
     }
     return translateDbError(error);
   }
@@ -281,7 +286,10 @@ export async function updateContract(
     });
   } catch (error) {
     if (sqlstate(error) === '23505') {
-      throw new AppError('CONFLICT', `Există deja un contract cu codul ${values.code} la firma asta.`);
+      throw new AppError(
+        'CONFLICT',
+        `Există deja un contract cu codul ${values.code} la firma asta.`,
+      );
     }
     return translateDbError(error);
   }
@@ -348,7 +356,10 @@ export async function listComponentsForContracts(
  * formular care poate fi bifat gresit nu are ce cauta pe un asemenea comutator.
  * Baza impune aceeasi egalitate, ca plasa (verificarile #3 si #4).
  */
-export async function createComponent(actor: Actor, input: ComponentInput): Promise<{ id: string }> {
+export async function createComponent(
+  actor: Actor,
+  input: ComponentInput,
+): Promise<{ id: string }> {
   const values = componentInputSchema.parse(input);
   try {
     return await withActor(actor, async (tx) => {
@@ -544,8 +555,7 @@ export async function getContractOverview(
     listComponents(actor, contractId),
   ]);
 
-  const contractYear =
-    years.find((row) => anchor >= row.startsOn && anchor <= row.endsOn) ?? null;
+  const contractYear = years.find((row) => anchor >= row.startsOn && anchor <= row.endsOn) ?? null;
 
   const ceilings = await withActor(actor, async (tx) =>
     components.length === 0
@@ -584,10 +594,7 @@ export async function getContractOverview(
             consumed: schema.componentPeriodRollup.consumed,
           })
           .from(schema.componentPeriodRollup)
-          .innerJoin(
-            schema.periods,
-            eq(schema.componentPeriodRollup.periodId, schema.periods.id),
-          )
+          .innerJoin(schema.periods, eq(schema.componentPeriodRollup.periodId, schema.periods.id))
           .where(
             and(
               inArray(
@@ -825,10 +832,7 @@ export async function listContractsForObjective(
 }
 
 /** Componentele active fara plafon pe luna curenta. Folosit de ecranul de Componente. */
-export async function countCeilingsWithoutValue(
-  actor: Actor,
-  contractId: string,
-): Promise<number> {
+export async function countCeilingsWithoutValue(actor: Actor, contractId: string): Promise<number> {
   const rows = await withActor(actor, async (tx) =>
     tx
       .select({ id: schema.contractComponents.id })

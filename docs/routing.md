@@ -16,13 +16,13 @@ funcție **pură** — fără bază de date, testată în `routing.test.ts` făr
 routeRequest({ value, ceilings, threshold? }): RoutingProposal
 ```
 
-| Intrare | De unde vine | Ce înseamnă |
-|---|---|---|
-| `value` | `requests.estimated_value` | valoarea estimată a cererii, calculată din catalogul de operațiuni |
-| `ceilings.deltaFreeByPeriod` | `routingContext` din `packages/services/src/requests.ts` | cât e liber pe Deltă, **pe fiecare lună deschisă**, în ordine |
-| `ceilings.lucrariCeilingFree` | idem | cât e liber pe componenta Lucrări, în luna curentă. `null` = operațiunea nu e prevăzută în contract |
-| `ceilings.isCommercialOpportunity` | `isCommercialOpportunity(request.type)` | vezi mai jos |
-| `threshold` | implicit **2.000 lei** | pragul de mentenanță |
+| Intrare                            | De unde vine                                             | Ce înseamnă                                                                                         |
+| ---------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `value`                            | `requests.estimated_value`                               | valoarea estimată a cererii, calculată din catalogul de operațiuni                                  |
+| `ceilings.deltaFreeByPeriod`       | `routingContext` din `packages/services/src/requests.ts` | cât e liber pe Deltă, **pe fiecare lună deschisă**, în ordine                                       |
+| `ceilings.lucrariCeilingFree`      | idem                                                     | cât e liber pe componenta Lucrări, în luna curentă. `null` = operațiunea nu e prevăzută în contract |
+| `ceilings.isCommercialOpportunity` | `isCommercialOpportunity(request.type)`                  | vezi mai jos                                                                                        |
+| `threshold`                        | implicit **2.000 lei**                                   | pragul de mentenanță                                                                                |
 
 ### Ce înseamnă „liber"
 
@@ -79,7 +79,7 @@ diverge exact în luna care contează.
 
 ```ts
 isCommercialOpportunity(requestType) =
-  requestType === 'tichet_client' || requestType === 'propunere_interna'
+  requestType === 'tichet_client' || requestType === 'propunere_interna';
 ```
 
 Un tichet de client sau o propunere internă pot deveni contract individual nou; o
@@ -104,14 +104,14 @@ ar exista două drumuri de creare de contract.
 
 ## Cum se ajustează regula
 
-| Vrei să schimbi | Unde |
-|---|---|
-| pragul de mentenanță | `DEFAULT_THRESHOLD` în `routing.ts`, sau se dă `threshold` la apel (ex. per firmă, din „Praguri și reguli") |
-| ordinea de prioritate | lanțul de `if` de la finalul lui `routeRequest` |
-| ordinea de afișare | `ROUTING_CHOICES`, tot în `routing.ts` |
-| ce e oportunitate | `isCommercialOpportunity` |
-| câte luni de Deltă se iau în calcul | parametrul `months` al lui `routingContext` (implicit 3) |
-| textele „✗ …" | tot în `routing.ts` — sunt singura explicație pe care o vede omul |
+| Vrei să schimbi                     | Unde                                                                                                        |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| pragul de mentenanță                | `DEFAULT_THRESHOLD` în `routing.ts`, sau se dă `threshold` la apel (ex. per firmă, din „Praguri și reguli") |
+| ordinea de prioritate               | lanțul de `if` de la finalul lui `routeRequest`                                                             |
+| ordinea de afișare                  | `ROUTING_CHOICES`, tot în `routing.ts`                                                                      |
+| ce e oportunitate                   | `isCommercialOpportunity`                                                                                   |
+| câte luni de Deltă se iau în calcul | parametrul `months` al lui `routingContext` (implicit 3)                                                    |
+| textele „✗ …"                       | tot în `routing.ts` — sunt singura explicație pe care o vede omul                                           |
 
 După orice modificare: `pnpm --filter @damina/domain test`. Cazurile din §6 al
 planului (verificările #6, #7, #8) sunt acolo, fără bază de date.

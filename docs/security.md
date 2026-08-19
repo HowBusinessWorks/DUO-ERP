@@ -3,9 +3,9 @@
 Trei straturi, în ordinea în care se dărâmă unul pe altul. **Primul e sursa de adevăr**,
 celelalte două sunt plase, nu înlocuitori:
 
-1. **Grant-uri pe tabelă și pe coloană** — ce *coloane* pot fi citite. Un `select` greșit din
+1. **Grant-uri pe tabelă și pe coloană** — ce _coloane_ pot fi citite. Un `select` greșit din
    contextul de teren **cade cu 42501**, nu întoarce null.
-2. **Politici RLS** — ce *rânduri* pot fi citite. Filtrare, nu refuz: o firmă la care nu ai
+2. **Politici RLS** — ce _rânduri_ pot fi citite. Filtrare, nu refuz: o firmă la care nu ai
    acces întoarce zero rânduri, pentru că un refuz ar spune că firma există.
 3. **DTO-uri Zod** în `packages/contracts` — ce iese pe sârmă.
 
@@ -42,12 +42,12 @@ nu le pot exprima.
 
 ## Cine sunt eu, în politici
 
-| Funcție | Sursă |
-|---|---|
-| `app.current_person_id()` · `app.current_persona()` | claim-ul din `request.jwt.claims` |
-| `app.has_office_role(rol)` | **doar** claim-ul — citirea din tabelă ar da recursiune de politică |
-| `app.current_company_ids()` | claim → `person_company_access` → *(dacă e admin fără nicio firmă)* tot grupul |
-| `app.current_subcontractor_id()` · `app.current_client_id()` | claim → `app.persons` |
+| Funcție                                                      | Sursă                                                                          |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `app.current_person_id()` · `app.current_persona()`          | claim-ul din `request.jwt.claims`                                              |
+| `app.has_office_role(rol)`                                   | **doar** claim-ul — citirea din tabelă ar da recursiune de politică            |
+| `app.current_company_ids()`                                  | claim → `person_company_access` → _(dacă e admin fără nicio firmă)_ tot grupul |
+| `app.current_subcontractor_id()` · `app.current_client_id()` | claim → `app.persons`                                                          |
 
 Regula administratorului fără firme nu deschide nimic: un admin poate oricum să scrie în
 `person_company_access`, deci să-și dea singur acces. Fără ea, prima instalare n-ar avea cum
@@ -65,7 +65,7 @@ citesc exact ce a emis baza. Un nume de claim schimbat într-un loc și nu în c
 testul „duce claim-urile mai departe către RLS” din `packages/auth`.
 
 **Hook-ul trebuie activat în proiect**, o singură dată, din Authentication → Hooks →
-*Customize Access Token (JWT) Claims* → `app.custom_access_token_hook`. Fără activare,
+_Customize Access Token (JWT) Claims_ → `app.custom_access_token_hook`. Fără activare,
 autentificarea funcționează dar token-ul n-are `persona`, iar aplicația refuză sesiunea cu
 mesajul „hook-ul nu e activat” — deliberat diferit de „contul nu e configurat”, pentru că se
 rezolvă în alt loc și de altcineva.
@@ -100,8 +100,8 @@ tabel. Nivelul de autentificare e o poartă pe drum, aplicată în două locuri:
   redirect: un `fetch` care primește 307 către HTML îl urmează și încearcă să citească JSON dintr-o
   pagină.
 
-Un `admin` care și-a schimbat telefonul se deblochează din Administrare › fișa lui › *Cont de
-login* → „Resetează verificarea în doi pași”, de către **alt** administrator — pe sine nu se poate.
+Un `admin` care și-a schimbat telefonul se deblochează din Administrare › fișa lui › _Cont de
+login_ → „Resetează verificarea în doi pași”, de către **alt** administrator — pe sine nu se poate.
 Fără ușa asta, un mecanism obligatoriu ar fi o capcană.
 
 ### `MFA_ENFORCED=0` — poarta oprită, pe medii de test
@@ -116,7 +116,7 @@ nimeni.
 schimbă cu un bit.
 
 **De ce nu se blochează pe `NODE_ENV === 'production'`**, care ar fi fost reflexul: pe Vercel
-`NODE_ENV` e `production` pe *toate* deploy-urile, inclusiv preview. Verificarea ar fi fost ori
+`NODE_ENV` e `production` pe _toate_ deploy-urile, inclusiv preview. Verificarea ar fi fost ori
 inutilă, ori ar fi blocat exact mediul pentru care comutatorul există. Garanția e deci **vizibilă**,
 nu ascunsă: cât timp comutatorul e pornit, shell-ul de birou afișează o bandă roșie pe fiecare
 ecran, la fiecare om. Un mediu în care al doilea factor e oprit nu poate fi confundat cu unul în
@@ -154,7 +154,7 @@ login, adică exact suprafața pe care vrea s-o obosească un atacator.
 
 `grant insert (coloane)` pare simetric cu `grant select (coloane)`. **Nu e**, dacă scrii prin
 drizzle: un `insert` generat de drizzle **numește toate coloanele tabelei**, punând `default`
-pe cele nedate. Postgres cere privilegiu pe fiecare coloană *numită*, nu doar pe cele cu
+pe cele nedate. Postgres cere privilegiu pe fiecare coloană _numită_, nu doar pe cele cu
 valoare — deci un `insert` care lasă `unit_cost` pe `default` cade tot cu 42501.
 
 Consecința practică, aflată la 09b-2 pe `app.intervention_materials`:

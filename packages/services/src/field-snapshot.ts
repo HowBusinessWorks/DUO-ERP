@@ -460,8 +460,7 @@ export async function pullFieldSnapshot(actor: Actor): Promise<FieldSnapshot> {
         locationId: unit.teamLocationId ?? '',
         checklistId: unit.checklistId,
         performedOn: unit.inspectionPerformedOn ?? unit.interventionPerformedOn,
-        validated:
-          unit.inspectionValidatedAt !== null || unit.interventionValidatedAt !== null,
+        validated: unit.inspectionValidatedAt !== null || unit.interventionValidatedAt !== null,
       })),
       stages,
       checklists: checklists.map((checklist) => ({

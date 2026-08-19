@@ -7,6 +7,7 @@ export {
   filesCleanup,
   filesDerive,
   inventoryVerifyStock,
+  reportsMonthly,
   requestsExpireBacklog,
   rollupVerify,
   SCHEDULED_JOBS,

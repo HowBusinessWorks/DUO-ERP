@@ -188,8 +188,16 @@ export function routeRequest(input: RouteRequestInput): RoutingProposal {
   const upTo3Months = ceilings.deltaFreeByPeriod.slice(0, 3);
 
   const mentenanta: RoutingOption = value.lte(threshold)
-    ? { choice: 'interventie_mentenanta', available: true, reason: `${fmt(value)} ≤ pragul de ${fmt(threshold)}` }
-    : { choice: 'interventie_mentenanta', available: false, reason: `✗ peste pragul de ${fmt(threshold)}` };
+    ? {
+        choice: 'interventie_mentenanta',
+        available: true,
+        reason: `${fmt(value)} ≤ pragul de ${fmt(threshold)}`,
+      }
+    : {
+        choice: 'interventie_mentenanta',
+        available: false,
+        reason: `✗ peste pragul de ${fmt(threshold)}`,
+      };
 
   const deltaOneMonth = deltaOption(
     'lucrare_delta',
@@ -199,7 +207,11 @@ export function routeRequest(input: RouteRequestInput): RoutingProposal {
 
   const lucrari: RoutingOption =
     ceilings.lucrariCeilingFree === null
-      ? { choice: 'lucrare_componenta_lucrari', available: false, reason: '✗ operațiunea nu e prevăzută în contract' }
+      ? {
+          choice: 'lucrare_componenta_lucrari',
+          available: false,
+          reason: '✗ operațiunea nu e prevăzută în contract',
+        }
       : value.lte(ceilings.lucrariCeilingFree)
         ? {
             choice: 'lucrare_componenta_lucrari',
@@ -213,7 +225,11 @@ export function routeRequest(input: RouteRequestInput): RoutingProposal {
           };
 
   // Multi-luna: minimul de luni (2 sau 3) care umple valoarea, in ordine.
-  let multiLuna: RoutingOption = { choice: 'lucrare_delta_multi_luna', available: false, reason: '✗ nu sunt destule luni de Deltă deschise' };
+  let multiLuna: RoutingOption = {
+    choice: 'lucrare_delta_multi_luna',
+    available: false,
+    reason: '✗ nu sunt destule luni de Deltă deschise',
+  };
   for (let n = 2; n <= upTo3Months.length; n += 1) {
     const candidate = deltaOption('lucrare_delta_multi_luna', upTo3Months.slice(0, n), value);
     if (candidate.available) {
@@ -224,10 +240,22 @@ export function routeRequest(input: RouteRequestInput): RoutingProposal {
   }
 
   const oportunitate: RoutingOption = ceilings.isCommercialOpportunity
-    ? { choice: 'contract_individual_nou', available: true, reason: 'cererea e o oportunitate comercială' }
-    : { choice: 'contract_individual_nou', available: false, reason: '✗ nu e marcată ca oportunitate comercială' };
+    ? {
+        choice: 'contract_individual_nou',
+        available: true,
+        reason: 'cererea e o oportunitate comercială',
+      }
+    : {
+        choice: 'contract_individual_nou',
+        available: false,
+        reason: '✗ nu e marcată ca oportunitate comercială',
+      };
 
-  const backlog: RoutingOption = { choice: 'amanata_backlog', available: true, reason: 'poate aștepta — intră în backlog' };
+  const backlog: RoutingOption = {
+    choice: 'amanata_backlog',
+    available: true,
+    reason: 'poate aștepta — intră în backlog',
+  };
 
   const options: readonly RoutingOption[] = [
     mentenanta,

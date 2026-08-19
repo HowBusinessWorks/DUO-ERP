@@ -73,9 +73,7 @@ export function FundingPanel({
 
   const active = allocations.filter((row) => row.status === 'active');
   const superseded = allocations.filter((row) => row.status !== 'active');
-  const total = MoneyValue.sum(
-    active.map((row) => MoneyValue.fromDb(row.allocatedAmount)),
-  );
+  const total = MoneyValue.sum(active.map((row) => MoneyValue.fromDb(row.allocatedAmount)));
 
   return (
     <div className="space-y-5">

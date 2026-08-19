@@ -1,4 +1,11 @@
-import type { ProductInput, SupplierInput, ClientInput, SubcontractorInput, QualificationInput, RateCardInput } from '@damina/contracts';
+import type {
+  ProductInput,
+  SupplierInput,
+  ClientInput,
+  SubcontractorInput,
+  QualificationInput,
+  RateCardInput,
+} from '@damina/contracts';
 import {
   clientInputSchema,
   productInputSchema,
@@ -81,7 +88,10 @@ export async function listProducts(actor: Actor, options: ListOptions = {}): Pro
           includeInactive ? undefined : eq(schema.products.isActive, true),
           query === undefined || query === ''
             ? undefined
-            : or(ilike(schema.products.code, like(query)), ilike(schema.products.name, like(query))),
+            : or(
+                ilike(schema.products.code, like(query)),
+                ilike(schema.products.name, like(query)),
+              ),
         ),
       )
       .orderBy(asc(schema.products.name))
@@ -168,7 +178,9 @@ export async function listSuppliers(
       .where(
         and(
           includeInactive ? undefined : eq(schema.suppliers.isActive, true),
-          query === undefined || query === '' ? undefined : ilike(schema.suppliers.name, like(query)),
+          query === undefined || query === ''
+            ? undefined
+            : ilike(schema.suppliers.name, like(query)),
         ),
       )
       .orderBy(asc(schema.suppliers.name))
@@ -178,7 +190,11 @@ export async function listSuppliers(
 
 export async function getSupplier(actor: Actor, id: string): Promise<SupplierRow> {
   const row = await withActor(actor, async (tx) => {
-    const [found] = await tx.select().from(schema.suppliers).where(eq(schema.suppliers.id, id)).limit(1);
+    const [found] = await tx
+      .select()
+      .from(schema.suppliers)
+      .where(eq(schema.suppliers.id, id))
+      .limit(1);
     return found;
   });
   if (row === undefined) {
@@ -243,7 +259,11 @@ export async function listClients(actor: Actor, options: ListOptions = {}): Prom
 
 export async function getClient(actor: Actor, id: string): Promise<ClientRow> {
   const row = await withActor(actor, async (tx) => {
-    const [found] = await tx.select().from(schema.clients).where(eq(schema.clients.id, id)).limit(1);
+    const [found] = await tx
+      .select()
+      .from(schema.clients)
+      .where(eq(schema.clients.id, id))
+      .limit(1);
     return found;
   });
   if (row === undefined) {
@@ -255,7 +275,10 @@ export async function getClient(actor: Actor, id: string): Promise<ClientRow> {
 export async function createClient(actor: Actor, input: ClientInput): Promise<{ id: string }> {
   const values = clientInputSchema.parse(input);
   return withActor(actor, async (tx) => {
-    const [row] = await tx.insert(schema.clients).values(values).returning({ id: schema.clients.id });
+    const [row] = await tx
+      .insert(schema.clients)
+      .values(values)
+      .returning({ id: schema.clients.id });
     if (row === undefined) {
       throw new AppError('CONFLICT', 'Clientul nu a putut fi salvat.');
     }
@@ -450,7 +473,10 @@ export async function listRateCards(
         qualificationCode: schema.qualifications.code,
       })
       .from(schema.rateCards)
-      .innerJoin(schema.qualifications, eq(schema.rateCards.qualificationId, schema.qualifications.id))
+      .innerJoin(
+        schema.qualifications,
+        eq(schema.rateCards.qualificationId, schema.qualifications.id),
+      )
       .where(
         options.qualificationId === undefined
           ? undefined

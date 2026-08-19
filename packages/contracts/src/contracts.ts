@@ -105,7 +105,8 @@ export const contractInputSchema = z
   // contractuali, deci n-ar avea nici plafoane, nici marja. Mai bine refuzat
   // aici decat descoperit peste doua luni ca ecranul de Prezentare e gol.
   .refine((v) => v.type !== 'mentenanta_multianual' || v.monthlyValue !== null, {
-    message: 'Contractul de mentenanță are abonament lunar. Fără el nu se pot genera anii contractuali.',
+    message:
+      'Contractul de mentenanță are abonament lunar. Fără el nu se pot genera anii contractuali.',
     path: ['monthlyValue'],
   });
 
@@ -124,7 +125,8 @@ export const componentInputSchema = z
     path: ['budgetCadence'],
   })
   .refine((v) => v.type !== 'delta' || v.budgetCadence === 'lunar', {
-    message: 'Delta se setează lunar, manual. Un plafon anual de Delta nu are sens: ce nu umpli într-o lună se pierde.',
+    message:
+      'Delta se setează lunar, manual. Un plafon anual de Delta nu are sens: ce nu umpli într-o lună se pierde.',
     path: ['budgetCadence'],
   });
 

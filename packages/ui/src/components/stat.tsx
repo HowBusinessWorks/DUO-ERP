@@ -26,7 +26,15 @@ const TONES = {
   success: 'text-success-700',
 } as const;
 
-export function Stat({ label, value, context, href, tone = 'neutral', icon, className }: StatProps) {
+export function Stat({
+  label,
+  value,
+  context,
+  href,
+  tone = 'neutral',
+  icon,
+  className,
+}: StatProps) {
   const content = (
     <>
       <div className="flex items-center gap-1.5">

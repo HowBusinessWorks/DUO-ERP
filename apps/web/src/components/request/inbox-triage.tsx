@@ -78,7 +78,14 @@ export function InboxTriage({ requests, objectives, contracts, canTriage }: Inbo
   const current = requests[index];
   const [form, setForm] = useState<FormState>(() =>
     current === undefined
-      ? { type: 'solicitare', objectiveId: '', contractId: '', title: '', description: '', estimatedValue: '' }
+      ? {
+          type: 'solicitare',
+          objectiveId: '',
+          contractId: '',
+          title: '',
+          description: '',
+          estimatedValue: '',
+        }
       : blankFrom(current),
   );
   const [error, setError] = useState<string | undefined>(undefined);
@@ -300,9 +307,7 @@ export function InboxTriage({ requests, objectives, contracts, canTriage }: Inbo
               variant="primary"
               loading={saving}
               disabled={!canTriage || form.title.trim() === ''}
-              disabledReason={
-                canTriage ? undefined : 'Rolul tău nu poate tria cereri.'
-              }
+              disabledReason={canTriage ? undefined : 'Rolul tău nu poate tria cereri.'}
               onClick={save}
             >
               Salvează și treci mai departe

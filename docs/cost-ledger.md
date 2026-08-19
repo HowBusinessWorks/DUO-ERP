@@ -38,10 +38,10 @@ trigger, în aceeași tranzacție.
 
 ## Ce se întâmplă la mutarea finanțării
 
-| Luna | Mecanica |
-|---|---|
+| Luna         | Mecanica                                                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **deschisă** | `app.recharge_cost_line(linie, contract, componentă, motiv)` rescrie `charged_*`. Rollup-urile ambelor componente se mișcă în aceeași tranzacție. |
-| **închisă** | Liniile rămân datate în luna lor. Se emite **document de re-alocare** în luna curentă, cu două linii noi (`is_reallocation = true`). |
+| **închisă**  | Liniile rămân datate în luna lor. Se emite **document de re-alocare** în luna curentă, cu două linii noi (`is_reallocation = true`).              |
 
 `app.recharge_cost_line` e singura ușă — `update` nu e acordat niciunui rol. Ea nu
 deschide luna închisă: sunt două uși diferite, dinadins.

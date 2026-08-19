@@ -24,14 +24,7 @@ export interface EmptyStateProps {
  * De aceea `title`, `body` si `action` sunt in semnatura si `title`/`body` nu
  * sunt optionale: e imposibil sa livrezi o stare goala nedesenata.
  */
-export function EmptyState({
-  title,
-  body,
-  action,
-  icon,
-  size = 'md',
-  className,
-}: EmptyStateProps) {
+export function EmptyState({ title, body, action, icon, size = 'md', className }: EmptyStateProps) {
   return (
     <div
       className={cn(

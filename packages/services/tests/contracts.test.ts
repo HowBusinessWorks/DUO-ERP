@@ -37,8 +37,12 @@ async function ground(): Promise<Ground> {
   const tag = companyId.slice(-8);
 
   await withActor(officeActor(), async (tx) => {
-    await tx.execute(sql`insert into app.companies (id, name) values (${companyId}, ${`Firma ${tag}`})`);
-    await tx.execute(sql`insert into app.clients (id, name) values (${clientId}, ${`Client ${tag}`})`);
+    await tx.execute(
+      sql`insert into app.companies (id, name) values (${companyId}, ${`Firma ${tag}`})`,
+    );
+    await tx.execute(
+      sql`insert into app.clients (id, name) values (${clientId}, ${`Client ${tag}`})`,
+    );
   });
 
   return { companyId, clientId };
@@ -107,10 +111,7 @@ describe('createContract', () => {
   // Verificarea #2.
   it('cu indexare 0 cei 4 ani au aceeasi valoare', async () => {
     const base = await ground();
-    const { id } = await createContract(
-      officeActor(),
-      contractInput(base, { indexationPct: '0' }),
-    );
+    const { id } = await createContract(officeActor(), contractInput(base, { indexationPct: '0' }));
     const years = await listContractYears(officeActor(), id);
 
     expect(years).toHaveLength(4);

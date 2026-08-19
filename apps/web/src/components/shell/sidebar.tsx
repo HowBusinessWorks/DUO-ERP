@@ -193,7 +193,9 @@ function SidebarItem({
         className={cn(
           'flex h-8 items-center gap-2.5 rounded-md px-2 text-sm font-medium',
           'transition-colors duration-100',
-          active ? 'bg-brand-700 text-white' : 'text-brand-100/85 hover:bg-brand-800 hover:text-white',
+          active
+            ? 'bg-brand-700 text-white'
+            : 'text-brand-100/85 hover:bg-brand-800 hover:text-white',
         )}
       >
         <Icon className="size-4 shrink-0" aria-hidden="true" />
@@ -218,8 +220,7 @@ function SidebarItem({
             const childHref = child.slug === '' ? href : `${href}/${child.slug}`;
             // Pe pagina modulului, sub-sectiunea activa o da `?view=`; pe o
             // ruta proprie (ex. `/panou/grup`), o da calea.
-            const childActive =
-              pathname === href ? view === child.slug : pathname === childHref;
+            const childActive = pathname === href ? view === child.slug : pathname === childHref;
             return (
               <li key={child.slug}>
                 <Link
@@ -230,9 +231,7 @@ function SidebarItem({
                     // Sub-sectiunile se disting prin TEXT, nu prin fundal: un al
                     // doilea dreptunghi colorat sub modulul activ ar concura cu
                     // el si s-ar citi ca doua selectii deodata.
-                    childActive
-                      ? 'font-semibold text-white'
-                      : 'text-brand-200/70 hover:text-white',
+                    childActive ? 'font-semibold text-white' : 'text-brand-200/70 hover:text-white',
                   )}
                 >
                   <ChevronRight

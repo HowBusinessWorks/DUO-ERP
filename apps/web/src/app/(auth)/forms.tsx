@@ -90,7 +90,14 @@ export function ResetForm() {
         <label className={LABEL} htmlFor="reset-email">
           {roRO.auth.email}
         </label>
-        <Input id="reset-email" name="email" type="email" autoComplete="username" required autoFocus />
+        <Input
+          id="reset-email"
+          name="email"
+          type="email"
+          autoComplete="username"
+          required
+          autoFocus
+        />
       </div>
 
       <Button type="submit" loading={pending} className="w-full">

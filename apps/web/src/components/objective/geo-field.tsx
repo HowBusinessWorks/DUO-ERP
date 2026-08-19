@@ -16,17 +16,14 @@ import { useMemo } from 'react';
  * la import, deci nu are ce cauta in randarea de server.
  */
 
-const ObjectiveMap = dynamic(
-  async () => (await import('./objective-map')).ObjectiveMap,
-  {
-    ssr: false,
-    loading: () => (
-      <div className="grid h-56 place-items-center rounded-lg border border-dashed border-border bg-surface-sunken text-sm text-ink-subtle">
-        Se încarcă harta…
-      </div>
-    ),
-  },
-);
+const ObjectiveMap = dynamic(async () => (await import('./objective-map')).ObjectiveMap, {
+  ssr: false,
+  loading: () => (
+    <div className="grid h-56 place-items-center rounded-lg border border-dashed border-border bg-surface-sunken text-sm text-ink-subtle">
+      Se încarcă harta…
+    </div>
+  ),
+});
 
 export function GeoField({
   latName,
@@ -46,9 +43,7 @@ export function GeoField({
   const picked = useMemo(() => {
     const latitude = toNumber(lat);
     const longitude = toNumber(lng);
-    return latitude === null || longitude === null
-      ? null
-      : { lat: latitude, lng: longitude };
+    return latitude === null || longitude === null ? null : { lat: latitude, lng: longitude };
   }, [lat, lng]);
 
   return (
@@ -56,12 +51,22 @@ export function GeoField({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field name={latName} label={`${label} — latitudine`}>
           {(props) => (
-            <Input {...props} {...form.register(latName)} inputMode="decimal" placeholder="44,4268" />
+            <Input
+              {...props}
+              {...form.register(latName)}
+              inputMode="decimal"
+              placeholder="44,4268"
+            />
           )}
         </Field>
         <Field name={lngName} label={`${label} — longitudine`} hint={hint}>
           {(props) => (
-            <Input {...props} {...form.register(lngName)} inputMode="decimal" placeholder="26,1025" />
+            <Input
+              {...props}
+              {...form.register(lngName)}
+              inputMode="decimal"
+              placeholder="26,1025"
+            />
           )}
         </Field>
       </div>

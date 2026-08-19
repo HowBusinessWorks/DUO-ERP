@@ -200,11 +200,7 @@ export {
   operationMaterialInputSchema,
   operationMaterialsInputSchema,
 } from './operations';
-export type {
-  OperationInput,
-  OperationMaterialInput,
-  OperationMaterialsInput,
-} from './operations';
+export type { OperationInput, OperationMaterialInput, OperationMaterialsInput } from './operations';
 
 export {
   CHECKLIST_ANSWER_LABELS,
@@ -273,3 +269,14 @@ export type {
   PullSyncInput,
   PushMutationsInput,
 } from './field';
+
+export {
+  REPORT_TEMPLATES,
+  generateMonthlyReportInputSchema,
+  monthlyReportActionInputSchema,
+} from './reports';
+export type {
+  GenerateMonthlyReportInput,
+  MonthlyReportActionInput,
+  ReportTemplate,
+} from './reports';

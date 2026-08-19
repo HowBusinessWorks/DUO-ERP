@@ -49,9 +49,7 @@ export async function verifyRollupsJob(
     const companyId = await companyOfComponent(actor, first.componentId);
     if (companyId === null) continue;
 
-    const worst = rows.reduce((a, b) =>
-      diff(a).abs().compare(diff(b).abs()) >= 0 ? a : b,
-    );
+    const worst = rows.reduce((a, b) => (diff(a).abs().compare(diff(b).abs()) >= 0 ? a : b));
 
     await raiseAlert(jobName, {
       companyId,

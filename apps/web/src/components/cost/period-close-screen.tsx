@@ -39,12 +39,13 @@ const STATE_LABELS: Readonly<Record<string, string>> = {
   not_applicable: 'nu se aplică',
 };
 
-const STATUS_BADGES: Readonly<Record<string, { label: string; tone: 'success' | 'warning' | 'neutral' }>> =
-  {
-    open: { label: 'deschisă', tone: 'success' },
-    closing: { label: 'în verificare', tone: 'warning' },
-    closed: { label: 'închisă', tone: 'neutral' },
-  };
+const STATUS_BADGES: Readonly<
+  Record<string, { label: string; tone: 'success' | 'warning' | 'neutral' }>
+> = {
+  open: { label: 'deschisă', tone: 'success' },
+  closing: { label: 'în verificare', tone: 'warning' },
+  closed: { label: 'închisă', tone: 'neutral' },
+};
 
 export async function PeriodCloseScreen({ ctx }: { ctx: EntityContext }) {
   const companies = ctx.app.companies.filter((company) =>
@@ -163,7 +164,8 @@ function CompanyClosing({
 
               {check.pendingModule === null ? null : (
                 <p className="mt-0.5 text-sm text-ink-subtle">
-                  Se verifică din {check.pendingModule}. Rândul se aprinde singur când apare modulul.
+                  Se verifică din {check.pendingModule}. Rândul se aprinde singur când apare
+                  modulul.
                 </p>
               )}
 

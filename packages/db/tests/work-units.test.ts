@@ -215,11 +215,7 @@ describe('unitatea de lucru', () => {
       ),
     );
 
-    expect([...codes].sort()).toEqual([
-      `${series}-000001`,
-      `${series}-000002`,
-      `${series}-000003`,
-    ]);
+    expect([...codes].sort()).toEqual([`${series}-000001`, `${series}-000002`, `${series}-000003`]);
   });
 });
 
@@ -529,7 +525,9 @@ describe('alocari de finantare', () => {
         await tx.execute(
           sql`update app.funding_allocations set status = 'superseded' where id = ${id}`,
         );
-        await tx.execute(sql`update app.funding_allocations set status = 'active' where id = ${id}`);
+        await tx.execute(
+          sql`update app.funding_allocations set status = 'active' where id = ${id}`,
+        );
       }),
     );
 

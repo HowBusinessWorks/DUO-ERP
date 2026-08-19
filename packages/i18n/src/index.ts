@@ -26,9 +26,7 @@ export type TranslationKey = LeafPaths<Dictionary>;
 type LeafPaths<T> = T extends string
   ? never
   : {
-      [K in keyof T & (string | number)]: T[K] extends string
-        ? `${K}`
-        : `${K}.${LeafPaths<T[K]>}`;
+      [K in keyof T & (string | number)]: T[K] extends string ? `${K}` : `${K}.${LeafPaths<T[K]>}`;
     }[keyof T & (string | number)];
 
 /** Valorile care se interpoleaza in `{nume}`. */

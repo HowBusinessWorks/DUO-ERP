@@ -44,7 +44,10 @@ const coordinateSchema = (max: number, label: string) =>
     .string()
     .trim()
     .regex(/^-?\d{1,3}([.,]\d{1,7})?$/, `${label} se scrie în grade zecimale.`)
-    .refine((v) => Math.abs(Number(v.replace(',', '.'))) <= max, `${label} e în afara intervalului.`)
+    .refine(
+      (v) => Math.abs(Number(v.replace(',', '.'))) <= max,
+      `${label} e în afara intervalului.`,
+    )
     .or(z.literal(''))
     .transform((v) => (v === '' ? null : v.replace(',', '.')));
 

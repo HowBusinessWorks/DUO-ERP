@@ -29,7 +29,9 @@ async function makeContract(code: string): Promise<{ contractId: string; company
   const tag = companyId.slice(-8);
 
   await withActor(officeActor(), async (tx) => {
-    await tx.execute(sql`insert into app.companies (id, name) values (${companyId}, ${`F ${tag}`})`);
+    await tx.execute(
+      sql`insert into app.companies (id, name) values (${companyId}, ${`F ${tag}`})`,
+    );
     await tx.execute(sql`insert into app.clients (id, name) values (${clientId}, ${`C ${tag}`})`);
   });
 
@@ -80,9 +82,7 @@ describe('obiective', () => {
   });
 
   it('o singura coordonata e refuzata inainte sa atinga baza', async () => {
-    const error = await rejection(
-      createObjective(officeActor(), objectiveInput({ geoLng: '' })),
-    );
+    const error = await rejection(createObjective(officeActor(), objectiveInput({ geoLng: '' })));
     expect(String(error)).toContain('ambele coordonate');
   });
 
@@ -339,7 +339,11 @@ describe('acoperire inspectii', () => {
     });
     await unlinkObjective(officeActor(), linkId, '2026-03-01', 'reziliat');
 
-    expect((await getInspectionCoverage(officeActor(), contractId, 2026, 2)).objectiveCount).toBe(1);
-    expect((await getInspectionCoverage(officeActor(), contractId, 2026, 4)).objectiveCount).toBe(0);
+    expect((await getInspectionCoverage(officeActor(), contractId, 2026, 2)).objectiveCount).toBe(
+      1,
+    );
+    expect((await getInspectionCoverage(officeActor(), contractId, 2026, 4)).objectiveCount).toBe(
+      0,
+    );
   });
 });

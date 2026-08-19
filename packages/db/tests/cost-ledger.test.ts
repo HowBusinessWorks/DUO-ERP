@@ -54,7 +54,8 @@ async function insertLine(tx: ActorTx, options: LineOptions = {}): Promise<strin
   // `??` nu se poate folosi pe campurile nullabile: `null` e o VALOARE ceruta de
   // teste (o linie fara analitica „descarcat" e cazul verificarii #1), iar
   // `null ?? implicit` ar trimite implicitul si testul n-ar verifica nimic.
-  const pick = <T>(value: T | undefined, fallback: T): T => (value === undefined ? fallback : value);
+  const pick = <T>(value: T | undefined, fallback: T): T =>
+    value === undefined ? fallback : value;
 
   await tx.execute(sql`
     insert into app.cost_lines (
@@ -196,9 +197,7 @@ describe('ce refuza registrul la scriere', () => {
 
   it('#2 o linie pe o lucrare fara etapa e respinsa', async () => {
     const error = await rejection(
-      withActor(officeActor(), (tx) =>
-        insertLine(tx, { workUnitId: lucrareId, stageId: null }),
-      ),
+      withActor(officeActor(), (tx) => insertLine(tx, { workUnitId: lucrareId, stageId: null })),
     );
 
     expect(sqlstate(error)).toBe(SQLSTATE.RAISED);
@@ -207,9 +206,7 @@ describe('ce refuza registrul la scriere', () => {
 
   it('#2 si reversul: o etapa pe o interventie e respinsa', async () => {
     const error = await rejection(
-      withActor(officeActor(), (tx) =>
-        insertLine(tx, { workUnitId: interventieId, stageId }),
-      ),
+      withActor(officeActor(), (tx) => insertLine(tx, { workUnitId: interventieId, stageId })),
     );
 
     expect(sqlstate(error)).toBe(SQLSTATE.RAISED);
@@ -278,9 +275,7 @@ describe('#4 luna se deriva din data de efect', () => {
     );
 
     const period = await withActor(officeActor(), async (tx) => {
-      const rows = await tx.execute(
-        sql`select period_id from app.cost_lines where id = ${id}`,
-      );
+      const rows = await tx.execute(sql`select period_id from app.cost_lines where id = ${id}`);
       return (rows.rows[0] as { period_id: string }).period_id;
     });
 
@@ -436,7 +431,12 @@ describe('#8 rollup-ul da exact suma din registru', () => {
         select component_id, column_name, stored, expected
           from app.rollup_verify(${periodAugust})
          where component_id = ${component}`);
-      return rows.rows as { component_id: string; column_name: string; stored: string; expected: string }[];
+      return rows.rows as {
+        component_id: string;
+        column_name: string;
+        stored: string;
+        expected: string;
+      }[];
     });
 
     expect(divergences).toHaveLength(1);
@@ -448,16 +448,19 @@ describe('#8 rollup-ul da exact suma din registru', () => {
 
 describe('#12 luna inchisa', () => {
   it('nu se mai poate scrie in ea', async () => {
-    const periodIulie = await withActor(officeActor('inchidere de luna pentru test'), async (tx) => {
-      const id = uuidv7();
-      await tx.execute(sql`
+    const periodIulie = await withActor(
+      officeActor('inchidere de luna pentru test'),
+      async (tx) => {
+        const id = uuidv7();
+        await tx.execute(sql`
         insert into app.periods (id, company_id, year, month)
         values (${id}, ${companyId}, 2026, 7)`);
-      await tx.execute(sql`
+        await tx.execute(sql`
         update app.periods set status = 'closed', closed_at = now(), closed_by = ${pmId}
          where id = ${id}`);
-      return id;
-    });
+        return id;
+      },
+    );
 
     expect(periodIulie).toBeTruthy();
 

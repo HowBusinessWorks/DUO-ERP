@@ -2,17 +2,7 @@
 
 import { createInspectionInputSchema } from '@damina/contracts';
 import { t } from '@damina/i18n';
-import {
-  Banner,
-  Button,
-  Dialog,
-  Field,
-  FieldRow,
-  Form,
-  Input,
-  Select,
-  useToast,
-} from '@damina/ui';
+import { Banner, Button, Dialog, Field, FieldRow, Form, Input, Select, useToast } from '@damina/ui';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { createInspectionAction } from '../../app/(office)/sheet-actions';

@@ -47,6 +47,7 @@ export {
   canTriageRequests,
   canValidateSheets,
   canWriteInventory,
+  canEmitReports,
   canWriteSheets,
   capabilitiesOf,
   CAPABILITIES,

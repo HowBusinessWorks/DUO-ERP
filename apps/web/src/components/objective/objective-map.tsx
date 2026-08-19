@@ -107,10 +107,7 @@ export function ObjectiveMap({
         if (handler === undefined) {
           return;
         }
-        handler(
-          Number(event.latlng.lat.toFixed(7)),
-          Number(event.latlng.lng.toFixed(7)),
-        );
+        handler(Number(event.latlng.lat.toFixed(7)), Number(event.latlng.lng.toFixed(7)));
       });
 
       mapRef.current = map;
@@ -128,7 +125,6 @@ export function ObjectiveMap({
     // la fiecare re-randare a parintelui, pierzand zoom-ul si pozitia omului.
     // Cand se schimba filtrul listei, se schimba si ruta, deci componenta se
     // monteaza din nou oricum.
-     
   }, []);
 
   // Pinul selectiei traieste separat de cele ale listei: se muta des, si nu are

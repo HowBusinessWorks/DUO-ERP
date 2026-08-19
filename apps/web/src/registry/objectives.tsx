@@ -1,9 +1,5 @@
 import { canEditNomenclature, canWriteSheets } from '@damina/auth';
-import {
-  OBJECTIVE_KIND_LABELS,
-  OBJECTIVE_KINDS,
-  WORK_UNIT_TYPE_LABELS,
-} from '@damina/contracts';
+import { OBJECTIVE_KIND_LABELS, OBJECTIVE_KINDS, WORK_UNIT_TYPE_LABELS } from '@damina/contracts';
 import {
   checklistsForContractObjective,
   getObjective,

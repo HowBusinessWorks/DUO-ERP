@@ -48,7 +48,9 @@ export function MonthNav({
 
       <span
         data-numeric
-        title={locked ? 'Luna e închisă. Se poate citi tot, nu se poate modifica nimic.' : undefined}
+        title={
+          locked ? 'Luna e închisă. Se poate citi tot, nu se poate modifica nimic.' : undefined
+        }
         className={cn(
           'flex min-w-32 items-center justify-center gap-1.5 text-base font-semibold tabular-nums',
           locked ? 'text-warning-700' : 'text-ink',

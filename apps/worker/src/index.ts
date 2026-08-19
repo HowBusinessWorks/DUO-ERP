@@ -4,6 +4,7 @@ import { createBoss, ensureQueues } from './boss';
 import { registerContractAlerts, scheduleContractAlerts } from './handlers/contract-alerts';
 import { registerFilesDerive } from './handlers/files-derive';
 import { registerIntegrityJobs } from './handlers/integrity';
+import { registerMonthlyReports } from './handlers/monthly-report';
 import { registerRequestJobs } from './handlers/requests';
 import { registerSystemPing } from './handlers/system-ping';
 
@@ -37,6 +38,7 @@ async function main(): Promise<void> {
   await registerFilesDerive(boss);
   await registerRequestJobs(boss);
   await registerIntegrityJobs(boss);
+  await registerMonthlyReports(boss);
   await scheduleContractAlerts(boss);
   logger.info({ worker_id: WORKER_ID }, 'cozi inregistrate, worker activ');
 

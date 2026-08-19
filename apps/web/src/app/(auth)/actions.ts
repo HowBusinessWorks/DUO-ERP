@@ -211,10 +211,7 @@ export async function changePassword(
  * token-uri, cu `aal2`, iar clientul de server le scrie in cookie-uri. De acolo
  * incolo middleware-ul nu-l mai opreste.
  */
-export async function verifyMfaCode(
-  _state: AuthFormState,
-  data: FormData,
-): Promise<AuthFormState> {
+export async function verifyMfaCode(_state: AuthFormState, data: FormData): Promise<AuthFormState> {
   const factorId = field(data, 'factorId');
   const code = field(data, 'code').replace(/\s+/g, '');
 

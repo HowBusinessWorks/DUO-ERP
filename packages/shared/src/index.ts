@@ -9,10 +9,4 @@ export type { AppErrorCode } from './errors';
 export { uuidv7, isUuid, timestampFromUuidv7 } from './uuid';
 export { PERSONAS, isPersona } from './persona';
 export type { Persona } from './persona';
-export {
-  MAGIC_BYTES_NEEDED,
-  IMAGE_MIMES,
-  isImageMime,
-  isVideoMime,
-  sniffMime,
-} from './magic';
+export { MAGIC_BYTES_NEEDED, IMAGE_MIMES, isImageMime, isVideoMime, sniffMime } from './magic';

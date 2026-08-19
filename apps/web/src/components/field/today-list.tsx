@@ -53,8 +53,13 @@ function ContextRows({
   readonly blocked: number;
   readonly unstarted: number;
 }) {
-  const rows: { key: string; icon: typeof ListChecks; text: string; href?: string; alert?: boolean }[] =
-    [];
+  const rows: {
+    key: string;
+    icon: typeof ListChecks;
+    text: string;
+    href?: string;
+    alert?: boolean;
+  }[] = [];
 
   if (unstarted > 0) {
     rows.push({
@@ -67,10 +72,7 @@ function ContextRows({
     rows.push({
       key: 'pending',
       icon: ClipboardCheck,
-      text:
-        pending === 1
-          ? 'O fișă așteaptă semnal'
-          : `${String(pending)} fișe așteaptă semnal`,
+      text: pending === 1 ? 'O fișă așteaptă semnal' : `${String(pending)} fișe așteaptă semnal`,
     });
   }
   if (photos > 0) {
@@ -85,7 +87,10 @@ function ContextRows({
     rows.push({
       key: 'blocked',
       icon: AlertTriangle,
-      text: blocked === 1 ? 'O fișă refuzată — cere-ți atenția' : `${String(blocked)} fișe refuzate — cer atenția ta`,
+      text:
+        blocked === 1
+          ? 'O fișă refuzată — cere-ți atenția'
+          : `${String(blocked)} fișe refuzate — cer atenția ta`,
       href: '/field/conflicte',
       alert: true,
     });
@@ -176,30 +181,30 @@ export function TodayList({ only }: TodayListProps = {}) {
   return (
     <div className="space-y-2">
       <ul className="space-y-2">
-      {units.map((unit) => {
-        const Icon = ICONS[unit.type as keyof typeof ICONS] ?? Hammer;
-        return (
-          <li key={unit.id}>
-            <Link
-              href={`/field/${unit.id}`}
-              className="flex min-h-16 items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 active:bg-surface-hover"
-            >
-              <Icon className="size-5 shrink-0 text-ink-muted" aria-hidden />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium text-ink">{unit.name}</span>
-                <span className="block truncate text-xs text-ink-muted">
-                  {unit.objectiveName} · {unit.code}
+        {units.map((unit) => {
+          const Icon = ICONS[unit.type as keyof typeof ICONS] ?? Hammer;
+          return (
+            <li key={unit.id}>
+              <Link
+                href={`/field/${unit.id}`}
+                className="flex min-h-16 items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 active:bg-surface-hover"
+              >
+                <Icon className="size-5 shrink-0 text-ink-muted" aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium text-ink">{unit.name}</span>
+                  <span className="block truncate text-xs text-ink-muted">
+                    {unit.objectiveName} · {unit.code}
+                  </span>
                 </span>
-              </span>
-              {unit.validated ? (
-                <Badge tone="success">gata</Badge>
-              ) : (
-                <Badge tone="outline">{LABELS[unit.type] ?? unit.type}</Badge>
-              )}
-            </Link>
-          </li>
-        );
-      })}
+                {unit.validated ? (
+                  <Badge tone="success">gata</Badge>
+                ) : (
+                  <Badge tone="outline">{LABELS[unit.type] ?? unit.type}</Badge>
+                )}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
 
       <ContextRows pending={data} photos={media} blocked={blocked} unstarted={unstarted} />

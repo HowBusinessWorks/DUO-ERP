@@ -2,7 +2,17 @@
 
 import { ROUTING_CHOICE_LABELS } from '@damina/contracts';
 import { Money as MoneyValue } from '@damina/shared';
-import { Badge, Banner, Button, EmptyState, Input, Money, Select, Textarea, useToast } from '@damina/ui';
+import {
+  Badge,
+  Banner,
+  Button,
+  EmptyState,
+  Input,
+  Money,
+  Select,
+  Textarea,
+  useToast,
+} from '@damina/ui';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { decideRoutingAction } from '../../app/(office)/request-actions';
@@ -136,7 +146,14 @@ export function DecisionScreen(props: DecisionScreenProps) {
    * Feliile pe luni NU se recalculează aici: vin din `option.split`, produs de
    * `splitDeltaAcrossPeriods` în domain. Ecranul le traduce în alocări, atât.
    */
-  function allocationsFor(): { contractId: string; componentId: string; periodId: string; allocatedAmount: string; allocatedPct: string; reason: string }[] {
+  function allocationsFor(): {
+    contractId: string;
+    componentId: string;
+    periodId: string;
+    allocatedAmount: string;
+    allocatedPct: string;
+    reason: string;
+  }[] {
     const contractId = props.contractId ?? '';
     const periodId = firstPeriod?.id ?? '';
     const amount = value.toDbString();
@@ -145,13 +162,31 @@ export function DecisionScreen(props: DecisionScreenProps) {
       const component = componentOfType('mentenanta');
       return component === undefined
         ? []
-        : [{ contractId, componentId: component.id, periodId, allocatedAmount: amount, allocatedPct: '', reason }];
+        : [
+            {
+              contractId,
+              componentId: component.id,
+              periodId,
+              allocatedAmount: amount,
+              allocatedPct: '',
+              reason,
+            },
+          ];
     }
     if (choice === 'lucrare_componenta_lucrari') {
       const component = componentOfType('lucrari');
       return component === undefined
         ? []
-        : [{ contractId, componentId: component.id, periodId, allocatedAmount: amount, allocatedPct: '', reason }];
+        : [
+            {
+              contractId,
+              componentId: component.id,
+              periodId,
+              allocatedAmount: amount,
+              allocatedPct: '',
+              reason,
+            },
+          ];
     }
     if (choice === 'lucrare_delta' || choice === 'lucrare_delta_multi_luna') {
       const component = componentOfType('delta');
@@ -265,7 +300,9 @@ export function DecisionScreen(props: DecisionScreenProps) {
     );
   }
 
-  const deltaTotal = MoneyValue.sum(props.deltaMonths.map((month) => MoneyValue.fromDb(month.free)));
+  const deltaTotal = MoneyValue.sum(
+    props.deltaMonths.map((month) => MoneyValue.fromDb(month.free)),
+  );
 
   return (
     <div className="space-y-4">
@@ -424,7 +461,9 @@ export function DecisionScreen(props: DecisionScreenProps) {
         loading={saving}
         disabled={reason.trim() === '' || missing !== null}
         disabledReason={
-          reason.trim() === '' ? 'Scrie motivul deciziei. Fără el, decizia nu se salvează.' : missing ?? undefined
+          reason.trim() === ''
+            ? 'Scrie motivul deciziei. Fără el, decizia nu se salvează.'
+            : (missing ?? undefined)
         }
         onClick={submit}
       >

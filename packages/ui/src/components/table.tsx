@@ -115,7 +115,10 @@ export function Table<Row>({
                       // rand: Ctrl+click, click dreapta si Tab functioneaza. Un
                       // rand care se deschide doar cu click stang rupe cea mai
                       // folosita unealta a biroului — deschiderea in tab nou.
-                      <a href={href} className="block hover:underline focus-visible:outline-offset-1">
+                      <a
+                        href={href}
+                        className="block hover:underline focus-visible:outline-offset-1"
+                      >
                         {column.cell(row)}
                       </a>
                     ) : (

@@ -141,8 +141,11 @@ describe('deltaFill', () => {
 
   it('anul bisect are 29 de zile in februarie', () => {
     expect(
-      deltaFill({ revenueCeiling: lei('1000.00'), allocatedRevenue: Money.ZERO, asOf: '2028-02-28' })
-        .daysLeft,
+      deltaFill({
+        revenueCeiling: lei('1000.00'),
+        allocatedRevenue: Money.ZERO,
+        asOf: '2028-02-28',
+      }).daysLeft,
     ).toBe(2);
   });
 

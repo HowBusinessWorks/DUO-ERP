@@ -79,13 +79,16 @@ export default async function OfficeLayout({ children }: { children: ReactNode }
               role="status"
               className="border-b border-danger-300 bg-danger-100 px-4 py-1.5 text-center text-sm font-medium text-danger-900"
             >
-              Verificarea în doi pași e <strong>oprită</strong> în acest mediu
-              (<code className="font-mono text-xs">MFA_ENFORCED=0</code>). Rolurile de admin și
+              Verificarea în doi pași e <strong>oprită</strong> în acest mediu (
+              <code className="font-mono text-xs">MFA_ENFORCED=0</code>). Rolurile de admin și
               financiar intră fără al doilea factor — nu folosi mediul ăsta cu date reale.
             </p>
           ) : null}
 
-          <div id="continut" className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div
+            id="continut"
+            className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto"
+          >
             {children}
           </div>
         </div>

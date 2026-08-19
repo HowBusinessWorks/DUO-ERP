@@ -62,8 +62,12 @@ async function ground(): Promise<Ground> {
   const now = new Date();
 
   await withActor(officeActor('pregatire teren de test'), async (tx) => {
-    await tx.execute(sql`insert into app.companies (id, name) values (${companyId}, ${`Firma ${tag}`})`);
-    await tx.execute(sql`insert into app.clients (id, name) values (${clientId}, ${`Client ${tag}`})`);
+    await tx.execute(
+      sql`insert into app.companies (id, name) values (${companyId}, ${`Firma ${tag}`})`,
+    );
+    await tx.execute(
+      sql`insert into app.clients (id, name) values (${clientId}, ${`Client ${tag}`})`,
+    );
     await tx.execute(sql`
       insert into app.contracts (id, company_id, client_id, code, type, starts_on, ends_on, status)
       values (${contractId}, ${companyId}, ${clientId}, ${`C-${tag}`},
@@ -235,7 +239,11 @@ describe('createRequest + decideRouting', () => {
       );
       expect(req.rows[0]?.status).toBe('decisa');
 
-      const decisions = await tx.execute<{ choice: string; system_proposal: string; reason: string }>(
+      const decisions = await tx.execute<{
+        choice: string;
+        system_proposal: string;
+        reason: string;
+      }>(
         sql`select choice, system_proposal, reason from app.request_decisions where request_id = ${requestId}`,
       );
       expect(decisions.rows).toHaveLength(1);
@@ -264,7 +272,9 @@ describe('createRequest + decideRouting', () => {
     expect((error as AppError).code).toBe('PERIOD_CLOSED');
 
     await withActor(officeActor(), async (tx) => {
-      const wu = await tx.execute(sql`select 1 from app.work_units where source_request_id = ${requestId}`);
+      const wu = await tx.execute(
+        sql`select 1 from app.work_units where source_request_id = ${requestId}`,
+      );
       expect(wu.rows).toHaveLength(0);
       const req = await tx.execute<{ status: string }>(
         sql`select status from app.requests where id = ${requestId}`,
@@ -278,7 +288,11 @@ describe('createRequest + decideRouting', () => {
     const base = await ground();
     const { id: requestId } = await createRequest(
       officeActor(),
-      requestInput(base, { type: 'propunere_interna', title: 'Reparatie amanata', estimatedValue: '1800.00' }),
+      requestInput(base, {
+        type: 'propunere_interna',
+        title: 'Reparatie amanata',
+        estimatedValue: '1800.00',
+      }),
     );
 
     const { backlogProposalId } = await decideRouting(officeActor('amanare de test'), {
@@ -495,7 +509,12 @@ describe('evaluateRequest — precondiții și catalog (I3, I6)', () => {
 describe('promoteBacklog — contract, plafon, cursă (B2, B3, B4, I2)', () => {
   it('nu promovează propuneri ale altui contract', async () => {
     const base = await ground();
-    const foreign = await backlogged(base, 'Lucrare a contractului B', '1800.00', base.otherContractId);
+    const foreign = await backlogged(
+      base,
+      'Lucrare a contractului B',
+      '1800.00',
+      base.otherContractId,
+    );
 
     const error = await rejection(
       promoteBacklog(officeActor('promovare gresita'), {

@@ -78,7 +78,10 @@ export async function MarginScreen({ ctx, net }: { ctx: EntityContext; net: bool
     <div className="space-y-5">
       <p className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-ink-muted">
         Analitica: <strong className="text-ink">descărcat</strong> — cine plătește, nu unde s-a
-        lucrat. Baza: <strong className="text-ink">{net ? 'marjă netă, cu regie' : 'marjă brută, fără regie'}</strong>
+        lucrat. Baza:{' '}
+        <strong className="text-ink">
+          {net ? 'marjă netă, cu regie' : 'marjă brută, fără regie'}
+        </strong>
         . Comutatorul e sus, lângă vederile listei.
       </p>
 
@@ -96,7 +99,9 @@ export async function MarginScreen({ ctx, net }: { ctx: EntityContext; net: bool
         <Stat
           label="Regie"
           value={<Money value={total((line) => line.margin.overhead)} />}
-          context={net ? 'Din fotografia lunii, nu din procentul de azi' : 'Nu intră în marja brută'}
+          context={
+            net ? 'Din fotografia lunii, nu din procentul de azi' : 'Nu intră în marja brută'
+          }
         />
         <Stat
           label={net ? 'Marjă netă' : 'Marjă brută'}

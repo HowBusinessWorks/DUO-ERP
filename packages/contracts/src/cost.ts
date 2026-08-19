@@ -121,7 +121,9 @@ export const recordCostInputSchema = z
     qualificationId: optionalUuid,
 
     quantity: quantitySchema.or(z.literal('')).transform((v) => (v === '' ? null : v)),
-    uom: trimmed(16).or(z.literal('')).transform((v) => (v === '' ? null : v)),
+    uom: trimmed(16)
+      .or(z.literal(''))
+      .transform((v) => (v === '' ? null : v)),
     amount: moneySchema,
     stage: z.enum(COST_STAGES),
 
@@ -131,10 +133,13 @@ export const recordCostInputSchema = z
     supplierId: optionalUuid,
     subcontractorId: optionalUuid,
   })
-  .refine((v) => v.stage === 'angajat' || v.chargedContractId !== null || v.usedContractId !== null, {
-    message: 'De la recepție încolo, linia trebuie să spună cine plătește.',
-    path: ['chargedContractId'],
-  })
+  .refine(
+    (v) => v.stage === 'angajat' || v.chargedContractId !== null || v.usedContractId !== null,
+    {
+      message: 'De la recepție încolo, linia trebuie să spună cine plătește.',
+      path: ['chargedContractId'],
+    },
+  )
   // Cantitatea si unitatea de masura merg impreuna: „14" fara „m" nu spune nimic,
   // iar „m" fara cifra nu spune nici atat. Aceeasi regula ca `check`-ul din 0017.
   .refine((v) => (v.quantity === null) === (v.uom === null), {

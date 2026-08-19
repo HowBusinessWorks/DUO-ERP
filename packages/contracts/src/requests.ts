@@ -63,15 +63,14 @@ export const REQUEST_STATUSES = [
   'anulata',
 ] as const;
 
-export const REQUEST_STATUS_LABELS: Readonly<Record<(typeof REQUEST_STATUSES)[number], string>> =
-  {
-    neprocesata: 'Neprocesată',
-    in_evaluare: 'În evaluare',
-    decisa: 'Decisă',
-    in_backlog: 'În backlog',
-    respinsa: 'Respinsă',
-    anulata: 'Anulată',
-  };
+export const REQUEST_STATUS_LABELS: Readonly<Record<(typeof REQUEST_STATUSES)[number], string>> = {
+  neprocesata: 'Neprocesată',
+  in_evaluare: 'În evaluare',
+  decisa: 'Decisă',
+  in_backlog: 'În backlog',
+  respinsa: 'Respinsă',
+  anulata: 'Anulată',
+};
 
 export const ROUTING_CHOICES = [
   'interventie_mentenanta',
@@ -145,11 +144,14 @@ export const decideRoutingInputSchema = z
     creation: routingCreationSchema.optional(),
     backlog: routingBacklogSchema.optional(),
   })
-  .refine((v) => (v.choice === 'amanata_backlog' ? v.backlog !== undefined : v.creation !== undefined), {
-    message:
-      'Amânarea cere datele propunerii de backlog; orice altă alegere cere datele unității de lucru.',
-    path: ['choice'],
-  });
+  .refine(
+    (v) => (v.choice === 'amanata_backlog' ? v.backlog !== undefined : v.creation !== undefined),
+    {
+      message:
+        'Amânarea cere datele propunerii de backlog; orice altă alegere cere datele unității de lucru.',
+      path: ['choice'],
+    },
+  );
 
 /** Promovarea din backlog (§0): mai multe propuneri → UL-uri, o singura tranzactie. */
 export const promoteBacklogInputSchema = z.object({

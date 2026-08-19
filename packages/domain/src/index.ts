@@ -119,3 +119,11 @@ export type {
   RoutingOption,
   RoutingProposal,
 } from './requests';
+
+export {
+  REPORT_STATUSES,
+  canIssueMaintenanceInvoice,
+  reportProgress,
+  reportTransition,
+} from './reports';
+export type { ReportAction, ReportProgress, ReportStatus, ReportTransition } from './reports';

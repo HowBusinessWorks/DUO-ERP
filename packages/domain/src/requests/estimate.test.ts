@@ -6,7 +6,10 @@ describe('estimateFromCatalog', () => {
   // Verificarea #5: valoarea = suma manoperei + materialului, per cantitate.
   it('inmulteste fiecare linie cu cantitatea si aduna', () => {
     const result = estimateFromCatalog([
-      { quantity: 2, operation: { estimatedLabor: Money.of(180), estimatedMaterial: Money.of(232) } },
+      {
+        quantity: 2,
+        operation: { estimatedLabor: Money.of(180), estimatedMaterial: Money.of(232) },
+      },
       { quantity: 1, operation: { estimatedLabor: Money.of(50), estimatedMaterial: Money.of(10) } },
     ]);
     expect(result.labor.equals(Money.of(410))).toBe(true);

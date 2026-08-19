@@ -153,7 +153,9 @@ export const administrare = defineEntity<PersonRow>({
         key: 'persona',
         header: 'Spațiu',
         width: '9rem',
-        cell: (row) => <Badge tone={PERSONA_TONE[row.persona]}>{PERSONA_LABELS[row.persona]}</Badge>,
+        cell: (row) => (
+          <Badge tone={PERSONA_TONE[row.persona]}>{PERSONA_LABELS[row.persona]}</Badge>
+        ),
       },
       {
         key: 'roles',
@@ -177,7 +179,11 @@ export const administrare = defineEntity<PersonRow>({
         header: 'Firme',
         hideBelow: 'lg',
         cell: (row) =>
-          row.companyNames.length === 0 ? <Empty /> : <CellMeta>{row.companyNames.join(', ')}</CellMeta>,
+          row.companyNames.length === 0 ? (
+            <Empty />
+          ) : (
+            <CellMeta>{row.companyNames.join(', ')}</CellMeta>
+          ),
       },
       {
         key: 'account',
@@ -256,8 +262,8 @@ export const administrare = defineEntity<PersonRow>({
             <section>
               <h2 className="mb-1 text-base font-semibold text-ink">Rolurile persoanei</h2>
               <p className="mb-3 max-w-prose text-sm text-ink-muted">
-                Se propagă la următorul refresh de token, nu instantaneu: drepturile stau în JWT, iar
-                el trăiește o oră.
+                Se propagă la următorul refresh de token, nu instantaneu: drepturile stau în JWT,
+                iar el trăiește o oră.
               </p>
               <RoleEditor row={row} />
             </section>
@@ -349,14 +355,12 @@ export const administrare = defineEntity<PersonRow>({
                 },
                 {
                   label: 'Verificare în doi pași',
-                  value: rolesRequireMfa(row.persona, row.officeRoles) ? (
-                    // Ce se poate SPUNE de aici e ce cere rolul. Daca si-a legat
-                    // deja telefonul se afla doar de la GoTrue, cu cheia de
-                    // service — adica dintr-o ruta, nu la randarea fisei.
-                    'Obligatorie — o cere rolul lui'
-                  ) : (
-                    'Nu e obligatorie pentru rolurile lui'
-                  ),
+                  value: rolesRequireMfa(row.persona, row.officeRoles)
+                    ? // Ce se poate SPUNE de aici e ce cere rolul. Daca si-a legat
+                      // deja telefonul se afla doar de la GoTrue, cu cheia de
+                      // service — adica dintr-o ruta, nu la randarea fisei.
+                      'Obligatorie — o cere rolul lui'
+                    : 'Nu e obligatorie pentru rolurile lui',
                 },
               ]}
             />

@@ -75,7 +75,8 @@ async function devSession(): Promise<Session | null> {
  * primul se rezolva in Administrare si al doilea in setarile Supabase.
  */
 export async function getSessionOrReason(): Promise<
-  { readonly session: Session } | { readonly session: null; readonly reason: ClaimsRejection | null }
+  | { readonly session: Session }
+  | { readonly session: null; readonly reason: ClaimsRejection | null }
 > {
   if (supabaseConfig() !== null) {
     const supabase = await supabaseServer();

@@ -146,7 +146,9 @@ export function CompanyPicker({
                       aria-hidden="true"
                       className={cn(
                         'flex size-4 shrink-0 items-center justify-center rounded border',
-                        checked ? 'border-brand-600 bg-brand-600 text-white' : 'border-border-strong',
+                        checked
+                          ? 'border-brand-600 bg-brand-600 text-white'
+                          : 'border-border-strong',
                       )}
                     >
                       {checked ? <Check className="size-3" /> : null}

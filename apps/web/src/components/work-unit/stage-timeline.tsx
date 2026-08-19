@@ -139,8 +139,10 @@ export function StageTimeline({ stages }: { readonly stages: readonly TimelineSt
         </thead>
         <tbody>
           {stages.map((stage) => {
-            const planned = frame === null ? null : spanOf(stage.plannedStart, stage.plannedEnd, frame);
-            const actual = frame === null ? null : spanOf(stage.actualStart, stage.actualEnd, frame);
+            const planned =
+              frame === null ? null : spanOf(stage.plannedStart, stage.plannedEnd, frame);
+            const actual =
+              frame === null ? null : spanOf(stage.actualStart, stage.actualEnd, frame);
             const done = stage.actualEnd !== null;
 
             return (
@@ -150,7 +152,9 @@ export function StageTimeline({ stages }: { readonly stages: readonly TimelineSt
                 </td>
                 <td className="max-w-[16rem] py-2.5 pr-3">
                   {stage.groupLabel === undefined ? null : (
-                    <span className="block truncate text-xs text-ink-muted">{stage.groupLabel}</span>
+                    <span className="block truncate text-xs text-ink-muted">
+                      {stage.groupLabel}
+                    </span>
                   )}
                   {stage.href === undefined ? (
                     <span className="block truncate font-medium text-ink" title={stage.name}>

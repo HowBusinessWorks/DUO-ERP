@@ -61,8 +61,9 @@ export function EvaluationEditor({
 
   const priced = lines
     .map((line) => ({ line, operation: byId.get(line.operationId) }))
-    .filter((entry): entry is { line: EvaluationLine; operation: CatalogOption } =>
-      entry.operation !== undefined,
+    .filter(
+      (entry): entry is { line: EvaluationLine; operation: CatalogOption } =>
+        entry.operation !== undefined,
     );
 
   const quantities = priced.map((entry) => Number(entry.line.quantity.replace(',', '.')) || 0);
@@ -171,9 +172,7 @@ export function EvaluationEditor({
 
                 <span className="pb-2">
                   <Money value={unit.mul(quantity)} />
-                  <span className="ml-2 text-xs text-ink-subtle">
-                    {unit.format()} / unitate
-                  </span>
+                  <span className="ml-2 text-xs text-ink-subtle">{unit.format()} / unitate</span>
                 </span>
 
                 {canEdit ? (
@@ -196,8 +195,7 @@ export function EvaluationEditor({
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface-sunken px-4 py-3">
         <span className="text-sm text-ink-muted">
-          Manoperă <Money value={estimate.labor} /> + material{' '}
-          <Money value={estimate.material} />
+          Manoperă <Money value={estimate.labor} /> + material <Money value={estimate.material} />
         </span>
         <span className="flex items-baseline gap-2">
           <span className="text-sm text-ink-muted">Valoare estimată</span>

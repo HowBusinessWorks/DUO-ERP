@@ -362,11 +362,7 @@ export function MoveFundingDialog({
           <FieldRow columns={2}>
             <Field name="toContractId" label="Contract" required>
               {(props) => (
-                <Select
-                  {...props}
-                  {...form.register('toContractId')}
-                  options={contractOptions}
-                />
+                <Select {...props} {...form.register('toContractId')} options={contractOptions} />
               )}
             </Field>
 
@@ -456,11 +452,7 @@ export function StageDialog({
         <div className="space-y-4">
           <Field name="name" label="Denumirea etapei" required>
             {(props) => (
-              <Input
-                {...props}
-                {...form.register('name')}
-                placeholder="ex. Montaj pompe noi"
-              />
+              <Input {...props} {...form.register('name')} placeholder="ex. Montaj pompe noi" />
             )}
           </Field>
 
@@ -506,12 +498,7 @@ export function StageDialog({
             hint="Ponderile scrise fac bara de progres să spună adevărul. Fără ele, progresul se numără pe etape."
           >
             {(props) => (
-              <Input
-                {...props}
-                {...form.register('pctOfWork')}
-                inputMode="decimal"
-                suffix="%"
-              />
+              <Input {...props} {...form.register('pctOfWork')} inputMode="decimal" suffix="%" />
             )}
           </Field>
         </div>

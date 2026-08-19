@@ -37,8 +37,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (typeof body.workUnitId !== 'string' || body.workUnitId === '') {
       return NextResponse.json({ error: 'Lipsește unitatea de lucru.' }, { status: 400 });
     }
-    const phase =
-      body.phase === 'inainte' || body.phase === 'dupa' ? body.phase : undefined;
+    const phase = body.phase === 'inainte' || body.phase === 'dupa' ? body.phase : undefined;
 
     const parentId = await photoFolderFor(actor, body.workUnitId, phase);
     if (parentId === null) {

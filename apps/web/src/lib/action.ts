@@ -44,7 +44,8 @@ export function createAction<Schema extends z.ZodType, Result>(config: {
     raw: unknown,
   ) => Promise<Result>;
   /** Ce se invalideaza dupa succes. Fiecare use-case isi declara tagurile. */
-  readonly tags?: readonly string[] | ((result: Result, input: z.output<Schema>) => readonly string[]);
+  readonly tags?:
+    readonly string[] | ((result: Result, input: z.output<Schema>) => readonly string[]);
   /** Motivul scris, pentru operatiile ireversibile (§30.5). Ajunge in audit. */
   readonly reason?: string;
 }): (raw: unknown) => Promise<ActionResult<Result>> {

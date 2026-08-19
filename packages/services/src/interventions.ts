@@ -200,10 +200,7 @@ interface OpenIntervention {
  * concurente ar emite doua bonuri de consum pentru aceleasi materiale — adica
  * acelasi stoc consumat de doua ori.
  */
-async function lockOpenIntervention(
-  tx: ActorTx,
-  workUnitId: string,
-): Promise<OpenIntervention> {
+async function lockOpenIntervention(tx: ActorTx, workUnitId: string): Promise<OpenIntervention> {
   /*
    * Lock-ul si join-ul stau in DOUA interogari, nu intr-una: Postgres refuza
    * `for update` pe o interogare cu join calificat pe schema („FOR UPDATE must
@@ -503,7 +500,13 @@ async function loadRateCards(
   tx: ActorTx,
   qualificationIds: readonly string[],
 ): Promise<
-  { id: string; qualificationId: string; validFrom: string; validTo: string | null; hourlyCost: Money }[]
+  {
+    id: string;
+    qualificationId: string;
+    validFrom: string;
+    validTo: string | null;
+    hourlyCost: Money;
+  }[]
 > {
   if (qualificationIds.length === 0) {
     return [];

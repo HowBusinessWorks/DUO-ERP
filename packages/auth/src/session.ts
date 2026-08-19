@@ -115,7 +115,9 @@ export function parseDevSession(raw: string | undefined): Session | null {
     return null;
   }
 
-  const officeRoles = (Array.isArray(seed.officeRoles) ? seed.officeRoles : []).filter(isOfficeRole);
+  const officeRoles = (Array.isArray(seed.officeRoles) ? seed.officeRoles : []).filter(
+    isOfficeRole,
+  );
 
   return {
     personId: seed.personId,

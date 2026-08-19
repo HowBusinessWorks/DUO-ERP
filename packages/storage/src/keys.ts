@@ -21,7 +21,9 @@ export type BucketName = 'docs' | 'derived' | 'tmp' | 'archive';
  * capata bucket-urile lui, `R2_KEY_PREFIX` ramane gol si cheile sunt curate.
  */
 function keyPrefix(): string {
-  const raw = optionalEnv('R2_KEY_PREFIX').trim().replace(/^\/+|\/+$/g, '');
+  const raw = optionalEnv('R2_KEY_PREFIX')
+    .trim()
+    .replace(/^\/+|\/+$/g, '');
   if (raw === '') {
     return '';
   }
@@ -50,4 +52,18 @@ export function tmpKey(prefix: string): string {
     throw new Error(`Prefix temporar invalid: "${prefix}".`);
   }
   return `${keyPrefix()}tmp/${prefix}/${uuidv7()}`;
+}
+
+/**
+ * Cheia artefactului unui raport lunar, in bucket-ul `archive`.
+ *
+ * Cale semantica, spre deosebire de `blobKey`: arhiva se citeste si din afara
+ * aplicatiei, cand cineva cauta „ce s-a trimis clientului in august 2026" cu
+ * baza de date indisponibila. Acolo un uuid n-ar ajuta pe nimeni.
+ */
+export function reportKey(reportId: string, version: number): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(reportId)) {
+    throw new Error(`Id de raport invalid: "${reportId}".`);
+  }
+  return `${keyPrefix()}reports/${reportId}/v${String(version)}.html`;
 }

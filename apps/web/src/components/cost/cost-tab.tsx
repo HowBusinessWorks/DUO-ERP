@@ -4,7 +4,12 @@ import {
   EXPENSE_TYPE_LABELS,
   type CostQuery,
 } from '@damina/contracts';
-import { costBreakdown, listCostLines, type CostBreakdownRow, type CostLineRow } from '@damina/services';
+import {
+  costBreakdown,
+  listCostLines,
+  type CostBreakdownRow,
+  type CostLineRow,
+} from '@damina/services';
 import { Money as MoneyValue } from '@damina/shared';
 import { Badge, CellMeta, CellTitle, EmptyState, Money, Stat, Table } from '@damina/ui';
 import type { EntityContext } from '../../registry/types';
@@ -58,12 +63,7 @@ export async function CostTab({
   ]);
 
   if (lines.rows.length === 0) {
-    return (
-      <EmptyState
-        title="Niciun cost înregistrat"
-        body={emptyBody}
-      />
-    );
+    return <EmptyState title="Niciun cost înregistrat" body={emptyBody} />;
   }
 
   const total = (pick: (row: CostBreakdownRow) => MoneyValue): MoneyValue =>

@@ -25,6 +25,56 @@ export const TEST_PERSON_ID = '01950000-0000-7000-8000-000000000001';
 
 let container: StartedPostgreSqlContainer | undefined;
 
+/**
+ * Coada `reports.monthly`, pregatita pentru testele raportului lunar.
+ *
+ * `enqueue` insereaza direct in tabelele pg-boss, iar pg-boss si le creeaza
+ * singur la primul start al worker-ului — deci intr-o baza proaspata de test ele
+ * NU exista, si orice use-case care pune un job in coada ar cadea aici, nu in
+ * productie. Le facem minimal, cu exact coloanele folosite de `enqueue`. Pe o
+ * baza unde pg-boss chiar ruleaza, totul e `if not exists` / `on conflict do
+ * nothing`.
+ *
+ * Indexul unic pe `(name, singleton_key)` nu e decor: pe el se sprijina
+ * verificarea #26 a pasului 10 — al doilea job pentru aceeasi versiune de raport
+ * e respins de baza, nu de un `if` din serviciu.
+ */
+async function ensureJobQueues(pool: pg.Pool): Promise<void> {
+  await pool.query('create schema if not exists jobs');
+  await pool.query(`
+    create table if not exists jobs.queue (
+      name text primary key,
+      policy text,
+      retry_limit integer,
+      retry_delay integer,
+      retry_backoff boolean,
+      expire_seconds integer,
+      retention_minutes integer,
+      dead_letter text)`);
+  await pool.query(`
+    create table if not exists jobs.job (
+      id uuid primary key,
+      name text not null,
+      data jsonb,
+      priority integer,
+      start_after timestamptz,
+      singleton_key text,
+      singleton_on timestamptz,
+      dead_letter text,
+      expire_in interval,
+      keep_until timestamptz,
+      retry_limit integer,
+      retry_delay integer,
+      retry_backoff boolean,
+      policy text,
+      unique (name, singleton_key))`);
+  await pool.query(
+    `insert into jobs.queue (name, policy) values ('reports.monthly', 'standard')
+     on conflict do nothing`,
+  );
+  await pool.query('select jobs.grant_queue_access()');
+}
+
 export async function setup(project: TestProject): Promise<void> {
   /*
    * Aceeasi portita ca in `@damina/db`: cu `TEST_DATABASE_URL` setat, suita
@@ -49,6 +99,7 @@ export async function setup(project: TestProject): Promise<void> {
          on conflict do nothing`,
         [TEST_PERSON_ID],
       );
+      await ensureJobQueues(client);
     } finally {
       await client.end();
     }
@@ -81,6 +132,8 @@ export async function setup(project: TestProject): Promise<void> {
        on conflict do nothing`,
       [TEST_PERSON_ID],
     );
+
+    await ensureJobQueues(pool);
   } finally {
     await pool.end();
   }

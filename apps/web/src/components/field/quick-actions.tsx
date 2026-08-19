@@ -79,11 +79,7 @@ export function QuickActions() {
             }
           }}
         >
-          {open ? (
-            <X className="size-6" aria-hidden />
-          ) : (
-            <Plus className="size-6" aria-hidden />
-          )}
+          {open ? <X className="size-6" aria-hidden /> : <Plus className="size-6" aria-hidden />}
         </button>
       </div>
     </>

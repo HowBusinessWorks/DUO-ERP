@@ -57,9 +57,7 @@ export async function mfaState(): Promise<MfaState> {
     return { kind: 'failed' };
   }
 
-  const factors = (userData.user.factors ?? []).filter(
-    (factor) => factor.factor_type === 'totp',
-  );
+  const factors = (userData.user.factors ?? []).filter((factor) => factor.factor_type === 'totp');
 
   const verified = factors.find((factor) => factor.status === 'verified');
   if (verified !== undefined) {

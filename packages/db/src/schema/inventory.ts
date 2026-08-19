@@ -106,10 +106,7 @@ export const locations = app.table(
           and (${t.type} = 'subcontractant') = (${t.subcontractorId} is not null)
           and (${t.type} = 'consignatie') = (${t.supplierId} is not null)`,
     ),
-    check(
-      'locations_geo_pair',
-      sql`num_nonnulls(${t.geoLat}, ${t.geoLng}) <> 1`,
-    ),
+    check('locations_geo_pair', sql`num_nonnulls(${t.geoLat}, ${t.geoLng}) <> 1`),
   ],
 );
 
@@ -199,7 +196,10 @@ export const stockMovements = app.table(
     // Cantitatea are semn doar prin directie: un minus aici ar insemna „intrare
     // scrisa ca iesire", adica doua feluri de a scrie acelasi lucru.
     check('stock_movements_quantity_positive', sql`${t.quantity} > 0`),
-    check('stock_movements_unit_cost_non_negative', sql`${t.unitCost} is null or ${t.unitCost} >= 0`),
+    check(
+      'stock_movements_unit_cost_non_negative',
+      sql`${t.unitCost} is null or ${t.unitCost} >= 0`,
+    ),
     check(
       'stock_movements_has_direction',
       sql`num_nonnulls(${t.fromLocationId}, ${t.toLocationId}) >= 1`,
@@ -259,10 +259,7 @@ export const consumptionNotes = app.table(
     index('consumption_notes_location_idx').on(t.locationId),
     index('consumption_notes_period_idx').on(t.periodId),
     check('consumption_notes_number_not_blank', sql`length(btrim(${t.number})) > 0`),
-    check(
-      'consumption_notes_status_known',
-      sql`${t.status} in ('draft', 'consumat', 'anulat')`,
-    ),
+    check('consumption_notes_status_known', sql`${t.status} in ('draft', 'consumat', 'anulat')`),
     check(
       'consumption_notes_component_has_contract',
       sql`${t.componentId} is null or ${t.contractId} is not null`,

@@ -202,6 +202,30 @@ export const requestsExpireBacklog = defineJob({
   singletonKey: (payload) => payload.on ?? new Date().toISOString().slice(0, 10),
 });
 
+/**
+ * `reports.monthly` — generarea raportului lunar catre client (pasul 10, §3.6).
+ *
+ * `singletonKey` pe RAPORT, nu pe zi: doua apasari pe „Generează" nu produc doua
+ * PDF-uri si nu consuma de doua ori sute de poze (verificarea #26). Cheia e
+ * versiunea ceruta, ca o regenerare dupa inghet sa nu fie inghitita ca duplicat
+ * al celei dinainte.
+ *
+ * `expireInSeconds` e generos: 312 poze inseamna minute, nu secunde, iar un job
+ * expirat la jumatate ar lasa raportul in `building` pe vecie.
+ */
+export const reportsMonthly = defineJob({
+  name: 'reports.monthly',
+  schema: z.object({
+    reportId: z.string().uuid(),
+    version: z.number().int().positive(),
+    requestedBy: z.string().uuid().optional(),
+  }),
+  retryLimit: 3,
+  retryDelaySeconds: 60,
+  expireInSeconds: 60 * 60,
+  singletonKey: (payload) => `${payload.reportId}:${String(payload.version)}`,
+});
+
 /** Toate cozile cunoscute. Worker-ul le creeaza pe toate la pornire. */
 export const ALL_JOBS = [
   systemPing,
@@ -213,6 +237,7 @@ export const ALL_JOBS = [
   filesDerive,
   filesCleanup,
   requestsExpireBacklog,
+  reportsMonthly,
 ] as const;
 
 /**

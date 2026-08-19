@@ -55,10 +55,7 @@ export async function AuditTrail({
   return (
     <ol className="space-y-0">
       {entries.map((entry, index) => (
-        <li
-          key={entry.id}
-          className="relative flex gap-4 pb-6 last:pb-0"
-        >
+        <li key={entry.id} className="relative flex gap-4 pb-6 last:pb-0">
           {/* Firul vertical al cronologiei. Se opreste la ultimul element. */}
           {index === entries.length - 1 ? null : (
             <span
@@ -75,13 +72,8 @@ export async function AuditTrail({
               <Badge tone={OPERATION_TONE[entry.operation]}>
                 {OPERATION_LABEL[entry.operation]}
               </Badge>
-              <span className="text-base font-medium text-ink">
-                {entry.actorName ?? 'Sistem'}
-              </span>
-              <time
-                dateTime={entry.occurredAt.toISOString()}
-                className="text-sm text-ink-subtle"
-              >
+              <span className="text-base font-medium text-ink">{entry.actorName ?? 'Sistem'}</span>
+              <time dateTime={entry.occurredAt.toISOString()} className="text-sm text-ink-subtle">
                 {dateFormat.format(entry.occurredAt)}
               </time>
             </div>

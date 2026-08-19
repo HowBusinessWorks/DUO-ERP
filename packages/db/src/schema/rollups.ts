@@ -90,10 +90,7 @@ export const overheadSnapshots = app.table(
   (t) => [
     primaryKey({ columns: [t.contractId, t.periodId], name: 'overhead_snapshots_pk' }),
     index('overhead_snapshots_period_idx').on(t.periodId),
-    check(
-      'overhead_snapshots_pct_range',
-      sql`${t.overheadPct} >= 0 and ${t.overheadPct} <= 1`,
-    ),
+    check('overhead_snapshots_pct_range', sql`${t.overheadPct} >= 0 and ${t.overheadPct} <= 1`),
   ],
 );
 

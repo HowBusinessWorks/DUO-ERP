@@ -59,11 +59,7 @@ describe('persoane', () => {
     expect(person.officeRoles).toEqual([]);
     expect(person.companyIds).toEqual([]);
 
-    await updatePerson(
-      officeActor('test'),
-      id,
-      { ...form, phone: '0722 000 111' } as never,
-    );
+    await updatePerson(officeActor('test'), id, { ...form, phone: '0722 000 111' } as never);
     expect((await getPerson(officeActor(), id)).phone).toBe('0722 000 111');
   });
 
@@ -71,7 +67,9 @@ describe('persoane', () => {
     const form = personForm();
     await createPerson(officeActor(), form as never);
 
-    const error = await rejection(createPerson(officeActor(), personForm({ email: form.email }) as never));
+    const error = await rejection(
+      createPerson(officeActor(), personForm({ email: form.email }) as never),
+    );
     expect(String(error)).toMatch(/Există deja o persoană/);
   });
 

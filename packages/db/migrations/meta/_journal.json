@@ -239,6 +239,13 @@
       "when": 1787124428472,
       "tag": "0033_journal_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1787126331288,
+      "tag": "0034_monthly_reports",
+      "breakpoints": true
     }
   ]
 }

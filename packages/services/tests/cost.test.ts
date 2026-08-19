@@ -12,12 +12,7 @@ import {
   verifyRollups,
 } from '../src/cost';
 import { readIntegrityMetrics } from '../src/cost-integrity';
-import {
-  closePeriod,
-  evaluatePeriodClose,
-  reopenPeriod,
-  startClosing,
-} from '../src/period-close';
+import { closePeriod, evaluatePeriodClose, reopenPeriod, startClosing } from '../src/period-close';
 import { createWorkUnit, moveFunding } from '../src/work-units';
 import { TEST_PERSON_ID } from './global-setup';
 import { officeActor, rejection } from './helpers';
@@ -211,10 +206,7 @@ describe('recordCost', () => {
     const base = await ground();
     const { workUnitId } = await interventionOn(base, base.mentenanta, base.openPast);
 
-    const { costLineId, periodId } = await recordCost(
-      officeActor(),
-      costInput(base, workUnitId),
-    );
+    const { costLineId, periodId } = await recordCost(officeActor(), costInput(base, workUnitId));
 
     expect(periodId).toBe(base.openPast);
 
@@ -279,7 +271,11 @@ describe('stornoCost', () => {
       const result = await tx.execute(sql`
         select amount, quantity, reallocation_of_id
           from app.cost_lines where work_unit_id = ${workUnitId} order by amount`);
-      return result.rows as { amount: string; quantity: string; reallocation_of_id: string | null }[];
+      return result.rows as {
+        amount: string;
+        quantity: string;
+        reallocation_of_id: string | null;
+      }[];
     });
 
     expect(rows).toHaveLength(2);
@@ -320,11 +316,7 @@ describe('stornoCost', () => {
 describe('#13 mutarea finantarii duce costurile cu ea', () => {
   it('luna deschisa: analitica „descarcat" se rescrie, „folosit" ramane', async () => {
     const base = await ground();
-    const { workUnitId, allocationId } = await interventionOn(
-      base,
-      base.mentenanta,
-      base.openPast,
-    );
+    const { workUnitId, allocationId } = await interventionOn(base, base.mentenanta, base.openPast);
 
     const { costLineId } = await recordCost(
       officeActor(),
@@ -392,11 +384,7 @@ describe('#13 mutarea finantarii duce costurile cu ea', () => {
 
   it('#15 linia mutata pe alt contract intra in reconciliere', async () => {
     const base = await ground();
-    const { workUnitId, allocationId } = await interventionOn(
-      base,
-      base.mentenanta,
-      base.openPast,
-    );
+    const { workUnitId, allocationId } = await interventionOn(base, base.mentenanta, base.openPast);
 
     // Al doilea contract al aceleiasi firme, cu componenta lui.
     const contractDoi = uuidv7();
@@ -583,9 +571,9 @@ describe('#16, #17, #18 inchiderea de luna', () => {
     await stornoCost(officeActor(), { costLineId: angajat.costLineId, reason: 'comanda anulata' });
 
     const state = await evaluatePeriodClose(officeActor(), base.openPast);
-    expect(
-      state.checks.find((row) => row.checkKey === 'costuri_angajate_deschise')?.status,
-    ).toBe('ok');
+    expect(state.checks.find((row) => row.checkKey === 'costuri_angajate_deschise')?.status).toBe(
+      'ok',
+    );
     expect(state.canClose).toBe(true);
 
     const closed = await closePeriod(officeActor(), base.openPast, 'toate comenzile lămurite');

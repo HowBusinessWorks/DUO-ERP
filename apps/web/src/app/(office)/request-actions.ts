@@ -164,9 +164,7 @@ export async function promoteBacklogAction(
  * aceeași traducere de erori. Liberul lunii se recitește pe server: o combinație
  * calculată față de o cifră veche ar fi optimă față de nimic.
  */
-export async function suggestBacklogFillAction(
-  raw: unknown,
-): Promise<
+export async function suggestBacklogFillAction(raw: unknown): Promise<
   ActionResult<{
     readonly selectedIds: readonly string[];
     readonly total: string;

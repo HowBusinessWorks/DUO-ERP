@@ -110,10 +110,7 @@ export const timesheetLines = app.table(
     ),
     // Tariful si costul lui merg impreuna: un cost fara tariful din care vine
     // n-ar mai putea fi explicat la un control.
-    check(
-      'timesheet_lines_rate_pair',
-      sql`num_nonnulls(${t.rateCardId}, ${t.hourlyCost}) <> 1`,
-    ),
+    check('timesheet_lines_rate_pair', sql`num_nonnulls(${t.rateCardId}, ${t.hourlyCost}) <> 1`),
   ],
 );
 

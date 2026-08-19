@@ -159,9 +159,7 @@ export function JournalEntry() {
             setPhotos((current) => current + 1);
           }}
         />
-        {photos > 0 ? (
-          <span className="text-sm text-ink-muted">{photos} în coadă</span>
-        ) : null}
+        {photos > 0 ? <span className="text-sm text-ink-muted">{photos} în coadă</span> : null}
       </div>
 
       <Button

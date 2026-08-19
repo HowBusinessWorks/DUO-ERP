@@ -125,9 +125,7 @@ export async function getOperation(
       includeInactive: true,
       limit: 1000,
       withMoney: options.withMoney ?? true,
-    }).then((rows) =>
-      rows.filter((candidate) => candidate.id === id),
-    ),
+    }).then((rows) => rows.filter((candidate) => candidate.id === id)),
   );
   if (row === undefined) {
     throw new AppError('NOT_FOUND', 'Operațiune inexistentă.');
@@ -273,7 +271,10 @@ export async function listOperationMaterials(
         quantity: schema.operationCatalogMaterials.quantity,
       })
       .from(schema.operationCatalogMaterials)
-      .innerJoin(schema.products, eq(schema.operationCatalogMaterials.productId, schema.products.id))
+      .innerJoin(
+        schema.products,
+        eq(schema.operationCatalogMaterials.productId, schema.products.id),
+      )
       .where(eq(schema.operationCatalogMaterials.operationId, operationId))
       .orderBy(asc(schema.products.code)),
   );
@@ -428,7 +429,8 @@ function deviation(real: Money | null, estimated: Money | null): number | null {
     return null;
   }
   return (
-    Math.round(((real.toUnsafeNumber() - estimated.toUnsafeNumber()) / estimated.toUnsafeNumber()) *
-      1000) / 10
+    Math.round(
+      ((real.toUnsafeNumber() - estimated.toUnsafeNumber()) / estimated.toUnsafeNumber()) * 1000,
+    ) / 10
   );
 }

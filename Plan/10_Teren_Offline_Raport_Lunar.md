@@ -157,7 +157,7 @@ Butonul ＋ deschide **cele 4 acțiuni frecvente**: Necesar material · Fișă d
 
 **Geotag + timestamp automat pe fiecare poză.** La 700 de obiective, e singura dovadă că inspecția s-a făcut acolo.
 
-### 3.6 Raportul lunar către client (migrarea `0024_monthly_reports`)
+### 3.6 Raportul lunar către client (migrarea `0024_monthly_reports`, numerotată `0034` în lanțul real — **livrat**)
 
 ```sql
 app.monthly_reports (id uuid pk, contract_id, period_id,

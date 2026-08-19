@@ -81,7 +81,11 @@ function blockersFor(
     if (point.answer === 'nok' && point.outcome === '') {
       out.push({ itemId: item.id, message: 'Alege ce se întâmplă cu neconformitatea.' });
     }
-    if (point.answer === 'nok' && point.outcome === 'rezolvat_pe_loc' && point.resolutionNote === '') {
+    if (
+      point.answer === 'nok' &&
+      point.outcome === 'rezolvat_pe_loc' &&
+      point.resolutionNote === ''
+    ) {
       out.push({ itemId: item.id, message: 'Scrie ce ai făcut pe loc.' });
     }
     if (item.requiresPhoto && point.photos === 0) {
@@ -160,7 +164,14 @@ export function FieldInspectionSheet({ unit, copyOf }: FieldInspectionSheetProps
       if (copyOf !== undefined) {
         const blocked = await db.outbox.get(copyOf);
         const payload = blocked?.payload as
-          | { answers?: { checklistItemId: string; answer: string; note?: string | null; finding?: { outcome?: string; resolutionNote?: string | null } }[] }
+          | {
+              answers?: {
+                checklistItemId: string;
+                answer: string;
+                note?: string | null;
+                finding?: { outcome?: string; resolutionNote?: string | null };
+              }[];
+            }
           | undefined;
         for (const answer of payload?.answers ?? []) {
           base[answer.checklistItemId] = {
@@ -308,9 +319,7 @@ export function FieldInspectionSheet({ unit, copyOf }: FieldInspectionSheetProps
           className="mt-1"
           label="Puncte completate"
           value={
-            checklist.items.length === 0
-              ? 0
-              : Math.round((answered / checklist.items.length) * 100)
+            checklist.items.length === 0 ? 0 : Math.round((answered / checklist.items.length) * 100)
           }
         />
       </div>

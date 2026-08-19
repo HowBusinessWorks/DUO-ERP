@@ -4,7 +4,13 @@ import { check, date, index, numeric, text, timestamp, uuid } from 'drizzle-orm/
 import { citext } from './citext';
 import { companies } from './companies';
 import { contractComponents, contracts } from './contracts';
-import { app, requestSourceEnum, requestStatusEnum, requestTypeEnum, routingChoiceEnum } from './enums';
+import {
+  app,
+  requestSourceEnum,
+  requestStatusEnum,
+  requestTypeEnum,
+  routingChoiceEnum,
+} from './enums';
 import { operationCatalog } from './operation-catalog';
 import { contractObjectives, objectives } from './objectives';
 import { persons } from './organization';

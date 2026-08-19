@@ -307,7 +307,8 @@ export const roRO = {
 
   // ── Nomenclatoare ─────────────────────────────────────────────────────────
   nomenclature: {
-    sharedNotice: 'Nomenclatoarele sunt comune celor 5 firme. Doar seriile de documente sunt per firmă.',
+    sharedNotice:
+      'Nomenclatoarele sunt comune celor 5 firme. Doar seriile de documente sunt per firmă.',
     tabs: {
       prezentare: 'Prezentare',
       utilizare: 'Utilizare',

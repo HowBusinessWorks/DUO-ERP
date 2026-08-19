@@ -87,12 +87,12 @@ export const CLOSE_CHECKS: readonly CloseCheckSpec[] = [
          order by sum(cl.amount) desc
          limit 20`);
 
-      const items = (
-        rows.rows as { open_amount: string; code: string; line_id: string }[]
-      ).map((row) => ({
-        label: `${row.code} · ${row.open_amount} lei angajați, fără recepție`,
-        href: `/bani/costuri?linie=${row.line_id}`,
-      }));
+      const items = (rows.rows as { open_amount: string; code: string; line_id: string }[]).map(
+        (row) => ({
+          label: `${row.code} · ${row.open_amount} lei angajați, fără recepție`,
+          href: `/bani/costuri?linie=${row.line_id}`,
+        }),
+      );
 
       return {
         status: items.length === 0 ? 'ok' : 'blocked',
@@ -110,7 +110,12 @@ export const CLOSE_CHECKS: readonly CloseCheckSpec[] = [
           from app.rollup_verify(${periodId})`);
 
       const items = (
-        rows.rows as { component_id: string; column_name: string; stored: string; expected: string }[]
+        rows.rows as {
+          component_id: string;
+          column_name: string;
+          stored: string;
+          expected: string;
+        }[]
       ).map((row) => ({
         label: `${row.column_name}: ${row.stored} în loc de ${row.expected}`,
         href: `/bani/plafoane?componenta=${row.component_id}`,
@@ -224,8 +229,7 @@ export async function evaluatePeriodClose(
         periodId,
         status: period.status,
         checks,
-        canClose:
-          period.status !== 'closed' && !checks.some((check) => check.status === 'blocked'),
+        canClose: period.status !== 'closed' && !checks.some((check) => check.status === 'blocked'),
       };
     });
   } catch (error) {

@@ -325,11 +325,12 @@ describe('folderele de sistem nu se ating', () => {
     for (const [what, statement] of [
       ['redenumire', sql`update app.nodes set name = 'Pozele mele' where id = ${photosId}`],
       ['mutare', sql`update app.nodes set parent_id = ${sheetId} where id = ${photosId}`],
-      ['stergere logica', sql`update app.nodes set deleted_at = now(), deleted_by = ${pmId} where id = ${photosId}`],
+      [
+        'stergere logica',
+        sql`update app.nodes set deleted_at = now(), deleted_by = ${pmId} where id = ${photosId}`,
+      ],
     ] as const) {
-      const error = await rejection(
-        withActor(officeActor(), async (tx) => tx.execute(statement)),
-      );
+      const error = await rejection(withActor(officeActor(), async (tx) => tx.execute(statement)));
       expect(sqlstate(error), what).toBe(SQLSTATE.RESTRICT_VIOLATION);
     }
   });

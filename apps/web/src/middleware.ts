@@ -83,7 +83,8 @@ export async function middleware(request: NextRequest) {
 
   const { data: sessionData } = await supabase.auth.getSession();
   const claims = decodeAccessTokenClaims(sessionData.session?.access_token ?? '');
-  const record = typeof claims === 'object' && claims !== null ? (claims as Record<string, unknown>) : {};
+  const record =
+    typeof claims === 'object' && claims !== null ? (claims as Record<string, unknown>) : {};
   const persona = record['persona'];
 
   // Cont valid, dar fara persoana in nomenclator (sau cu una dezactivata).
@@ -149,5 +150,7 @@ export const config = {
    * Cererile alea nu poarta decizie de acces si ar plati degeaba un round-trip
    * la serverul Auth.
    */
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+  ],
 };

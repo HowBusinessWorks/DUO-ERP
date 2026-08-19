@@ -24,7 +24,10 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = await supabaseServer();
-  const { error } = await supabase.auth.verifyOtp({ type: type as EmailOtpType, token_hash: tokenHash });
+  const { error } = await supabase.auth.verifyOtp({
+    type: type as EmailOtpType,
+    token_hash: tokenHash,
+  });
 
   if (error !== null) {
     // Link expirat sau deja folosit. Ecranul de login are drumul catre o noua
@@ -32,9 +35,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(LOGIN_PATH, request.url));
   }
 
-  const target = next !== null && next.startsWith('/') && !next.startsWith('//')
-    ? next
-    : CHANGE_PASSWORD_PATH;
+  const target =
+    next !== null && next.startsWith('/') && !next.startsWith('//') ? next : CHANGE_PASSWORD_PATH;
 
   return NextResponse.redirect(new URL(target, request.url));
 }

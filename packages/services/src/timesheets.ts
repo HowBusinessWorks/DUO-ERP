@@ -202,7 +202,11 @@ async function validateOneTimesheet(
       }
 
       // Tariful valabil la ZIUA pontata, nu cel curent (verificarea #14).
-      const card = rateCardAt(await loadRateCards(tx, qualificationId), qualificationId, sheet.workDate);
+      const card = rateCardAt(
+        await loadRateCards(tx, qualificationId),
+        qualificationId,
+        sheet.workDate,
+      );
       if (card === null) {
         throw new AppError(
           'VALIDATION_FAILED',
@@ -398,7 +402,10 @@ export async function listTimesheetWeek(
       )
       .orderBy(asc(schema.persons.fullName), asc(schema.timesheets.workDate));
 
-    const sheets = new Map<string, { header: Omit<TimesheetRow, 'lines' | 'totalHours'>; lines: TimesheetLineRow[] }>();
+    const sheets = new Map<
+      string,
+      { header: Omit<TimesheetRow, 'lines' | 'totalHours'>; lines: TimesheetLineRow[] }
+    >();
     const byPerson = new Map<string, Quantity>();
     const byWorkUnit = new Map<string, Quantity>();
 

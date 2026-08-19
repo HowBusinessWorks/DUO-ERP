@@ -30,7 +30,10 @@ export function TableSkeleton({ rows = 6, columns = 4 }: { rows?: number; column
         ))}
       </div>
       {Array.from({ length: rows }, (_, rowIndex) => (
-        <div key={rowIndex} className="flex gap-3 border-b border-border/70 px-3 py-2.5 last:border-0">
+        <div
+          key={rowIndex}
+          className="flex gap-3 border-b border-border/70 px-3 py-2.5 last:border-0"
+        >
           {Array.from({ length: columns }, (_, index) => (
             <Skeleton key={index} className="h-3.5 flex-1" />
           ))}

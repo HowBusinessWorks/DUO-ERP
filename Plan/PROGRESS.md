@@ -40,10 +40,10 @@ Detaliile, în intrările de jurnal ale fiecărei bucăți.
 | **01–07** | Gata. |
 | **08** | Gata pe **08a** (schemă, domain, servicii) și **08b** (ecrane). **08c e SĂRIT dinadins** — decizia utilizatorului, vezi secțiunea lui mai jos. Din 08c există doar expirarea propunerilor. |
 | **09** | **Gata, tot** — 09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon de consum · 09b-4 acoperire, istoric, validare în masă, seed. Toate cele 24 de verificări acoperite. |
-| **10** | **10a**, **10b**, **10c** (tot, inclusiv 10c-4) și **10e** gata. Rămâne **10d — raportul lunar**. |
+| **10** | **Gata, tot** — 10a, 10b, 10c (inclusiv 10c-4), **10d raportul lunar** și 10e. Cu asta **faza 1 e completă**. |
 
-**Următorul lucru de făcut e 10d: raportul lunar către client.** Cu el, pasul 10 e închis, iar
-faza 1 e completă.
+**Pasul 10 e închis.** Următoarea serie de pași acoperă fazele 2–5: devize și situații de lucrări,
+achiziții și stoc, flotă și procese verbale, facturare și consolidare.
 
 ### Pasul 10, tăiat în cinci — iar 10c în patru
 
@@ -66,7 +66,8 @@ jumătatea unui pas. Aceeași convenție a mers la 09.
     `Bon de consum` a fost **scos din pasul 10** — vezi mai jos de ce.
   - **10c-4**: GATA. `Jurnal de șantier` — tabela `app.journal_entries` (migrarea `0033`),
     `journal.append` cu executantul lui, ecranul în 3 tapuri, plus scheletul `Verificare SL`.
-- **10d — raportul lunar** către client: migrare, coadă cu progres real, versionare și îngheț.
+- **10d — raportul lunar** către client: GATA. Migrarea `0034`, coada `reports.monthly` cu progres
+  real, versionare, îngheț și link tokenizat.
   **SINGURUL rămas.**
 - **10e — panoul PM** cu gauge-ul Delta: GATA (commit `3a67299`).
 
@@ -238,7 +239,7 @@ n-are cum să apară la typecheck: `permission denied` nu e o eroare de tip.
 | 06 | **21** | Indexul de cursor măsurat la 10.000 de linii, nu la 100.000. Planul e însă independent de volum. |
 | 07 | **7** | Reluarea per parte există în client și merge; **întreruperea reală de rețea** cere Playwright. Singura verificare deschisă din pasul 07. |
 | 09 | — | Toate cele 24 sunt acoperite. |
-| 10 | **20–26** | Cer raportul lunar (10d). Restul pasului e acoperit. |
+| 10 | **20, 22 (parțial)** | Restul (21, 23–26) e acoperit de 10d, cu teste. Rămâne de văzut pe date reale generarea cu sute de poze (#20) și artefactul chiar scris în R2 (#22) — codul e scris, dar n-a rulat cu worker pornit. |
 | 10 | **17, 18** | **Acoperite** de fișa de inspecție de teren: NOK cu ieșire impusă **local**, verificat pe date reale din rolul `app_field`. |
 | 10 | **12–15** | **Măsurate cap-coadă** pentru `Necesar material` și `Jurnal` (3 tapuri fiecare), blocant în CI. Celelalte două acțiuni de sub ＋ se măsoară când capătă ecran propriu. |
 | 10 | **5–7, 10, 11, 16** | **Acoperite** de la 10a–10b: idempotență, oprirea cozii, retenție, felia sub 2 MB, zero lei la nivel de date. |
@@ -450,6 +451,53 @@ smoke aruncabile, pe dev, cu bucket real. **Așa au ieșit la iveală toate defe
   serverele de dezvoltare înainte.
 
 ---
+
+## 10d — raportul lunar către client (19 august 2026)
+
+Migrarea `0034_monthly_reports`: `app.monthly_reports` (cap, cu stare și progres) și
+`app.monthly_report_versions` (imutabile). Terenul **nu are niciun grant** aici, nici `select`:
+raportul e documentul comercial al lunii. Versiunile n-au `update`/`delete` pentru nimeni, nici
+pentru `app_service` — o regenerare face versiunea următoare, nu o rescrie pe cea trimisă.
+
+**Ce intră în raport vine din alocarea de finanțare**, nu din `contract_objective_id`. Alocarea e
+cea care spune cine plătește și tot ea se mută când rutarea se schimbă. Un test verifică exact
+asta: retragerea alocării scoate fișa din raport.
+
+**Artefactul e HTML, nu PDF** — alegerea din plan pentru contractele cu multe poze. Se scrie în
+două locuri: `archive` (dovada, nu se poate șterge din explorer) și, ca nod, în folderul
+contractului. Pozele **nu se înglobează**: se referă prin `/raport/<token>/poza/<versiune>`, deci
+artefactul rămâne de ordinul zecilor de KB, iar ruta publică verifică apartenența pozei la
+`included_work_unit_ids` al versiunii. Fără verificarea aia, un token de raport ar fi fost cheie
+către orice fișier din ERP.
+
+Raportul web e **rută, nu pagină React** (`(public)/raport/[token]/route.ts`): servește artefactul
+înghețat byte cu byte, cu CSP restrictiv. O fișă corectată luna următoare nu-l poate schimba (#23).
+
+Progresul e scris de job pe rând (`progress_done` / `progress_total`), pe pagină de 100 de poze —
+nu la fiecare poză, ca să nu fie 480 de tranzacții pentru o cifră citită din 5 în 5 secunde. Nu s-a
+adăugat tabela `job_progress` din plan: două coloane pe raport spun același lucru și se citesc în
+aceeași interogare cu restul ecranului.
+
+Drept nou: **`reports.emit`** (admin, pm, financiar). Separat de `financials.read`, fiindcă unul
+înseamnă „vede cifre", celălalt „semnează hârtia pe baza căreia se plătește".
+`maintenanceInvoiceGate` implementează acum blocajul facturii de mentenanță — ecranul de facturare
+e faza 5, dar precondiția e verificabilă de azi.
+
+**Un defect prins de teste, invizibil pentru typecheck:** pe `tx.execute` scris de mână, driverul
+întoarce `timestamptz` ca **string**, nu ca `Date`. Tiparea lui ca `Date` trecea de `tsc` și cădea
+la prima rulare (`row.expires_at.getTime is not a function`). Regula rămâne: pe interogări scrise
+de mână, tipurile se declară cum vin de pe fir, nu cum ne-ar conveni.
+
+Harness: `tests/global-setup.ts` creează acum minimal `jobs.queue` / `jobs.job` — pg-boss și le
+face singur la primul start al worker-ului, deci într-o bază proaspătă orice `enqueue` ar fi căzut
+în test, nu în producție. Indexul unic pe `(name, singleton_key)` e chiar ce testează #26.
+
+Teste noi: `packages/domain` **+11** (`reports/monthly-report.test.ts`), `packages/services` **+8**
+(`monthly-reports.test.ts`). Toate rulate pe Supabase dev cu `TEST_DATABASE_URL`, verde.
+
+**Ce n-a rulat încă:** generarea reală cu worker pornit (R2 + poze). Codul e scris și tipurile
+verificate, dar #20 și #22 se confirmă abia cu worker-ul pornit pe dev.
+
 
 ## 10e — panoul PM, cu gauge-ul Delta (19 august 2026)
 
@@ -1585,7 +1633,7 @@ Ce ți-a lăsat pasul 07 și îți va folosi:
 | 07 — File management (R2) | 🟩 **gata** (07a–07c-2; 20/21 — #7 cere Playwright pentru întreruperea reală de rețea) | 2026-08-18 |
 | 08 — Cereri, rutare, backlog | 🟨 în lucru (08a + 08b gata; **08c SĂRIT dinadins** — decizia utilizatorului) | 2026-08-18 |
 | 09 — Fișe de lucru | 🟩 **gata** (09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon · 09b-4 acoperire, istoric, validare în masă, seed; 24/24) | 2026-08-18 |
-| 10 — Teren offline, raport lunar | 🟨 în lucru (**10a**, **10b**, **10c** ecranele, **10e** panoul PM: gata; **10d** raportul lunar: neatins) | 2026-08-19 |
+| 10 — Teren offline, raport lunar | ✅ gata (10a, 10b, 10c, **10d raportul lunar**, 10e) | 2026-08-19 |
 
 Legendă: ⬜ neînceput · 🟨 în lucru · 🟩 gata (toate verificările din pas trec) · 🟥 blocat
 

@@ -16,11 +16,7 @@ import {
   saveInspection,
   validateInspection,
 } from '../src/inspections';
-import {
-  createIntervention,
-  saveIntervention,
-  validateIntervention,
-} from '../src/interventions';
+import { createIntervention, saveIntervention, validateIntervention } from '../src/interventions';
 import { saveTimesheet, validateTimesheets } from '../src/timesheets';
 import { createOperation, setOperationMaterials } from '../src/operations';
 
@@ -185,30 +181,24 @@ async function wipe(): Promise<void> {
     await tx
       .delete(schema.operationCatalog)
       .where(inArray(schema.operationCatalog.id, seedOperationIds));
-    await tx
-      .delete(schema.products)
-      .where(
-        inArray(
-          schema.products.id,
-          Array.from({ length: 4 }, (_, index) => IDS.product(index + 1)),
-        ),
-      );
-    await tx
-      .delete(schema.rateCards)
-      .where(
-        inArray(
-          schema.rateCards.id,
-          Array.from({ length: 2 }, (_, index) => IDS.rateCard(index + 1)),
-        ),
-      );
-    await tx
-      .delete(schema.qualifications)
-      .where(
-        inArray(
-          schema.qualifications.id,
-          Array.from({ length: 2 }, (_, index) => IDS.qualification(index + 1)),
-        ),
-      );
+    await tx.delete(schema.products).where(
+      inArray(
+        schema.products.id,
+        Array.from({ length: 4 }, (_, index) => IDS.product(index + 1)),
+      ),
+    );
+    await tx.delete(schema.rateCards).where(
+      inArray(
+        schema.rateCards.id,
+        Array.from({ length: 2 }, (_, index) => IDS.rateCard(index + 1)),
+      ),
+    );
+    await tx.delete(schema.qualifications).where(
+      inArray(
+        schema.qualifications.id,
+        Array.from({ length: 2 }, (_, index) => IDS.qualification(index + 1)),
+      ),
+    );
 
     // Cautate dupa cheia naturala (cod + firma), nu dupa id: rulari mai vechi
     // ale seed-ului au lasat contracte cu id generat, iar ele blocheaza unicul
@@ -224,9 +214,9 @@ async function wipe(): Promise<void> {
       );
     const contractIds = stale.map((row) => row.id);
     if (contractIds.length > 0) {
-      await tx.delete(schema.contractObjectives).where(
-        inArray(schema.contractObjectives.contractId, contractIds),
-      );
+      await tx
+        .delete(schema.contractObjectives)
+        .where(inArray(schema.contractObjectives.contractId, contractIds));
       await tx.delete(schema.contracts).where(inArray(schema.contracts.id, contractIds));
     }
     await tx.delete(schema.objectives).where(
@@ -245,16 +235,22 @@ async function wipe(): Promise<void> {
     // ambele capete, altfel fisele raman referite si `delete` pica cu 23503.
     await tx.delete(schema.inspectionProfileItems).where(
       or(
-        inArray(schema.inspectionProfileItems.profileId, profiles.map((row) => row.id)),
-        inArray(schema.inspectionProfileItems.checklistId, [IDS.checklistStation, IDS.checklistBasin]),
+        inArray(
+          schema.inspectionProfileItems.profileId,
+          profiles.map((row) => row.id),
+        ),
+        inArray(schema.inspectionProfileItems.checklistId, [
+          IDS.checklistStation,
+          IDS.checklistBasin,
+        ]),
       ),
     );
-    await tx.delete(schema.inspectionProfiles).where(
-      inArray(schema.inspectionProfiles.name, [PROFILE_QUARTERLY, PROFILE_MONTHLY]),
-    );
-    await tx.delete(schema.checklists).where(
-      inArray(schema.checklists.id, [IDS.checklistStation, IDS.checklistBasin]),
-    );
+    await tx
+      .delete(schema.inspectionProfiles)
+      .where(inArray(schema.inspectionProfiles.name, [PROFILE_QUARTERLY, PROFILE_MONTHLY]));
+    await tx
+      .delete(schema.checklists)
+      .where(inArray(schema.checklists.id, [IDS.checklistStation, IDS.checklistBasin]));
   });
   console.log('Datele de seed sterse.');
 }
@@ -264,12 +260,7 @@ async function exists(): Promise<boolean> {
     const rows = await tx
       .select({ id: schema.contracts.id })
       .from(schema.contracts)
-      .where(
-        and(
-          eq(schema.contracts.companyId, IDS.companyA),
-          eq(schema.contracts.code, '4700'),
-        ),
-      )
+      .where(and(eq(schema.contracts.companyId, IDS.companyA), eq(schema.contracts.code, '4700')))
       .limit(1);
     return rows.length > 0;
   });
@@ -289,8 +280,18 @@ async function bootstrap(): Promise<void> {
     await tx
       .insert(schema.clients)
       .values([
-        { id: IDS.clientApaNova, name: 'Apa Nova București', cui: 'RO12345678', paymentTermDays: 70 },
-        { id: IDS.clientPrimarie, name: 'Primăria Sector 3', cui: 'RO87654321', paymentTermDays: 90 },
+        {
+          id: IDS.clientApaNova,
+          name: 'Apa Nova București',
+          cui: 'RO12345678',
+          paymentTermDays: 70,
+        },
+        {
+          id: IDS.clientPrimarie,
+          name: 'Primăria Sector 3',
+          cui: 'RO87654321',
+          paymentTermDays: 90,
+        },
       ])
       .onConflictDoNothing();
 
@@ -366,8 +367,17 @@ async function inspectionLibrary(): Promise<void> {
           text: 'Fără scurgeri la garnituri',
           requiresPhoto: true,
         },
-        { checklistId: IDS.checklistStation, position: 3, text: 'Tabloul electric — fără urme de arc' },
-        { checklistId: IDS.checklistBasin, position: 1, text: 'Nivelul apei în limite', requiresPhoto: true },
+        {
+          checklistId: IDS.checklistStation,
+          position: 3,
+          text: 'Tabloul electric — fără urme de arc',
+        },
+        {
+          checklistId: IDS.checklistBasin,
+          position: 1,
+          text: 'Nivelul apei în limite',
+          requiresPhoto: true,
+        },
         { checklistId: IDS.checklistBasin, position: 2, text: 'Grătarul de la intrare e curat' },
       ])
       .onConflictDoNothing();
@@ -434,8 +444,7 @@ async function costGround(): Promise<WorkUnitGround | null> {
       .from(schema.contractComponents)
       .where(eq(schema.contractComponents.contractId, contractId));
 
-    const byType = (type: string): string =>
-      components.find((row) => row.type === type)?.id ?? '';
+    const byType = (type: string): string => components.find((row) => row.type === type)?.id ?? '';
 
     const objectiveIds = Array.from({ length: 20 }, (_, index) => IDS.objective(index + 1));
 
@@ -663,24 +672,28 @@ async function main(): Promise<void> {
   console.log(`${String(objectiveIds.length)} obiective.`);
 
   // ── Contractul de mentenanta pe 4 ani ──────────────────────────────────────
-  const maintenance = await createContract(actor('seed'), {
-    companyId: IDS.companyA,
-    clientId: IDS.clientApaNova,
-    code: '4700',
-    reference: 'Contract 4700 / 12.02.2026',
-    type: 'mentenanta_multianual',
-    startsOn: '2026-03-01',
-    endsOn: '2030-02-28',
-    totalValue: '2400000.00',
-    monthlyValue: '50000.00',
-    paymentTermDays: '70',
-    indexationPct: '5',
-    deltaThreshold: '2000.00',
-    expiryAlertMonths: '6',
-    ownerPersonId: IDS.pm,
-    overheadPct: '12',
-    status: 'activ',
-  }, IDS.contractMaintenance);
+  const maintenance = await createContract(
+    actor('seed'),
+    {
+      companyId: IDS.companyA,
+      clientId: IDS.clientApaNova,
+      code: '4700',
+      reference: 'Contract 4700 / 12.02.2026',
+      type: 'mentenanta_multianual',
+      startsOn: '2026-03-01',
+      endsOn: '2030-02-28',
+      totalValue: '2400000.00',
+      monthlyValue: '50000.00',
+      paymentTermDays: '70',
+      indexationPct: '5',
+      deltaThreshold: '2000.00',
+      expiryAlertMonths: '6',
+      ownerPersonId: IDS.pm,
+      overheadPct: '12',
+      status: 'activ',
+    },
+    IDS.contractMaintenance,
+  );
 
   const components = {
     maintenance: await createComponent(actor('seed'), {
@@ -750,7 +763,10 @@ async function main(): Promise<void> {
 
   // Planul ANUAL al componentei Lucrari, pe anul contractual 1.
   const years = await withActor(actor(), async (tx) =>
-    tx.select().from(schema.contractYears).where(eq(schema.contractYears.contractId, maintenance.id)),
+    tx
+      .select()
+      .from(schema.contractYears)
+      .where(eq(schema.contractYears.contractId, maintenance.id)),
   );
   const firstYear = years.find((year) => year.yearIndex === 1);
   if (firstYear !== undefined) {
@@ -765,24 +781,28 @@ async function main(): Promise<void> {
   }
 
   // ── Contractul individual ──────────────────────────────────────────────────
-  const individual = await createContract(actor('seed'), {
-    companyId: IDS.companyB,
-    clientId: IDS.clientPrimarie,
-    code: '5100',
-    reference: 'Comandă 5100 / 03.04.2026',
-    type: 'individual_deviz',
-    startsOn: '2026-04-01',
-    endsOn: '2026-10-31',
-    totalValue: '186000.00',
-    monthlyValue: '',
-    paymentTermDays: '90',
-    indexationPct: '0',
-    deltaThreshold: '2000.00',
-    expiryAlertMonths: '2',
-    ownerPersonId: IDS.pm,
-    overheadPct: '',
-    status: 'activ',
-  }, IDS.contractIndividual);
+  const individual = await createContract(
+    actor('seed'),
+    {
+      companyId: IDS.companyB,
+      clientId: IDS.clientPrimarie,
+      code: '5100',
+      reference: 'Comandă 5100 / 03.04.2026',
+      type: 'individual_deviz',
+      startsOn: '2026-04-01',
+      endsOn: '2026-10-31',
+      totalValue: '186000.00',
+      monthlyValue: '',
+      paymentTermDays: '90',
+      indexationPct: '0',
+      deltaThreshold: '2000.00',
+      expiryAlertMonths: '2',
+      ownerPersonId: IDS.pm,
+      overheadPct: '',
+      status: 'activ',
+    },
+    IDS.contractIndividual,
+  );
 
   await createComponent(actor('seed'), {
     contractId: individual.id,
@@ -905,7 +925,6 @@ async function seedWorkUnits(base: WorkUnitGround): Promise<void> {
         expiresAt: '2027-12-31',
       })
       .onConflictDoNothing();
-
   });
 
   await ensureDocumentSeries();
@@ -1114,7 +1133,10 @@ async function seedCostLines(base: WorkUnitGround): Promise<void> {
   const months = ([3, 4, 5] as const)
     .map((month) => periods.find((row) => row.year === 2026 && row.month === month))
     .filter((row): row is NonNullable<typeof row> => row !== undefined && row.status === 'open')
-    .map((row) => ({ date: `2026-0${String(row.month)}-1${String(row.month % 5)}`, period: row.id }));
+    .map((row) => ({
+      date: `2026-0${String(row.month)}-1${String(row.month % 5)}`,
+      period: row.id,
+    }));
 
   if (months.length === 0) {
     console.log('Lunile 03-05/2026 lipsesc sau sunt inchise; liniile de cost se sar.');
@@ -1197,8 +1219,6 @@ async function seedCostLines(base: WorkUnitGround): Promise<void> {
   );
 }
 
-
-
 /** Catalogul, calificarile si tarifele lor. Manopera se deriveaza din ele. */
 const QUALIFICATIONS = [
   { code: 'INST', name: 'Instalator', salary: '28.00' },
@@ -1222,16 +1242,86 @@ const CATALOG_PRODUCTS = [
  * Delta sau pe Lucrari in functie de plafonul lunii.
  */
 const OPERATIONS = [
-  { code: 'OP-101', name: 'Înlocuire garnitură vană DN80', qual: 'INST', hours: '1.5000', material: '45.00', category: 'Instalații' },
-  { code: 'OP-102', name: 'Curățare gură de canal', qual: 'INST', hours: '2.0000', material: '0.00', category: 'Canalizare' },
-  { code: 'OP-103', name: 'Verificare tablou electric stație', qual: 'ELEC', hours: '1.0000', material: '0.00', category: 'Electrice' },
-  { code: 'OP-104', name: 'Înlocuire senzor nivel', qual: 'ELEC', hours: '2.5000', material: '380.00', category: 'Automatizări' },
-  { code: 'OP-105', name: 'Schimb ulei pompă submersibilă', qual: 'INST', hours: '3.0000', material: '210.00', category: 'Pompe' },
-  { code: 'OP-106', name: 'Reparație conductă PP-R 32', qual: 'INST', hours: '4.0000', material: '160.00', category: 'Instalații' },
-  { code: 'OP-107', name: 'Refacere circuit forță pompă', qual: 'ELEC', hours: '6.0000', material: '540.00', category: 'Electrice' },
-  { code: 'OP-108', name: 'Decolmatare bazin de retenție', qual: 'INST', hours: '12.0000', material: '0.00', category: 'Canalizare' },
-  { code: 'OP-109', name: 'Înlocuire pompă submersibilă 5,5 kW', qual: 'INST', hours: '10.0000', material: '4200.00', category: 'Pompe' },
-  { code: 'OP-110', name: 'Reabilitare tablou general stație', qual: 'ELEC', hours: '40.0000', material: '9800.00', category: 'Electrice' },
+  {
+    code: 'OP-101',
+    name: 'Înlocuire garnitură vană DN80',
+    qual: 'INST',
+    hours: '1.5000',
+    material: '45.00',
+    category: 'Instalații',
+  },
+  {
+    code: 'OP-102',
+    name: 'Curățare gură de canal',
+    qual: 'INST',
+    hours: '2.0000',
+    material: '0.00',
+    category: 'Canalizare',
+  },
+  {
+    code: 'OP-103',
+    name: 'Verificare tablou electric stație',
+    qual: 'ELEC',
+    hours: '1.0000',
+    material: '0.00',
+    category: 'Electrice',
+  },
+  {
+    code: 'OP-104',
+    name: 'Înlocuire senzor nivel',
+    qual: 'ELEC',
+    hours: '2.5000',
+    material: '380.00',
+    category: 'Automatizări',
+  },
+  {
+    code: 'OP-105',
+    name: 'Schimb ulei pompă submersibilă',
+    qual: 'INST',
+    hours: '3.0000',
+    material: '210.00',
+    category: 'Pompe',
+  },
+  {
+    code: 'OP-106',
+    name: 'Reparație conductă PP-R 32',
+    qual: 'INST',
+    hours: '4.0000',
+    material: '160.00',
+    category: 'Instalații',
+  },
+  {
+    code: 'OP-107',
+    name: 'Refacere circuit forță pompă',
+    qual: 'ELEC',
+    hours: '6.0000',
+    material: '540.00',
+    category: 'Electrice',
+  },
+  {
+    code: 'OP-108',
+    name: 'Decolmatare bazin de retenție',
+    qual: 'INST',
+    hours: '12.0000',
+    material: '0.00',
+    category: 'Canalizare',
+  },
+  {
+    code: 'OP-109',
+    name: 'Înlocuire pompă submersibilă 5,5 kW',
+    qual: 'INST',
+    hours: '10.0000',
+    material: '4200.00',
+    category: 'Pompe',
+  },
+  {
+    code: 'OP-110',
+    name: 'Reabilitare tablou general stație',
+    qual: 'ELEC',
+    hours: '40.0000',
+    material: '9800.00',
+    category: 'Electrice',
+  },
 ] as const;
 
 /** Trei cereri in stari diferite + cinci amanate, care umplu backlogul. */
@@ -1312,9 +1402,7 @@ async function seedRequestsAndCatalog(base: WorkUnitGround): Promise<void> {
     const tariffed = await tx
       .select({ qualificationId: schema.rateCards.qualificationId })
       .from(schema.rateCards)
-      .where(
-        inArray(schema.rateCards.qualificationId, [...qualificationIds.values()]),
-      );
+      .where(inArray(schema.rateCards.qualificationId, [...qualificationIds.values()]));
     const withTariff = new Set(tariffed.map((row) => row.qualificationId));
 
     const missing = QUALIFICATIONS.map((qualification, index) => ({ qualification, index })).filter(
@@ -1453,7 +1541,8 @@ async function seedRequestsAndCatalog(base: WorkUnitGround): Promise<void> {
       BACKLOG_SEED.map((entry, index) => ({
         id: IDS.request(10 + index),
         companyId: IDS.companyA,
-        type: entry.kind === 'tichet' ? ('tichet_client' as const) : ('constatare_inspectie' as const),
+        type:
+          entry.kind === 'tichet' ? ('tichet_client' as const) : ('constatare_inspectie' as const),
         source: entry.kind === 'tichet' ? ('email' as const) : ('fisa_inspectie' as const),
         status: 'in_backlog' as const,
         objectiveId: base.objectiveIds[index % base.objectiveIds.length] ?? objective,

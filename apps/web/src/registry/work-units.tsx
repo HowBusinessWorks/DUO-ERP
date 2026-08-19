@@ -1594,9 +1594,7 @@ async function FindingsTab({
               {point.text}
             </p>
             <Badge tone={point.outcome === null ? 'danger' : 'neutral'}>
-              {point.outcome === null
-                ? 'Fără ieșire'
-                : FINDING_OUTCOME_LABELS[point.outcome]}
+              {point.outcome === null ? 'Fără ieșire' : FINDING_OUTCOME_LABELS[point.outcome]}
             </Badge>
           </div>
 
@@ -1857,9 +1855,7 @@ async function ValidationTab({ ctx }: { readonly ctx: EntityContext }) {
   const [inspections, interventions, series] = await Promise.all([
     listUnvalidatedInspections(ctx.actor, ctx.app.selectedCompanyIds),
     listUnvalidatedInterventions(ctx.actor, ctx.app.selectedCompanyIds),
-    companyId === ''
-      ? Promise.resolve([])
-      : listDocumentSeries(ctx.actor, companyId, 'bon_consum'),
+    companyId === '' ? Promise.resolve([]) : listDocumentSeries(ctx.actor, companyId, 'bon_consum'),
   ]);
 
   const sheets = [

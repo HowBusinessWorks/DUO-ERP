@@ -326,7 +326,10 @@ export const fundingAllocations = app.table(
       sql`${t.allocatedPct} is null or (${t.allocatedPct} > 0 and ${t.allocatedPct} <= 1)`,
     ),
     check('funding_allocations_reason_not_blank', sql`length(btrim(${t.reason})) > 0`),
-    check('funding_allocations_not_superseded_by_self', sql`${t.supersededBy} is distinct from ${t.id}`),
+    check(
+      'funding_allocations_not_superseded_by_self',
+      sql`${t.supersededBy} is distinct from ${t.id}`,
+    ),
     /*
      * Implicatie, nu egalitate: un rand care arata spre succesorul lui e
      * obligatoriu supersedat, dar unul supersedat poate sa n-aiba succesor —

@@ -71,9 +71,7 @@ export async function promoteWorkUnit(
  * Ecranul ANUNTA mecanica inainte de confirmare, din `previewFundingMove`, care
  * citeste aceeasi sursa. Aici nu se mai decide nimic — se executa.
  */
-export async function moveWorkUnitFunding(
-  raw: unknown,
-): Promise<
+export async function moveWorkUnitFunding(raw: unknown): Promise<
   ActionResult<{
     readonly kind: string;
     readonly reallocationNumber: string | null;

@@ -114,7 +114,9 @@ describe('planFundingMove', () => {
 
   it('mutarea pe alt contract, in aceeasi componenta si luna, e permisa', () => {
     const plan = planFundingMove(
-      input({ to: { contractId: 'c-individual', componentId: 'comp-mentenanta', periodId: 'per-2026-08' } }),
+      input({
+        to: { contractId: 'c-individual', componentId: 'comp-mentenanta', periodId: 'per-2026-08' },
+      }),
     );
     expect(plan.kind).toBe('rewrite-charged-analytics');
   });

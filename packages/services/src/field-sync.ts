@@ -103,10 +103,7 @@ export interface PushResult {
  * stoc si cost sau niciunul), iar o tranzactie mai mare ar fi dat inapoi si
  * mutatiile care au mers — adica exact munca pe care omul o crede trimisa.
  */
-export async function pushMutations(
-  actor: Actor,
-  input: PushMutationsInput,
-): Promise<PushResult> {
+export async function pushMutations(actor: Actor, input: PushMutationsInput): Promise<PushResult> {
   const values = pushMutationsInputSchema.parse(input);
 
   // Ordinea crearii, nu cea din sir: un client care le trimite amestecate n-are
@@ -330,9 +327,7 @@ export async function readCursor(actor: Actor, deviceId: string): Promise<SyncCu
  */
 export async function pruneAppliedMutations(actor: Actor, days = 90): Promise<number> {
   const rows = await withActor(actor, async (tx) =>
-    tx.execute<{ pruned: number }>(
-      sql`select app.prune_applied_mutations(${days}) as pruned`,
-    ),
+    tx.execute<{ pruned: number }>(sql`select app.prune_applied_mutations(${days}) as pruned`),
   );
   return rows.rows[0]?.pruned ?? 0;
 }

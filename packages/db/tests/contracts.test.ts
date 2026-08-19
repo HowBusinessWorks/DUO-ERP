@@ -36,7 +36,9 @@ async function makeContract(
   await tx.execute(
     sql`insert into app.companies (id, name) values (${companyId}, ${`Firma ${tag}`})`,
   );
-  await tx.execute(sql`insert into app.clients (id, name) values (${clientId}, ${`Client ${tag}`})`);
+  await tx.execute(
+    sql`insert into app.clients (id, name) values (${clientId}, ${`Client ${tag}`})`,
+  );
   await tx.execute(sql`
     insert into app.contracts
       (id, company_id, client_id, code, type, starts_on, ends_on,
@@ -436,7 +438,9 @@ describe('izolarea pretului pe contracte', () => {
     ]) {
       const error = await rejection(
         withActor(fieldActor(), async (tx) => {
-          await tx.execute(sql`select ${sql.raw(column)} from app.contracts where id = ${contractId}`);
+          await tx.execute(
+            sql`select ${sql.raw(column)} from app.contracts where id = ${contractId}`,
+          );
         }),
       );
       expect(sqlstate(error), `coloana ${column} ar trebui refuzata`).toBe(

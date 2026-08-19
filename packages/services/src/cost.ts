@@ -38,10 +38,7 @@ export interface RecordCostResult {
  * `effect_date`. Daca ai nevoie sa stii in ce luna a cazut linia, il primesti
  * inapoi — nu-l calcula a doua oara in apelant.
  */
-export async function recordCost(
-  actor: Actor,
-  input: RecordCostInput,
-): Promise<RecordCostResult> {
+export async function recordCost(actor: Actor, input: RecordCostInput): Promise<RecordCostResult> {
   const values = recordCostInputSchema.parse(input);
 
   try {
@@ -130,10 +127,7 @@ export async function recordCostTx(
  * inchis, `guard_closed_period` refuza scrierea — si atunci corectia trece prin
  * documentul de re-alocare, ca orice miscare pe o luna raportata.
  */
-export async function stornoCost(
-  actor: Actor,
-  input: StornoCostInput,
-): Promise<RecordCostResult> {
+export async function stornoCost(actor: Actor, input: StornoCostInput): Promise<RecordCostResult> {
   const values = stornoCostInputSchema.parse(input);
 
   try {
@@ -501,18 +495,18 @@ export async function objectiveCostHistory(
        group by 1
        order by 1 desc`);
 
-    return (
-      rows.rows as { year: number; total: string; months: number; work_units: number }[]
-    ).map((row) => {
-      const total = Money.fromDb(row.total);
-      return {
-        year: row.year,
-        total,
-        monthlyAverage: row.months === 0 ? Money.ZERO : total.div(row.months),
-        monthsWithActivity: row.months,
-        workUnitCount: row.work_units,
-      };
-    });
+    return (rows.rows as { year: number; total: string; months: number; work_units: number }[]).map(
+      (row) => {
+        const total = Money.fromDb(row.total);
+        return {
+          year: row.year,
+          total,
+          monthlyAverage: row.months === 0 ? Money.ZERO : total.div(row.months),
+          monthsWithActivity: row.months,
+          workUnitCount: row.work_units,
+        };
+      },
+    );
   });
 }
 
@@ -721,7 +715,9 @@ export async function recomputeOverheadSnapshot(
         join app.contract_components cc on cc.id = r.component_id
        where cc.contract_id = ${contractId} and r.period_id = ${periodId}`);
 
-    const directCost = Money.fromDb((totals.rows[0] as { direct_cost?: string } | undefined)?.direct_cost);
+    const directCost = Money.fromDb(
+      (totals.rows[0] as { direct_cost?: string } | undefined)?.direct_cost,
+    );
     const overhead = directCost.mul(Number(pct));
 
     await tx.execute(sql`
@@ -753,10 +749,7 @@ export interface RollupDivergence {
  * test care ar verifica rollup-ul cu aceeasi formula care l-a produs n-ar
  * verifica nimic. Jobul nocturn `rollup.verify` cheama functia asta.
  */
-export async function verifyRollups(
-  actor: Actor,
-  periodId?: string,
-): Promise<RollupDivergence[]> {
+export async function verifyRollups(actor: Actor, periodId?: string): Promise<RollupDivergence[]> {
   return withActor(actor, async (tx) => {
     const result = await tx.execute(sql`
       select component_id, period_id, column_name, stored, expected

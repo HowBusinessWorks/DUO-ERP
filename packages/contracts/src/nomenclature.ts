@@ -99,7 +99,12 @@ export const subcontractorInputSchema = z.object({
   name: requiredText(200),
   cui: cuiSchema,
   specialties: trimmed(400).transform((v) =>
-    v === '' ? [] : v.split(',').map((s) => s.trim()).filter((s) => s !== ''),
+    v === ''
+      ? []
+      : v
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s !== ''),
   ),
   warrantyRetentionPct: z
     .string()

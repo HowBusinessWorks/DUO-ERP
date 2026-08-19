@@ -115,7 +115,9 @@ describe('coada de lucru', () => {
     expect(await open()).toBe('1');
 
     await withActor(owner, async (tx) => {
-      await tx.execute(sql`update app.work_queue_items set resolved_at = now() where id = ${itemId}`);
+      await tx.execute(
+        sql`update app.work_queue_items set resolved_at = now() where id = ${itemId}`,
+      );
     });
 
     expect(await open()).toBe('0');

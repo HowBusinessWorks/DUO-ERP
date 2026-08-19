@@ -275,10 +275,7 @@ export type AllocationRow = typeof schema.fundingAllocations.$inferSelect & {
  * cele supersedate spun de unde se platea si cine a decis sa nu mai fie asa. A
  * doua intrebare e cea care se pune la sedinta de luna.
  */
-export async function listAllocations(
-  actor: Actor,
-  workUnitId: string,
-): Promise<AllocationRow[]> {
+export async function listAllocations(actor: Actor, workUnitId: string): Promise<AllocationRow[]> {
   return withActor(actor, async (tx) => {
     const rows = await tx
       .select({
@@ -376,10 +373,7 @@ export async function listStagesForCompanies(
       .innerJoin(schema.workUnits, eq(schema.workUnits.id, schema.workStages.workUnitId))
       .innerJoin(schema.objectives, eq(schema.objectives.id, schema.workUnits.objectiveId))
       .where(and(...conditions))
-      .orderBy(
-        asc(schema.workUnits.code),
-        asc(schema.workStages.position),
-      )
+      .orderBy(asc(schema.workUnits.code), asc(schema.workStages.position))
       .limit(options.limit ?? DEFAULT_LIMIT * 5);
 
     return rows.map((row) => ({
@@ -429,10 +423,7 @@ export type AssignmentRow = typeof schema.workUnitAssignments.$inferSelect & {
   readonly personName: string;
 };
 
-export async function listAssignments(
-  actor: Actor,
-  workUnitId: string,
-): Promise<AssignmentRow[]> {
+export async function listAssignments(actor: Actor, workUnitId: string): Promise<AssignmentRow[]> {
   return withActor(actor, async (tx) => {
     const rows = await tx
       .select({ assignment: schema.workUnitAssignments, personName: schema.persons.fullName })
@@ -945,8 +936,7 @@ export async function previewFundingMove(
       amount: Money.fromDb(context.allocation.allocatedAmount),
       fromComponentName: context.fromComponentName,
       fromPeriodLabel: periodLabel(context.fromPeriodYear, context.fromPeriodMonth),
-      currentPeriodLabel:
-        current === null ? null : periodLabel(current.year, current.month),
+      currentPeriodLabel: current === null ? null : periodLabel(current.year, current.month),
     };
   });
 }
@@ -1153,9 +1143,7 @@ export async function listReallocationDocuments(
   }
 
   return withActor(actor, async (tx) => {
-    const conditions = [
-      inArray(schema.reallocationDocuments.companyId, [...options.companyIds]),
-    ];
+    const conditions = [inArray(schema.reallocationDocuments.companyId, [...options.companyIds])];
     if (options.periodId !== undefined) {
       conditions.push(eq(schema.reallocationDocuments.periodId, options.periodId));
     }
@@ -1177,10 +1165,7 @@ export async function listReallocationDocuments(
         createdByName: schema.persons.fullName,
       })
       .from(schema.reallocationDocuments)
-      .innerJoin(
-        schema.workUnits,
-        eq(schema.workUnits.id, schema.reallocationDocuments.workUnitId),
-      )
+      .innerJoin(schema.workUnits, eq(schema.workUnits.id, schema.reallocationDocuments.workUnitId))
       .innerJoin(
         schema.contractComponents,
         eq(schema.contractComponents.id, schema.reallocationDocuments.fromComponentId),

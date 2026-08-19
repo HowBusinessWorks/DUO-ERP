@@ -349,7 +349,11 @@ export function TimesheetWeek({
             ))}
           </ul>
 
-          <Button variant="primary" onClick={validate} disabled={validating || selected.length === 0}>
+          <Button
+            variant="primary"
+            onClick={validate}
+            disabled={validating || selected.length === 0}
+          >
             {validating
               ? 'Se validează…'
               : `Validează ${String(selected.length)} ${selected.length === 1 ? 'pontaj' : 'pontaje'}`}

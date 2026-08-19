@@ -27,9 +27,7 @@ const optionalMoney = moneySchema.or(z.literal('')).transform((v) => (v === '' ?
 
 export const WORK_UNIT_TYPES = ['inspectie', 'interventie', 'lucrare'] as const;
 
-export const WORK_UNIT_TYPE_LABELS: Readonly<
-  Record<(typeof WORK_UNIT_TYPES)[number], string>
-> = {
+export const WORK_UNIT_TYPE_LABELS: Readonly<Record<(typeof WORK_UNIT_TYPES)[number], string>> = {
   inspectie: 'Inspecție',
   interventie: 'Intervenție',
   lucrare: 'Lucrare',
@@ -198,12 +196,7 @@ export const workUnitFormSchema = z
   })
   .refine(
     (v) => {
-      const parts = [
-        v.fundingContractId,
-        v.fundingComponentId,
-        v.fundingPeriodId,
-        v.fundingAmount,
-      ];
+      const parts = [v.fundingContractId, v.fundingComponentId, v.fundingPeriodId, v.fundingAmount];
       const filled = parts.filter((part) => part !== null).length;
       return filled === 0 || filled === parts.length;
     },
@@ -228,10 +221,13 @@ export const workStageInputSchema = z
       .or(z.literal(''))
       .transform((v) => (v === '' ? null : (Number(v.replace(',', '.')) / 100).toFixed(4))),
   })
-  .refine((v) => v.plannedEnd === null || v.plannedStart === null || v.plannedEnd >= v.plannedStart, {
-    message: 'Sfârșitul etapei nu poate fi înaintea începutului.',
-    path: ['plannedEnd'],
-  });
+  .refine(
+    (v) => v.plannedEnd === null || v.plannedStart === null || v.plannedEnd >= v.plannedStart,
+    {
+      message: 'Sfârșitul etapei nu poate fi înaintea începutului.',
+      path: ['plannedEnd'],
+    },
+  );
 
 /**
  * Mutarea finantarii. `reason` e obligatoriu si **nu are implicit** — verificarea

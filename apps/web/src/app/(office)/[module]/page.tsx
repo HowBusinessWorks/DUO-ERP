@@ -144,36 +144,36 @@ export default async function ModuleListPage({
 
         {alternate === null ? (
           <>
-        <Table
-          caption={entity.plural}
-          columns={entity.list.columns}
-          rows={rows}
-          rowKey={entity.list.rowKey}
-          rowHref={entity.list.rowHref}
-          rowFlagged={entity.list.rowFlagged}
-          className="min-h-0"
-          empty={
-            query === undefined ? (
-              <EmptyState
-                title={entity.list.empty.title}
-                body={entity.list.empty.body}
-                className="rounded-lg border border-dashed border-border bg-surface"
-              />
-            ) : (
-              <EmptyState
-                title={`Niciun rezultat pentru „${query}”`}
-                body="Încearcă un alt cuvânt sau golește căutarea. Înregistrările inactive nu apar în listă."
-                className="rounded-lg border border-dashed border-border bg-surface"
-              />
-            )
-          }
-        />
+            <Table
+              caption={entity.plural}
+              columns={entity.list.columns}
+              rows={rows}
+              rowKey={entity.list.rowKey}
+              rowHref={entity.list.rowHref}
+              rowFlagged={entity.list.rowFlagged}
+              className="min-h-0"
+              empty={
+                query === undefined ? (
+                  <EmptyState
+                    title={entity.list.empty.title}
+                    body={entity.list.empty.body}
+                    className="rounded-lg border border-dashed border-border bg-surface"
+                  />
+                ) : (
+                  <EmptyState
+                    title={`Niciun rezultat pentru „${query}”`}
+                    body="Încearcă un alt cuvânt sau golește căutarea. Înregistrările inactive nu apar în listă."
+                    className="rounded-lg border border-dashed border-border bg-surface"
+                  />
+                )
+              }
+            />
 
-        {rows.length === 0 ? null : (
-          <p className="mt-2 text-sm text-ink-subtle">
-            {rows.length === 1 ? 'un rând' : `${String(rows.length)} rânduri`}
-          </p>
-        )}
+            {rows.length === 0 ? null : (
+              <p className="mt-2 text-sm text-ink-subtle">
+                {rows.length === 1 ? 'un rând' : `${String(rows.length)} rânduri`}
+              </p>
+            )}
           </>
         ) : (
           <div className="min-h-0 flex-1">{alternate}</div>
@@ -233,9 +233,7 @@ function ViewSwitch({
           aria-current={view.key === active ? 'page' : undefined}
           className={cn(
             'rounded px-2.5 py-1 text-sm font-medium transition-colors',
-            view.key === active
-              ? 'bg-surface text-ink shadow-sm'
-              : 'text-ink-muted hover:text-ink',
+            view.key === active ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted hover:text-ink',
           )}
         >
           {view.label}

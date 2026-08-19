@@ -94,7 +94,9 @@ export const contracts = app.table(
     unique('contracts_company_code_unique').on(t.companyId, t.code),
     // Scanul zilnic de expirare intreaba „ce contracte active se termina in
     // urmatoarele N luni”. Indexul e exact pe intrebarea aia.
-    index('contracts_expiry_idx').on(t.endsOn).where(sql`status = 'activ'`),
+    index('contracts_expiry_idx')
+      .on(t.endsOn)
+      .where(sql`status = 'activ'`),
     index('contracts_company_status_idx').on(t.companyId, t.status),
     index('contracts_client_idx').on(t.clientId),
     check('contracts_code_not_blank', sql`length(btrim(${t.code})) > 0`),
@@ -179,7 +181,10 @@ export const contractComponents = app.table(
   (t) => [
     unique('contract_components_contract_type_unique').on(t.contractId, t.type),
     check('contract_components_name_not_blank', sql`length(btrim(${t.name})) > 0`),
-    check('contract_components_fill_target_only_delta', sql`${t.isFillTarget} = (${t.type} = 'delta')`),
+    check(
+      'contract_components_fill_target_only_delta',
+      sql`${t.isFillTarget} = (${t.type} = 'delta')`,
+    ),
   ],
 );
 

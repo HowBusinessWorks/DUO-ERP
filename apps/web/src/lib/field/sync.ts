@@ -57,9 +57,7 @@ export async function summary(): Promise<SyncSummary> {
 }
 
 /** Pune o mutație în coadă. Se cheamă din ecrane, offline sau nu. */
-export async function enqueueMutation(
-  row: Omit<OutboxRow, 'attempts' | 'status'>,
-): Promise<void> {
+export async function enqueueMutation(row: Omit<OutboxRow, 'attempts' | 'status'>): Promise<void> {
   await fieldDb().outbox.put({ ...row, attempts: 0, status: 'pending' });
 }
 
@@ -109,10 +107,9 @@ export async function pull(): Promise<{ ok: boolean; reason?: string }> {
     return { ok: false, reason: 'Fără stocare locală.' };
   }
 
-  const response = await fetch(
-    `/api/field/sync?deviceId=${encodeURIComponent(deviceId())}`,
-    { cache: 'no-store' },
-  ).catch(() => null);
+  const response = await fetch(`/api/field/sync?deviceId=${encodeURIComponent(deviceId())}`, {
+    cache: 'no-store',
+  }).catch(() => null);
 
   if (response === null) {
     return { ok: false, reason: 'Fără rețea.' };

@@ -155,7 +155,10 @@ function LinkGroupBlock({ group }: { group: LinkGroup }) {
         className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left hover:bg-surface-hover"
       >
         <ChevronDown
-          className={cn('size-3 shrink-0 text-ink-subtle transition-transform', expanded ? '' : '-rotate-90')}
+          className={cn(
+            'size-3 shrink-0 text-ink-subtle transition-transform',
+            expanded ? '' : '-rotate-90',
+          )}
           aria-hidden="true"
         />
         <span className="flex-1 truncate text-sm font-medium text-ink">{group.title}</span>

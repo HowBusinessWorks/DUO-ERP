@@ -620,4 +620,3 @@ export async function verifyStockBalances(actor: Actor): Promise<StockDivergence
     }));
   });
 }
-

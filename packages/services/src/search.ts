@@ -13,13 +13,7 @@ import { and, eq, ilike, or, sql } from 'drizzle-orm';
  */
 
 export type SearchGroup =
-  | 'companies'
-  | 'persons'
-  | 'produse'
-  | 'furnizori'
-  | 'clienti'
-  | 'subcontractanti'
-  | 'calificari';
+  'companies' | 'persons' | 'produse' | 'furnizori' | 'clienti' | 'subcontractanti' | 'calificari';
 
 export interface SearchHit {
   readonly group: SearchGroup;
@@ -92,7 +86,11 @@ export async function searchEverything(
     if (wanted('furnizori')) {
       tasks.push(
         tx
-          .select({ id: schema.suppliers.id, name: schema.suppliers.name, cui: schema.suppliers.cui })
+          .select({
+            id: schema.suppliers.id,
+            name: schema.suppliers.name,
+            cui: schema.suppliers.cui,
+          })
           .from(schema.suppliers)
           .where(and(eq(schema.suppliers.isActive, true), ilike(schema.suppliers.name, pattern)))
           .limit(PER_GROUP)
@@ -137,7 +135,10 @@ export async function searchEverything(
           })
           .from(schema.subcontractors)
           .where(
-            and(eq(schema.subcontractors.isActive, true), ilike(schema.subcontractors.name, pattern)),
+            and(
+              eq(schema.subcontractors.isActive, true),
+              ilike(schema.subcontractors.name, pattern),
+            ),
           )
           .limit(PER_GROUP)
           .then((rows) =>
@@ -209,7 +210,11 @@ export async function searchEverything(
     if (wanted('companies')) {
       tasks.push(
         tx
-          .select({ id: schema.companies.id, name: schema.companies.name, cui: schema.companies.cui })
+          .select({
+            id: schema.companies.id,
+            name: schema.companies.name,
+            cui: schema.companies.cui,
+          })
           .from(schema.companies)
           .where(and(eq(schema.companies.isActive, true), ilike(schema.companies.name, pattern)))
           .limit(PER_GROUP)

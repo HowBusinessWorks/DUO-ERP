@@ -23,8 +23,7 @@ const id = () =>
     .primaryKey()
     .$defaultFn(() => uuidv7());
 
-const createdAt = () =>
-  timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
+const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
 /**
  * Clientii. Un client poate fi o firma din grup (`is_intercompany`) — atunci

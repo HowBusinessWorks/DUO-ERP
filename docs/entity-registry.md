@@ -16,11 +16,16 @@ completează, unde beneficiază toate entitățile deodată.
 
 ```tsx
 const contracte = defineEntity<ContractRow>({
-  slug: 'contracte', singular: 'Contract', plural: 'Contracte',
-  icon: 'fileSignature', group: 'operational', usesPeriod: true,
+  slug: 'contracte',
+  singular: 'Contract',
+  plural: 'Contracte',
+  icon: 'fileSignature',
+  group: 'operational',
+  usesPeriod: true,
   list: {
     load: (ctx, q) => listContracts(ctx.actor, q),
-    rowKey: (r) => r.id,  rowHref: (r) => `/contracte/${r.id}`,
+    rowKey: (r) => r.id,
+    rowHref: (r) => `/contracte/${r.id}`,
     searchPlaceholder: 'Caută după număr sau client',
     columns: [{ key: 'name', header: 'Denumire', cell: (r) => <CellTitle>{r.name}</CellTitle> }],
     empty: { title: 'Niciun contract', body: 'Contractele sunt…', actionLabel: 'Adaugă' },
@@ -34,14 +39,14 @@ Restul — antet, tab-uri, Legături, formular — se adaugă când ai nevoie de
 
 ## Ce mai poți declara
 
-| Cheie | Ce face |
-|---|---|
-| `detail.load` / `header` / `tabs` | pagina de detaliu, cu banda [2] și [3] |
-| `detail.links` | panoul de Legături, rezolvat în RSC, cu contoare |
-| `detail.quickActions` | 3–5 acțiuni care se schimbă **cu statusul** entității |
-| `form` | formularul de creare/editare, descris ca date |
-| `canRead` / `canWrite` | cine deschide modulul, cine îl modifică |
-| `usesPeriod` | dacă ecranul depinde de lună (selector + lacăt) |
+| Cheie                             | Ce face                                               |
+| --------------------------------- | ----------------------------------------------------- |
+| `detail.load` / `header` / `tabs` | pagina de detaliu, cu banda [2] și [3]                |
+| `detail.links`                    | panoul de Legături, rezolvat în RSC, cu contoare      |
+| `detail.quickActions`             | 3–5 acțiuni care se schimbă **cu statusul** entității |
+| `form`                            | formularul de creare/editare, descris ca date         |
+| `canRead` / `canWrite`            | cine deschide modulul, cine îl modifică               |
+| `usesPeriod`                      | dacă ecranul depinde de lună (selector + lacăt)       |
 
 ## Regulile care sunt impuse de tipuri, nu de disciplină
 

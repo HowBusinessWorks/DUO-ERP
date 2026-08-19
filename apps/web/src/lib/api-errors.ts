@@ -23,9 +23,12 @@ const STATUS: Readonly<Partial<Record<string, number>>> = {
 
 export function apiError(error: unknown): NextResponse {
   if (error instanceof AppError) {
-    return NextResponse.json({ error: error.message, code: error.code }, {
-      status: STATUS[error.code] ?? 400,
-    });
+    return NextResponse.json(
+      { error: error.message, code: error.code },
+      {
+        status: STATUS[error.code] ?? 400,
+      },
+    );
   }
   throw error;
 }

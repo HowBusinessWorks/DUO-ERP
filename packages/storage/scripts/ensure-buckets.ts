@@ -81,7 +81,9 @@ async function exists(name: string): Promise<boolean> {
         `Acces refuzat pe bucket-ul "${name}" (403). Tokenul R2 pare limitat la anumite bucket-uri — are nevoie de permisiune "Admin Read & Write" pe tot contul ca sa poata crea bucket-uri.`,
       );
     }
-    throw new Error(`HeadBucket "${name}" a esuat: ${e.name ?? 'necunoscut'} (HTTP ${status ?? '?'})`);
+    throw new Error(
+      `HeadBucket "${name}" a esuat: ${e.name ?? 'necunoscut'} (HTTP ${status ?? '?'})`,
+    );
   }
 }
 
@@ -119,7 +121,9 @@ async function ensure(target: BucketName): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const requested = process.argv.slice(2).filter((a): a is BucketName => ALL.includes(a as BucketName));
+  const requested = process.argv
+    .slice(2)
+    .filter((a): a is BucketName => ALL.includes(a as BucketName));
   const targets = requested.length > 0 ? requested : ALL;
 
   process.stdout.write(`Verific bucket-urile: ${targets.join(', ')}\n`);

@@ -81,7 +81,10 @@ export const inspections = app.table(
     index('inspections_effect_date_idx').on(t.effectDate),
     check('inspections_checklist_version_positive', sql`${t.checklistVersion} > 0`),
     // Cine a validat si cand se scriu deodata, ca `closed_at`/`closed_by` pe UL.
-    check('inspections_validated_complete', sql`num_nonnulls(${t.validatedAt}, ${t.validatedBy}) <> 1`),
+    check(
+      'inspections_validated_complete',
+      sql`num_nonnulls(${t.validatedAt}, ${t.validatedBy}) <> 1`,
+    ),
     // Data de efect exista exact cat timp fisa e validata: regula 3, in model.
     check(
       'inspections_effect_date_with_validation',

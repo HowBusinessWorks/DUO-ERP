@@ -88,7 +88,8 @@ async function post(url: string, body: unknown): Promise<SaveOutcome> {
   }
 
   const payload: unknown = await response.json().catch(() => null);
-  const record = typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>) : {};
+  const record =
+    typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>) : {};
 
   if (!response.ok) {
     const message = record['message'];
@@ -167,11 +168,13 @@ export function CheckboxSet({
               const result: SaveOutcome =
                 target.kind === 'endpoint'
                   ? await post(target.url, body)
-                  : await target.action(body).then((outcome) =>
-                      outcome.ok
-                        ? ({ ok: true } as const)
-                        : ({ ok: false, message: outcome.message } as const),
-                    );
+                  : await target
+                      .action(body)
+                      .then((outcome) =>
+                        outcome.ok
+                          ? ({ ok: true } as const)
+                          : ({ ok: false, message: outcome.message } as const),
+                      );
 
               setSaving(false);
               if (result.ok) {
