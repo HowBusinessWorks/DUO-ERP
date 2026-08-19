@@ -94,7 +94,6 @@ export function CeilingDialog({
           schema={cost ? costCeilingInputSchema : revenueCeilingInputSchema}
           defaultValues={defaults as never}
           id={formId}
-          serverError={serverError}
           onSubmit={(values) => {
             void (async () => {
               setServerError(undefined);
@@ -114,6 +113,7 @@ export function CeilingDialog({
           {(form) => {
             return (
               <Dialog
+                error={serverError}
                 open
                 onOpenChange={(next) => {
                   if (!next) {

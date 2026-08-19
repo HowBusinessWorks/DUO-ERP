@@ -76,7 +76,6 @@ export function LinkObjectiveDialog({
             } as never
           }
           id={formId}
-          serverError={serverError}
           onSubmit={(values) => {
             void (async () => {
               setServerError(undefined);
@@ -94,6 +93,7 @@ export function LinkObjectiveDialog({
           {(form) => {
             return (
               <Dialog
+                error={serverError}
                 open
                 onOpenChange={(next) => {
                   if (!next) {

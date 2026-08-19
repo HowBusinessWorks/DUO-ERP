@@ -196,7 +196,6 @@ function FormDialog({
       onSubmit={(values) => {
         void onSubmit(values);
       }}
-      serverError={serverError}
     >
       {(form) => {
         // `isDirty` merge in Dialog: la inchidere cu modificari nesalvate,
@@ -213,6 +212,7 @@ function FormDialog({
               }
             }}
             title={title}
+            error={serverError}
             isDirty={form.formState.isDirty}
             size="md"
             footer={

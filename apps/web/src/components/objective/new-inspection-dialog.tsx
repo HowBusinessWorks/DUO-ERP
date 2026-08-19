@@ -84,7 +84,6 @@ export function NewInspectionDialog({
         <Form
           schema={createInspectionInputSchema}
           id={`inspectie-${objectiveId}`}
-          serverError={serverError}
           defaultValues={
             {
               companyId: first.companyId,
@@ -120,6 +119,7 @@ export function NewInspectionDialog({
 
             return (
               <Dialog
+                error={serverError}
                 open
                 onOpenChange={(next) => {
                   if (!next) {

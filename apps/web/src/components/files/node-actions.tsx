@@ -59,7 +59,6 @@ function NameDialog({
       schema={nameSchema}
       defaultValues={{ name: defaultName }}
       id={formId}
-      serverError={serverError}
       onSubmit={(values: NameValues) => {
         void (async () => {
           setServerError(undefined);
@@ -76,6 +75,7 @@ function NameDialog({
     >
       {(form) => (
         <Dialog
+          error={serverError}
           open
           onOpenChange={(next) => {
             if (!next) {

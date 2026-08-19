@@ -75,7 +75,6 @@ function ReasonDialog({
           schema={reasonSchema}
           defaultValues={{ reason: '' }}
           id={formId}
-          serverError={serverError}
           onSubmit={(values: ReasonValues) => {
             void (async () => {
               setServerError(undefined);
@@ -92,6 +91,7 @@ function ReasonDialog({
         >
           {(form) => (
             <Dialog
+              error={serverError}
               open
               onOpenChange={(next) => {
                 if (!next) {

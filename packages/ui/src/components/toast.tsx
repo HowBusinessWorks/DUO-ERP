@@ -5,7 +5,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -102,11 +104,36 @@ function ToastViewport({
   toasts: readonly Toast[];
   onDismiss: (id: string) => void;
 }) {
+  const viewport = useRef<HTMLDivElement>(null);
+
+  // Dialogurile noastre sunt <dialog> nativ cu showModal(), deci stau in top
+  // layer — deasupra oricarui z-index. Un toast lasat in fluxul normal ramane
+  // in spatele backdrop-ului blurat si nu se vede. Il promovam si pe el in top
+  // layer ca popover manual. Unde API-ul lipseste, ramane un div obisnuit.
+  useEffect(() => {
+    const node = viewport.current;
+    if (node === null || typeof node.showPopover !== 'function') return;
+    node.setAttribute('popover', 'manual');
+    try {
+      node.showPopover();
+    } catch {
+      // deja deschis
+    }
+    return () => {
+      try {
+        node.hidePopover();
+      } catch {
+        // deja inchis
+      }
+    };
+  }, []);
+
   return (
     <div
+      ref={viewport}
       aria-live="polite"
       aria-atomic="false"
-      className="pointer-events-none fixed right-4 bottom-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
+      className="pointer-events-none fixed top-auto left-auto right-4 bottom-4 z-50 m-0 flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2 overflow-visible border-0 bg-transparent p-0"
     >
       {toasts.map((item) => {
         const Icon = ICONS[item.tone];

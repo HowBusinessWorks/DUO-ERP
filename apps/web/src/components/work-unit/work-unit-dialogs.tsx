@@ -101,7 +101,6 @@ function ActionDialog<Schema extends z.ZodType>({
           schema={schema}
           defaultValues={defaults as never}
           id={formId}
-          serverError={serverError}
           onSubmit={(values) => {
             void (async () => {
               setServerError(undefined);
@@ -118,6 +117,7 @@ function ActionDialog<Schema extends z.ZodType>({
         >
           {(form) => (
             <Dialog
+              error={serverError}
               open
               onOpenChange={(next) => {
                 if (!next) {

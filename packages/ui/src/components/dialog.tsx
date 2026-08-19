@@ -1,7 +1,7 @@
 'use client';
 
 import { t } from '@damina/i18n';
-import { X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { cn } from '../lib/cn';
 import { Button } from './button';
@@ -18,6 +18,15 @@ export interface DialogProps {
    * leaga direct la `formState.isDirty` din react-hook-form.
    */
   readonly isDirty?: boolean;
+  /**
+   * Eroarea de la server, randata in capul continutului.
+   *
+   * Traieste AICI, nu in `Form`: `<form>` ramane in pagina, iar `<dialog>` e in
+   * top layer, deci o banda randata de `Form` ar aparea in spatele fundalului
+   * blurat — vizibila pentru nimeni. E `sticky`, ca sa se vada si cand
+   * formularul e derulat in jos.
+   */
+  readonly error?: string;
   readonly footer?: ReactNode;
   readonly children: ReactNode;
   readonly size?: 'sm' | 'md' | 'lg';
@@ -52,6 +61,7 @@ export function Dialog({
   title,
   description,
   isDirty = false,
+  error,
   footer,
   children,
   size = 'md',
@@ -141,6 +151,15 @@ export function Dialog({
       </header>
 
       <div className="scrollbar-thin max-h-[min(70vh,44rem)] overflow-y-auto px-5 py-4">
+        {error === undefined ? null : (
+          <div
+            role="alert"
+            className="sticky top-0 z-10 mb-4 flex items-start gap-2 rounded-md border border-danger-200 bg-danger-50 px-3 py-2.5 text-base text-danger-700 shadow-sm"
+          >
+            <AlertTriangle className="mt-px size-4 shrink-0" aria-hidden="true" />
+            <p>{error}</p>
+          </div>
+        )}
         {children}
       </div>
 
