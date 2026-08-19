@@ -49,7 +49,14 @@ export default defineConfig({
     // `process.env` la build. Pus doar la pornire, steagul n-ar exista in bundle
     // si fiecare test ar vedea ecranul de login. Vezi `tools/scripts/e2e-server.mjs`.
     command: 'node tools/scripts/e2e-server.mjs',
-    url: 'http://127.0.0.1:3100/field',
+    /*
+     * Sonda de pornire loveste `/login`, nu `/field`. Fara cookie — si sonda
+     * n-are cookie-uri — `/field` e redirectat catre panoul de birou, care cere
+     * baza de date. In CI nu exista una, deci sonda nu primea niciodata 200 si
+     * jobul cadea dupa cinci minute, cu un teanc de ECONNREFUSED in log.
+     * `/login` se randeaza fara nimic in spate.
+     */
+    url: 'http://127.0.0.1:3100/login',
     reuseExistingServer: process.env.CI !== 'true',
     timeout: 300_000,
   },

@@ -399,6 +399,13 @@ aceea build-ul ăla e al lui: un bundle care acceptă o sesiune fabricată dintr
 A doua, mai banală: `reuseExistingServer` a reciclat un server rămas de la rularea anterioară, cu
 bundle-ul vechi. Testele au continuat să pice după ce cauza reală era deja reparată.
 
+A treia a apărut abia **în CI**, verde fiind local: sonda de pornire a lui Playwright cerea `/field`,
+iar sonda n-are cookie-uri — deci era redirectată către panoul de birou, care cere baza de date. Pe
+mașina mea baza există și sonda primea 200; în CI nu, și jobul cădea după cinci minute cu un teanc de
+`ECONNREFUSED`. Sonda lovește acum `/login`, care se randează fără nimic în spate. **Morala e că un
+job „fără bază de date" trebuie verificat că n-atinge niciun drum care cere una — inclusiv drumurile
+pe care le alege un redirect.**
+
 ### Cum a fost verificat
 
 - `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets` — toate verzi.
