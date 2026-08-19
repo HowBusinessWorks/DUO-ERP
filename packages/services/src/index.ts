@@ -450,3 +450,6 @@ export {
   timesheetTotals,
 } from '@damina/domain';
 export type { InspectionBlocker, InspectionValidationCheck, VarianceResult } from '@damina/domain';
+
+export { readPmPanel } from './pm-panel';
+export type { PmApproval, PmApprovalKind, PmContractCard, PmPanel, PmRiskRow } from './pm-panel';

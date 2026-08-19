@@ -1,8 +1,10 @@
+import { canSeeFinancials } from '@damina/auth';
 import { formatPeriodLong } from '@damina/i18n';
-import { countNomenclature, listOpenAlerts, listWorkQueue } from '@damina/services';
+import { countNomenclature, listOpenAlerts, listWorkQueue, readPmPanel } from '@damina/services';
 import { Badge, Banner, Card, CardBody, CardHeader, EmptyState, Stat } from '@damina/ui';
 import { AlertTriangle, Inbox } from 'lucide-react';
 import Link from 'next/link';
+import { PmSection } from '../../../components/panel/pm-section';
 import { PeriodLockBanner } from '../../../components/shell/period-lock-banner';
 import { getAppContext } from '../../../lib/context';
 
@@ -19,16 +21,27 @@ const SEVERITY_TONE = { info: 'info', warning: 'warning', critical: 'danger' } a
  *   3. CIFRELE — statistici. Nu au badge in sidebar, tocmai pentru ca nu se pot
  *      goli prin actiune; locul lor e aici.
  *
- * Cardurile pe rol, cu date reale, vin odata cu modulele lor (pasii 04-10). Ce
- * exista acum e scheletul si mecanica celor trei mecanisme, corect separate.
+ * Peste ele, din pasul 10e, sta blocul de PM (§3.7): Delta, contractele mele,
+ * ce am de aprobat si lucrarile in risc. Sta DEASUPRA cozii pentru ca Delta e
+ * singurul lucru de pe ecran care se pierde iremediabil daca omul nu face nimic
+ * azi — restul asteapta cuminte pana maine.
+ *
+ * Blocul apare doar pentru cine are voie sa vada bani. Delta, plafoanele si
+ * consumul sunt cifre financiare; pentru un rol fara dreptul asta n-ar fi doar
+ * nepotrivite, ar fi ilizibile.
  */
 export default async function PanelPage() {
   const ctx = await getAppContext();
 
-  const [queue, alerts, counts] = await Promise.all([
+  const financials = canSeeFinancials(ctx.session);
+
+  const [queue, alerts, counts, pm] = await Promise.all([
     listWorkQueue(ctx.actor, ctx.session.personId, ctx.selectedCompanyIds, { limit: 12 }),
     listOpenAlerts(ctx.actor, ctx.selectedCompanyIds, { limit: 8 }),
     countNomenclature(ctx.actor),
+    financials
+      ? readPmPanel(ctx.actor, ctx.session.personId, ctx.selectedCompanyIds, ctx.year, ctx.month)
+      : null,
   ]);
 
   return (
@@ -63,6 +76,8 @@ export default async function PanelPage() {
             ))}
           </div>
         )}
+
+        {pm === null ? null : <PmSection panel={pm} />}
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
           <Card className="xl:col-span-2">

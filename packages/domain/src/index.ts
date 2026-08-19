@@ -12,15 +12,18 @@ export const DOMAIN_PACKAGE_READY = true;
 
 export {
   addYears,
+  aggregateDeltaFill,
   applyIndexation,
   buildContractYears,
   CEILING_WARNING_PERCENT,
   ceilingUsage,
+  consumptionRisk,
   compareDates,
   contractYearAt,
   daysInMonth,
   deltaFill,
   previousDay,
+  RISK_CRITICAL_GAP,
 } from './contracts';
 export {
   allocatedTotal,
@@ -61,11 +64,14 @@ export type {
   CeilingState,
   CeilingUsage,
   CeilingUsageInput,
+  ConsumptionRisk,
   ContractYear,
   ContractYearsInput,
   DeltaFill,
   DeltaFillInput,
+  DeltaFillPart,
   DeltaState,
+  RiskSeverity,
 } from './contracts';
 export {
   estimateFromCatalog,

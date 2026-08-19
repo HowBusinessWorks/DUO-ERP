@@ -78,3 +78,6 @@ export type { TabItem, TabsProps } from './components/tabs';
 
 export { ToastProvider, useToast } from './components/toast';
 export type { Toast, ToastTone } from './components/toast';
+
+export { Gauge } from './components/gauge';
+export type { GaugeProps, GaugeTone } from './components/gauge';

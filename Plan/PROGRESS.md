@@ -450,6 +450,47 @@ smoke aruncabile, pe dev, cu bucket real. **Așa au ieșit la iveală toate defe
 
 ---
 
+## 10e — panoul PM, cu gauge-ul Delta (19 august 2026)
+
+### Ce a intrat
+
+- **`readPmPanel`** (`packages/services/src/pm-panel.ts`) — o singură citire, cu **număr fix de
+  interogări**, indiferent câte contracte are omul. Nicio tabelă nouă, nicio migrare: panoul
+  citește ce există deja — plafoane, `component_period_rollup`, `work_stages`, fișe nevalidate.
+- **`Gauge`** în `@damina/ui` — arc care **se umple**, cu semnul ritmului zilei desenat pe el.
+  Componentă separată de `ProgressBar` dinadins: aceeași distanță pe ecran înseamnă exact pe dos
+  la un plafon de venit față de unul de cost. Același motiv pentru care `deltaFill` și
+  `ceilingUsage` sunt două funcții, nu una cu un `boolean`.
+- **Patru carduri** în `Panou › Panoul meu`, deasupra cozii: Delta lunii (gauge, lei liberi, zile
+  rămase, link în backlog), Contractele mele (umplere + consum), De aprobat (fișe și pontaje
+  nevalidate), Lucrări în risc.
+- **`aggregateDeltaFill` și `consumptionRisk`** în domeniu, cu teste unitare. Suma Deltelor se
+  face **pe lei, nu pe procente**: media a două procente ar cântări la fel un contract de 200.000
+  și unul de 3.000, adică ar minți exact în cazul care contează.
+
+### Decizii care se văd pe ecran
+
+1. **Blocul apare doar cu `canSeeFinancials`.** Delta, plafoanele și consumul sunt cifre
+   financiare; pentru un rol fără dreptul ăsta n-ar fi doar nepotrivite, ar fi ilizibile.
+2. **`scope: 'mine' | 'toate'`.** Cine nu e PM pe niciun contract activ vede toate contractele
+   vizibile, și ecranul **scrie asta**. Un panou care zice „contractele mele" și arată
+   contractele altcuiva e mai rău decât unul gol.
+3. **Plafon nesetat ≠ plafon zero.** Componentele Delta fără plafon nu intră în gauge; se
+   numără separat, sub el.
+4. **Consum și progres nu se deduc unul din altul** — vin din registrul de cost și din etape,
+   tocmai ca să poată diverge. Divergența e chiar semnalul; pragul de „critic" e 15 pp.
+
+### Ce rămâne deschis
+
+- **Verificarea #27 spune „17 zile" pe 14 august**, dar `deltaFill` numără ziua curentă inclusiv
+  (regula scrisă la 04: pe 31 mai e o zi de lucrat), deci 18. Regula domeniului a rămas
+  neschimbată; textul verificării e cel care e cu o zi în urmă.
+- Testul de integrare (`packages/services/tests/pm-panel.test.ts`, verificările #27 și #28) e
+  scris, dar **nu a putut fi rulat local** — nu există Docker pe mașina de dezvoltare și nici
+  `TEST_DATABASE_URL`. Rulează în CI, la `test:db`.
+
+---
+
 ## 10c-3 (parțial) — necesarul de material și pontajul (19 august 2026)
 
 ### Ce a intrat

@@ -18,3 +18,6 @@ export type {
   DeltaFillInput,
   DeltaState,
 } from './ceilings';
+
+export { RISK_CRITICAL_GAP, aggregateDeltaFill, consumptionRisk } from './pm-panel';
+export type { ConsumptionRisk, DeltaFillPart, RiskSeverity } from './pm-panel';
