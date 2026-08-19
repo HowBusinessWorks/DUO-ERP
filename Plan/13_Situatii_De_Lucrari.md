@@ -159,7 +159,11 @@ stage            ← 'facturat'
 document_type    ← 'situatie_lucrari'
 document_id      ← sl_id
 document_line_id ← sl_line_id, pe fiecare linie
-charged_*        ← OBLIGATORIU pe stadiul asta (check-ul din 0017)
+charged_*        ← contractul si componenta de pe linia `angajat` a
+                   pachetului (pasul 12 §3.4). Se citesc de acolo, nu se
+                   recalculeaza si nu se cer de la om — altfel cele doua
+                   stadii ale aceleiasi cheltuieli ajung pe componente
+                   diferite si rollup-ul minte in ambele sensuri.
 ```
 
 **O linie de cost per linie de SL**, nu una pe document. Fără `document_line_id`, drill-down-ul de la pasul 06 (verificarea #11) se oprește la document și nu ajunge la sursă.

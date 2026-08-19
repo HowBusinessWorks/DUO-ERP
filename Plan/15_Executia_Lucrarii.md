@@ -50,11 +50,17 @@ Pasul pe care documentul îl numește „necesar, dar nedescris" (§15):
 
 > ajustare stoc rămas pe gestiunea șantierului, retur la magazie, ultimul bon de consum, PV de recepție, blocarea de noi costuri, calculul marjei finale, arhivarea în „proiecte anterioare" ca sursă de copiere pentru devize viitoare.
 
-**`getClosingChecklist` există deja** (`packages/services/src/work-units.ts:1334`) și are trei rânduri marcate `pending_module`, dintre care două spun literal „vin în faza 2":
+**`getClosingChecklist` există deja** (`packages/services/src/work-units.ts`) și are trei rânduri marcate `pending_module`:
 
-- `material_return` — retur la magazie;
+- `material_return` — retur la magazie; **rămâne `pending_module`**, aprovizionarea e faza 3;
 - `pv_receptie` — **rămâne `pending_module`**, PV-ul e faza 4;
 - `situatie_lucrari` — situație de lucrări acceptată → **devine rând real acum**.
+
+**Cele trei texte de pe ecran sunt greșite azi și se corectează în pasul ăsta**, chiar și acolo unde
+starea nu se schimbă: `material_return` spune „se verifică din pasul 06, când există registrul de cost"
+— registrul există din pasul 06, deci fraza promite ceva ce s-a întâmplat deja; `pv_receptie` spune
+„documentele de recepție vin în faza 2", dar PV-ul e faza 4. Un rând `pending_module` care arată către
+o fază greșită e o promisiune pe care nimeni n-o mai urmărește.
 
 Regula casei: *„un rând de checklist care nu poate cădea niciodată nu se pune pe ecran."* Verifică fiecare rând nou pe care-l adaugi.
 
@@ -156,8 +162,8 @@ Ecranul de teren capătă cele două ca acțiuni distincte, **doar pe lucrări**
 | `journal_before_after` — există intrare `inainte` și `dupa` | **real** | da |
 | `supplements_decided` — nicio suplimentare rămasă `propusa`/`verificata` | **real** | da |
 | `warranties` — garanțiile reținute au scadență | **real, informativ** | **nu** — se eliberează după închidere, e normal |
-| `material_return` — retur la magazie | **rămâne `pending_module`** | nu — faza 3 |
-| `pv_receptie` | **rămâne `pending_module`** | nu — faza 4 |
+| `material_return` — retur la magazie | **rămâne `pending_module`**, cu textul corectat pe faza 3 | nu — faza 3 |
+| `pv_receptie` | **rămâne `pending_module`**, cu textul corectat pe faza 4 | nu — faza 4 |
 
 **Blocarea de noi costuri după închidere**: trigger pe `cost_lines`, `before insert`, care refuză liniile pe o UL cu `status = 'inchisa'`. **Cu o singură ieșire: stornarea** (`is_reallocation` sau `reallocation_of_id` completat) — altfel o corecție legitimă a unei luni închise devine imposibilă.
 

@@ -91,7 +91,14 @@ package_offer_lines → offer_id, package_line_id, offered_price, comment,
                   unique (offer_id, package_line_id)
 ```
 
-**Triggerul care refuză materialul.** `before insert or update on package_lines`: dacă `deviz_line_id` arată către o linie a cărei componentă dominantă e material, refuză cu mesaj explicit. Regula concretă: linia trebuie să aibă `labor_cost > 0` și `material_cost = 0`. O linie mixtă se sparge în deviz înainte, nu se strecoară în pachet.
+**Triggerul care refuză materialul.** `before insert or update on package_lines`: dacă `deviz_line_id` arată către o linie cu `material_cost > 0`, refuză cu mesaj explicit. O linie mixtă se sparge în deviz înainte, nu se strecoară în pachet.
+
+**Atenție, aici e o întrebare de business încă deschisă (D7 din `QUESTIONS.md`), de răspuns înainte de 12a.**
+Devizul intern are patru feluri de cost (pasul 11 §3.1): material, manoperă, **utilaj, transport**. Regula
+„doar manoperă" scrisă ca `labor_cost > 0 and material_cost = 0` refuză și o poziție curat de utilaj sau
+de transport, care nu e material. Dacă subcontractantul nu primește niciodată utilaj/transport, condiția
+strictă e corectă și trebuie scrisă așa **dinadins**; dacă primește, condiția e `material_cost = 0` și
+atât. Nu ghici la implementare — întreabă, apoi scrie decizia în `QUESTIONS.md` și în `PROGRESS.md`.
 
 **`package_offer_lines` e a patra tabelă, peste cele trei din D.3.** Motivul: §8.3 cere ca subcontractantul să poată **oferta și comenta linie cu linie**. Fără tabela asta, oferta ar fi un singur preț pe pachet, adică exact granularitatea pe care modelul validat o respinge (§10.3: „verificarea e linie cu linie, nu în bloc" — și negocierea la fel).
 
@@ -106,13 +113,14 @@ package_offer_lines → offer_id, package_line_id, offered_price, comment,
 
 **View-ul `v_package_lines_field`**, cu `security_invoker = on`: `id, package_id, deviz_line_id, position, name, uom, quantity_contracted`. Fără nicio coloană de preț. `packages/db` îl expune ca schemă Drizzle separată, deci **TypeScript-ul nu cunoaște `unit_price` în contextul field**.
 
-Politica de izolare A-vs-B se scrie o dată, ca funcție `stable`:
+Politica de izolare A-vs-B se scrie o dată, peste `app.current_subcontractor_id()`.
 
-```sql
-create function app.current_subcontractor_id() returns uuid ...
-```
-
-Dacă funcția întoarce `null` (persona nu e subcontractant), politica **nu trebuie să lase nimic să treacă** — `null = uuid` e `null`, nu `false`, și un `where` cu `null` filtrează corect, dar scrie-o explicit ca să nu depindă de subtilitate.
+**Funcția EXISTĂ deja — `0011_rls_policies.sql:110`. Nu o recrea.** Politicile RLS din `0016_work_units.sql`
+și `0021_files.sql` se sprijină pe ea; un `create or replace` cu altă definiție le-ar schimba tăcut
+comportamentul. Refolosește-o ca atare și verifică doar un lucru înainte de a scrie politicile: dacă
+întoarce `null` (persona nu e subcontractant), politica **nu trebuie să lase nimic să treacă** —
+`null = uuid` e `null`, nu `false`, și un `where` cu `null` filtrează corect, dar scrie condiția explicit
+ca să nu depindă de subtilitate.
 
 ### 3.3 Provizionarea de conturi (migrarea `0044_subcontractor_accounts`)
 
@@ -136,8 +144,8 @@ company_id       ← al lucrarii
 document_date    ← data semnarii
 effect_date      ← idem (trigger-ul deduce period_id)
 used_*           ← contractul/componenta lucrarii, obiectiv, work_unit, stage_id
-charged_*        ← NULL e permis pe `angajat` (check-ul din 0017 il accepta
-                   doar pe stadiul asta — vezi comentariul din cost.ts)
+charged_*        ← OBLIGATORIU: contractul si componenta care finanteaza
+                   lucrarea. Se citesc de pe UL, nu se cer de la om.
 expense_type     ← 'servicii_subc'
 amount           ← totalul pachetului acceptat
 stage            ← 'angajat'
@@ -146,7 +154,15 @@ document_id      ← package_id
 subcontractor_id ← al lui
 ```
 
-**`document_type` refolosește `situatie_lucrari`, nu adaugă o valoare nouă în enum.** Motivul: `cost_document_type` e o tabelă din faza 0, iar a o extinde pentru fiecare document nou al fazei 2 înseamnă o migrare pe o structură de bază la fiecare pas. Perechea `document_type + document_id` rămâne suficientă pentru drill-down, fiindcă `document_id` arată neambiguu către `packages`.
+**`charged_*` nu poate rămâne gol, deși check-ul din bază l-ar accepta.** `cost_lines_charged_required`
+(`0017:30`) permite `NULL` pe stadiul `angajat` — dar **rollup-ul de plafon nu**: `app.rollup_apply_cost`
+iese din prima instrucțiune când componenta e `null` (`0018_rollups.sql:56`), iar funcția de reconciliere
+ignoră la fel liniile fără componentă (`:222`). Un pachet de 80.000 lei semnat cu `charged_*` gol ar fi
+**invizibil în plafon** — adică exact depășirea pe care pasul promite că o previne, și exact ce cere
+verificarea #13. Componenta se știe întotdeauna: o lucrare pe care se semnează un pachet are deja
+finanțare (pasul 05). Dacă nu are, semnarea se oprește, nu scrie o linie oarbă.
+
+**`document_type` refolosește `situatie_lucrari`, nu adaugă o valoare nouă în enum.** Motivul: `cost_document_type` e un **enum** din faza 0 (`0000_schemas_and_enums.sql:14`), iar a-l extinde pentru fiecare document nou al fazei 2 înseamnă o migrare de tip pe fundație la fiecare pas — mai scumpă decât ar fi pe o tabelă, fiindcă un `alter type` nu se dă înapoi. Perechea `document_type + document_id` rămâne suficientă pentru drill-down, fiindcă `document_id` arată neambiguu către `packages`.
 
 **Dacă la implementare drill-down-ul de la pasul 06 (verificarea #11) nu poate distinge pachetul de SL** din `document_id`, atunci adaugă valoarea `pachet_subc` în enum, cu migrare separată, și scrie de ce în `PROGRESS.md`. Verifică asta **înainte** de a scrie linia de cost, nu după.
 
@@ -188,7 +204,7 @@ Ecranele se lucrează cu **agentul de design**.
 3. **Subcontractantul vede prețul pachetului lui.** Nu-l ascunde „pentru siguranță" — negociază pe el, iar un portal fără prețuri e un portal inutil.
 4. **Parola temporară se arată o singură dată.** Nu se loghează, nu se persistă în clar, nu se retrimite.
 5. **Fără MFA pe `app_subcontractor`** (decizia utilizatorului). Schimbarea parolei la prima intrare e obligatorie.
-6. **Semnarea scrie în registrul de cost, în aceeași tranzacție.** Un pachet semnat fără linie de cost e o depășire de buget invizibilă.
+6. **Semnarea scrie în registrul de cost, în aceeași tranzacție, cu `charged_*` completat.** Un pachet semnat fără linie de cost — sau cu una fără componentă, deci în afara rollup-ului — e o depășire de buget invizibilă.
 7. **Anularea produce storno, nu `update`.**
 
 ## 5. Ce NU faci în pasul ăsta
@@ -214,7 +230,7 @@ Ecranele se lucrează cu **agentul de design**.
 | 8 | A ofertează 4 linii din 8, cu comentariu pe două | `package_offer_lines` are 4 rânduri; restul rămân la prețul propus |
 | 9 | PM-ul compară ofertele | vede cele 3, linie cu linie, cu diferența față de prețul lui |
 | 10 | PM acceptă oferta lui A și semnează | pachet `semnat`, `subcontractor_id` completat, celelalte 2 oferte trec pe `respins` |
-| 11 | Verifici registrul de cost după semnare | **o linie `angajat`**, `servicii_subc`, cu suma pachetului și `document_id` = pachetul |
+| 11 | Verifici registrul de cost după semnare | **o linie `angajat`**, `servicii_subc`, cu suma pachetului, `document_id` = pachetul și **`charged_*` completat** |
 | 12 | Anulezi pachetul semnat | linie de storno în minus; linia inițială rămâne neatinsă |
 | 13 | Rollup-ul de plafon după semnare | consumul „angajat" crește cu suma pachetului |
 | 14 | PM asignează un subcontractant fără cont | contul se creează, parola temporară apare **o dată**, pe ecran |

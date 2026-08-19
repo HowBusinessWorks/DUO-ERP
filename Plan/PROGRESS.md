@@ -68,12 +68,13 @@ jumătatea unui pas. Aceeași convenție a mers la 09.
     `journal.append` cu executantul lui, ecranul în 3 tapuri, plus scheletul `Verificare SL`.
 - **10d — raportul lunar** către client: GATA. Migrarea `0034`, coada `reports.monthly` cu progres
   real, versionare, îngheț și link tokenizat.
-  **SINGURUL rămas.**
 - **10e — panoul PM** cu gauge-ul Delta: GATA (commit `3a67299`).
 
-### Ce trebuie să știi ca să începi 10c-4
+### Ce ai deja, gata de folosit — cârligele pe care se prinde faza 2
 
-**Ce ai deja, gata de folosit:**
+Lista de mai jos e scrisă la 10c-4 și **rămâne valabilă**: sunt piesele de sincronizare offline pe care
+se sprijină `sl.verify-line` (pasul 13), `sl.verify-supplement` (pasul 14) și executantul nou al lui
+`material.request` (pasul 15).
 
 - `POST /api/field/sync` aplică un lot de mutații, idempotent, în ordinea creării, oprindu-se la
   prima eroare de business. `GET` întoarce felia + cursorul.

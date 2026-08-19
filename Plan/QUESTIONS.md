@@ -201,6 +201,21 @@ Anexa D.3 pune `sl_client` în faza 2, dar el produce factura, care e faza 5. **
 prin mapare intră acum** (pasul 6a din §10.1); emiterea facturii rămâne faza 5. Același tipar ca blocajul
 de facturare implementat la raportul lunar înainte să existe ecranul de facturare.
 
+### D7 — Utilajul și transportul în pachetul de subcontractant — DESCHISĂ
+
+§8.3 spune că subcontractanții facturează **doar manoperă**, iar D.3 cere un trigger care refuză liniile
+de material în `package_lines`. Devizul intern are însă patru feluri de cost (pasul 11 §3.1): material,
+manoperă, **utilaj, transport**. O regulă scrisă ca `labor_cost > 0 and material_cost = 0` refuză și o
+poziție curat de utilaj sau de transport, care nu e material.
+
+**De răspuns înainte de 12a:** primește vreodată subcontractantul o poziție de utilaj sau de transport?
+
+- **Nu** → condiția strictă (`labor_cost > 0 and material_cost = 0`) e corectă și se scrie așa dinadins,
+  cu motivul în comentariul migrării.
+- **Da** → condiția e `material_cost = 0` și atât.
+
+Nu se ghicește la implementare. Decizia se scrie aici și în `PROGRESS.md`.
+
 ### Contradicția rezolvată pe parcurs — cine vede devizul
 
 `PLAN_TEHNIC` §4.4 dă ca exemplu `GRANT SELECT (…) ON app.deviz_lines TO app_field`. §10.3 din business
