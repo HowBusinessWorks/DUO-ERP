@@ -28,3 +28,7 @@ env.local
 /playwright-report/
 /blob-report/
 /.playwright/
+
+# Aplicatii de referinta, tinute local pentru inspiratie. 112 MB care n-au ce
+# cauta in istoricul proiectului.
+/Initial_Context/refrence-apps/
