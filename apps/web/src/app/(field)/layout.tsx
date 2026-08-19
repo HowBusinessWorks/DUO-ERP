@@ -1,4 +1,4 @@
-import { Home, Menu, Camera, ClipboardCheck } from 'lucide-react';
+import { Home, Menu, Camera, ClipboardCheck, Clock } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ConflictBadge } from '../../components/field/conflict-badge';
@@ -37,7 +37,7 @@ export default async function FieldLayout({ children }: { children: ReactNode })
   const session = await requireWorkspace('field');
 
   return (
-    <SyncProvider>
+    <SyncProvider personId={session.personId}>
       <div data-shell="field" className="flex min-h-dvh flex-col bg-canvas">
         <RegisterServiceWorker />
         <SyncBanner />
@@ -60,11 +60,12 @@ export default async function FieldLayout({ children }: { children: ReactNode })
             degetul mare, nu intr-un meniu care se deschide. */}
         <nav
           aria-label="Navigare teren"
-          className="sticky bottom-0 grid grid-cols-3 border-t border-border bg-surface"
+          className="sticky bottom-0 grid grid-cols-4 border-t border-border bg-surface"
         >
           {[
             { href: '/field', label: 'Azi', icon: Home },
             { href: '/field/inspectii', label: 'Inspecții', icon: ClipboardCheck },
+            { href: '/field/pontaj', label: 'Pontaj', icon: Clock },
             { href: '/field/poze', label: 'Poze', icon: Camera },
           ].map((item) => (
             <Link

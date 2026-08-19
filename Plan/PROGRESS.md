@@ -24,9 +24,9 @@ lectură.*
 | **01–07** | Gata. |
 | **08** | Gata pe **08a** (schemă, domain, servicii) și **08b** (ecrane). **08c e SĂRIT dinadins** — decizia utilizatorului, vezi secțiunea lui mai jos. Din 08c există doar expirarea propunerilor. |
 | **09** | **Gata, tot** — 09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon de consum · 09b-4 acoperire, istoric, validare în masă, seed. Toate cele 24 de verificări acoperite. |
-| **10** | **10a**, **10b**, **10c-1** (pozele, ＋, Playwright) și **10c-2** (inspecția și intervenția) sunt gata. Rămân **10c-3, 10c-4, 10d, 10e**. |
+| **10** | **10a**, **10b**, **10c-1**, **10c-2** gata; **10c-3 e gata pe două treimi** (necesar material, pontaj). Rămân **`Bon de consum`, 10c-4, 10d, 10e**. |
 
-**Următorul lucru de făcut e 10c-3: `Necesar material`, `Pontaj`, `Bon de consum`.**
+**Următorul lucru de făcut: răspunde la întrebarea despre bonul de consum (mai jos), apoi 10c-4.**
 
 ### Pasul 10, tăiat în cinci — iar 10c în patru
 
@@ -45,7 +45,8 @@ jumătatea unui pas. Aceeași convenție a mers la 09.
   - **10c-2**: GATA. `Inspecție` și `Intervenție` offline, felia lărgită cu fișele completate,
     „duplică drept fișă nouă" pe ecranul de conflicte, plus **două migrări de grant** fără de care
     terenul nu putea salva nimic (vezi jurnalul).
-  - **10c-3**: `Necesar material` (în 3 tapuri), `Pontaj`, `Bon de consum`. **Următorul lucru.**
+  - **10c-3**: GATA pe `Necesar material` (trei tapuri, **măsurate**) și `Pontaj`.
+    `Bon de consum` e **blocat de o întrebare de model** — vezi mai jos.
   - **10c-4**: `Jurnal` (cu tabela lui), plus măsurarea bugetului pe toate cele patru acțiuni.
 - **10d — raportul lunar** către client: migrare, coadă cu progres real, versionare și îngheț.
 - **10e — panoul PM** cu gauge-ul Delta.
@@ -82,9 +83,9 @@ jumătatea unui pas. Aceeași convenție a mers la 09.
 | `Inspecții` | **Gata ca listă.** Checklist-ul propriu-zis lipsește. | 10c-1 / 10c-2 |
 | `Inspecție` | **Gata.** Checklist offline, NOK cu ieșire impusă local (#18), poze pe punct. | 10c-2 |
 | `Intervenție` | **Gata.** Materiale din gestiunea echipei, ore, poze înainte/după. | 10c-2 |
-| `Necesar material` | Tot, **în 3 tapuri** — și din buget au rămas **două**, vezi mai jos. | 10c-3 |
-| `Pontaj` | Tot. Ziua împărțită pe mai multe UL. | 10c-3 |
-| `Bon de consum` | Tot, plus lărgirea de drept decisă mai jos. | 10c-3 |
+| `Necesar material` | **Gata.** Trei tapuri cap-coadă, măsurate în CI. | 10c-3 |
+| `Pontaj` | **Gata.** Ziua împărțită pe mai multe UL. | 10c-3 |
+| `Bon de consum` | **Blocat.** Vezi întrebarea deschisă. | — |
 | `Jurnal` | Tot, **și tabela**. Decis: se face. | 10c-4 |
 | `Utilaje și PV`, `Verificare SL` | Schelet cu `EmptyState`. `Utilaje` există; `Verificare SL` nu. | 10c-1 / faza 2 |
 
@@ -98,14 +99,42 @@ există, se adaugă restul fluxului în același fișier.
 nevoie de ecranul fișei ca să deschidă o copie editabilă cu `id` nou. Se adaugă la **10c-2**, odată
 cu fișele.
 
+### Întrebarea deschisă: bonul de consum de pe teren
+
+**Decizia de pe 19 august nu se poate implementa așa cum a fost descrisă,** și motivul e de fond,
+nu de grant lipsă.
+
+`issueConsumptionNoteTx` citește **CMP-ul gestiunii** ca să calculeze valoarea, scrie `unit_cost`
+pe linia de bon și pe mișcarea de stoc, apoi scrie în registrul de cost. Ca `app_field` să ruleze
+asta direct, ar trebui să poată **citi prețuri** — exact ce interzice regula 2 a pasului 10.
+„Lărgire îngustă a dreptului" ar însemna, în practică, demolarea celei mai dure reguli din proiect.
+
+Trei ieșiri, în ordinea în care le-aș lua:
+
+1. **Funcție `security definer`** — `app.issue_field_consumption(...)`, deținută de un rol care are
+   voie la bani. Verifică singură că gestiunea e a echipei celui care cheamă, apoi face citirea de
+   CMP și scrierile. Terenul primește `execute` pe ea și nimic altceva. **E tiparul deja folosit în
+   proiect**: `app.allocate_document_number` e `security definer` exact din motivul ăsta.
+   *Costul:* o a doua implementare, în SQL, a unei logici care există în TypeScript — și care poate
+   diverge.
+2. **Executantul se ridică la `app_service`** după ce verifică, cu drepturile terenului, că
+   gestiunea e a echipei lui. O singură implementare, dar decizia de autorizare se mută din RLS în
+   TypeScript — adică din plasă în poartă.
+3. **Terenul nu emite bonuri deloc.** Consumul pleacă doar prin fișa de intervenție, iar biroul îl
+   materializează la validare — ceea ce se întâmplă **deja**. Ecranul `Bon de consum` dispare din
+   pasul 10 și se scrie asta în plan.
+
+Recomandarea mea e **3**, și nu din lene: drumul prin fișa de intervenție există, e testat, și
+păstrează banii acolo unde sunt oricum calculați. Varianta 1 e corectă, dar plătești o a doua
+implementare a aceleiași logici pentru un ecran care dublează un drum existent.
+
 ### Cele trei decizii deschise — luate pe 19 august
 
 Utilizatorul a decis toate trei. Nu se redeschid fără el.
 
-1. **Bonul de consum pe teren: se lărgește dreptul, îngust.** Terenul va putea emite consum
-   **doar din gestiunea propriei echipe** (`locations.type = 'echipa'` cu `team_id` = echipa mea),
-   printr-o politică nouă. NU se dă `inventory.write` de birou pe teren. Migrarea și politica se
-   scriu la **10c-3**, împreună cu ecranul.
+1. ~~**Bonul de consum pe teren: se lărgește dreptul, îngust.**~~ **Redeschisă pe 19 august**, la
+   implementare: lărgirea de drept nu e suficientă, fiindcă drumul cere citirea CMP-ului. Vezi
+   întrebarea deschisă de mai sus.
 2. **Jurnalul de șantier: se face acum**, nu în faza 2. Tabelă nouă (UL, etapă, om, text, dată,
    poze), plus `journal.append` în `MUTATION_TYPES` cu executantul lui. Toate trei împreună, la
    **10c-4** — un tip fără executant ar accepta mutații pe care nu le poate aplica nimeni.
@@ -183,7 +212,7 @@ n-are cum să apară la typecheck: `permission denied` nu e o eroare de tip.
 | 4 | **Playwright — instalat, dar folosit doar pentru tapuri** | Config, harness de tapuri și job de CI blocant există (10c-1). Rămân neacoperite verificările care cer un browser **cu baza de date în spate**: #13 din pasul 03, clicul pe hartă din 04b (#14), partea de client din #7 și #20 ale pasului 07. Jobul de tapuri e dinadins fără Postgres; alea au nevoie de altul, cu seed. |
 | 5 | **#8 din pasul 03** — Realtime se autentifică drept `authenticated`, rol fără niciun grant | Ori `grant select` pe `work_queue_items`/`notifications` cu politici proprii, ori se păstrează fallback-ul de 60 s și **se rescrie verificarea** ca să spună adevărul. |
 | 6 | **#10 și #14 din pasul 03** | #10: create/edit produs + audit pe date reale — `audit.entries.table_name` e `app.products`, **cu prefix de schemă**. #14: Lighthouse. |
-| 7 | ~~Decizia despre bonul de consum pe teren~~ — **luată pe 19 august** | Se lărgește dreptul, îngust: consum doar din gestiunea propriei echipe. Rămâne de **implementat** la 10c-3 (politică + migrare + ecran). |
+| 7 | **Bonul de consum pe teren — REDESCHISĂ** | Lărgirea de drept nu ajunge: `issueConsumptionNoteTx` citește CMP și scrie în registrul de cost, iar terenul n-are voie la bani. Trei ieșiri și o recomandare, în „Întrebarea deschisă" din predare. **Blochează ultimul ecran din 10c-3.** |
 | 8 | **Miniaturi pentru video** | `files.derive` produce miniaturi doar pentru imagini; pentru restul iese tăcut, dinadins. PDF-ul se rezolvă acum prin previzualizarea `inline`, deci rămâne doar video. Se adaugă când apare nevoia reală (raportul lunar, pasul 10). |
 
 **Datoria `pnpm db:generate` rămâne plătită.** Toate migrările care ating tabele au fost
@@ -354,6 +383,51 @@ smoke aruncabile, pe dev, cu bucket real. **Așa au ieșit la iveală toate defe
 - Înainte de commit: `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets`.
   Ultimul cere un build proaspăt, iar build-ul cade dacă un `next dev` ține `.next` ocupat — oprește
   serverele de dezvoltare înainte.
+
+---
+
+## 10c-3 (parțial) — necesarul de material și pontajul (19 august 2026)
+
+### Ce a intrat
+
+- **`Necesar material`**, ecranul real, în locul schelei. **Trei tapuri cap-coadă**, măsurate:
+  ＋ · acțiunea · Trimite. Unitatea de lucru vine precompletată, câmpul e focalizat, nu există
+  niciun alt câmp obligatoriu. Fiecare dintre ele ar fi fost „corect" și ar fi costat câte un tap.
+- **`Pontaj`** — ziua mea, împărțită pe unități. La birou pontajul e o grilă om × zi, pe teren e
+  invers: un om, o zi, mai multe unități. `personId` vine din **sesiune**, nu din felie — un ecran
+  care l-ar ghici din primul rând de `people` ar ponta pe altcineva în ziua în care echipa se
+  schimbă. A patra intrare din bara de jos, nu una de sub ＋: se face zilnic.
+- **Bugetul de tapuri se măsoară acum cap-coadă** (#12–15), nu doar până la ecran. Testul servește
+  o felie fabricată pe **ruta reală** (`e2e/support/slice.ts`), iar aplicația și-o scrie singură în
+  IndexedDB, cu același cod care rulează pe telefon. Un test care ar fi populat Dexie de mână ar fi
+  rămas în urmă la prima schimbare de schemă locală, tăcut.
+
+### Al treisprezecelea defect tăcut: `consumption.save` n-a rulat niciodată din teren
+
+Tipul de mutație există de la 10a, are executant și e testat — dar **toate testele lui rulează cu
+`officeActor()`.** Verificat pe dev: `app_field` are `false` la `insert` pe `consumption_notes`,
+`consumption_lines`, `stock_movements` și `cost_lines`, și `false` la `select` pe
+`stock_balances.avg_cost`. Nu moștenește niciun rol.
+
+Și **nu e o simplă lipsă de grant.** `issueConsumptionNoteTx` citește CMP-ul gestiunii ca să
+calculeze valoarea, scrie `unit_cost` pe linie și pe mișcare, apoi scrie în registrul de cost. Ca
+terenul să poată rula asta direct, rolul `app_field` ar trebui să **citească prețuri** — adică
+exact ce interzice regula 2 a pasului, cea mai dură din proiect.
+
+Deci lărgirea de drept decisă pe 19 august **nu se poate implementa așa cum am descris-o eu.**
+Vezi întrebarea deschisă din predare.
+
+### Cum a fost verificat
+
+- `pnpm e2e` — **4 teste**, inclusiv fluxul întreg de trei tapuri.
+- `field-sync.test.ts` — **11 teste**. Cel nou trimite `material.request` **din rolul de teren**,
+  exact cum îl compune ecranul, și verifică și că `estimated_value` rămâne gol. Până la `0032` ar
+  fi căzut cu 42501.
+- `pnpm typecheck` · `lint` · `test` · `build` · `scan:secrets` — verzi.
+
+### Ce a rămas din 10c-3
+
+`Bon de consum`, blocat de întrebarea de mai sus. Restul lui 10c-3 e gata.
 
 ---
 

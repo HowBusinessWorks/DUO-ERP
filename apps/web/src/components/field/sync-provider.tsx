@@ -17,6 +17,15 @@ import { summary, syncOnce, type SyncSummary } from '../../lib/field/sync';
 
 interface SyncContextValue extends SyncSummary {
   readonly syncing: boolean;
+  /**
+   * Cine e conectat. Vine din sesiunea de pe server, prin layout.
+   *
+   * Ecranele au nevoie de el ca sa poata compune mutatii — pontajul isi scrie
+   * propriul `personId`. Nu se citeste din felie: felia e o copie a datelor, nu
+   * a identitatii, iar un ecran care ar ghici omul din primul rand de `people`
+   * ar ponta pe altcineva in ziua in care echipa se schimba.
+   */
+  readonly personId: string;
   readonly refresh: () => Promise<void>;
   readonly syncNow: () => Promise<void>;
 }
@@ -33,6 +42,7 @@ const EMPTY: SyncSummary = {
 const SyncContext = createContext<SyncContextValue>({
   ...EMPTY,
   syncing: false,
+  personId: '',
   refresh: async () => undefined,
   syncNow: async () => undefined,
 });
@@ -41,7 +51,13 @@ export const useSync = (): SyncContextValue => useContext(SyncContext);
 
 const TICK_MS = 60_000;
 
-export function SyncProvider({ children }: { readonly children: ReactNode }) {
+export function SyncProvider({
+  children,
+  personId,
+}: {
+  readonly children: ReactNode;
+  readonly personId: string;
+}) {
   const [state, setState] = useState<SyncSummary>(EMPTY);
   const [syncing, setSyncing] = useState(false);
 
@@ -97,7 +113,7 @@ export function SyncProvider({ children }: { readonly children: ReactNode }) {
   }, []);
 
   return (
-    <SyncContext.Provider value={{ ...state, syncing, refresh, syncNow }}>
+    <SyncContext.Provider value={{ ...state, syncing, personId, refresh, syncNow }}>
       {children}
     </SyncContext.Provider>
   );

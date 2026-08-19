@@ -385,6 +385,51 @@ describe('sincronizarea de teren', () => {
     expect(lines.rows[0]?.hours).toBe('1');
   });
 
+  it('necesarul de material pleacă din teren, exact cum îl compune ecranul', async () => {
+    const base = await ground();
+    const field = fieldFor(base.personId, base.companyId);
+
+    /*
+     * `material.request` exista in `MUTATION_TYPES` de la 10a, are executant si
+     * era testat — dar NICIODATA din rolul de teren. Pana la migrarea 0032,
+     * `app.requests` avea doar `select` pentru `app_field`, deci prima cerere
+     * trimisa de pe un telefon ar fi cazut cu 42501.
+     */
+    const result = await pushMutations(field, {
+      deviceId: 'telefon-1',
+      mutations: [
+        {
+          id: uuidv7(),
+          type: 'material.request',
+          payload: {
+            companyId: base.companyId,
+            type: 'solicitare',
+            source: 'manual',
+            objectiveId: base.objectiveId,
+            contractId: '',
+            contractObjectiveId: '',
+            title: '20 m teava PEHD 63',
+            description: 'Cerut de pe teren.',
+            estimatedValue: '',
+            slaDueAt: '',
+          },
+          createdAt: at(0),
+        },
+      ],
+    });
+
+    expect(result.outcomes[0]?.status).toBe('applied');
+
+    const saved = await withActor(officeActor(), async (tx) =>
+      tx.execute<{ title: string; estimated: string | null }>(sql`
+        select title, estimated_value::text as estimated
+          from app.requests where created_by = ${base.personId}`),
+    );
+    expect(saved.rows[0]?.title).toBe('20 m teava PEHD 63');
+    // Terenul naste cererea, dar nu-i pune pret: coloana nici nu e in grant.
+    expect(saved.rows[0]?.estimated).toBeNull();
+  });
+
   it('coada se oprește la prima eroare de business și nu sare peste ea (#7)', async () => {
     const base = await ground();
     const good = uuidv7();

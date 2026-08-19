@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { FIELD_PERSON, signIn } from '../support/session';
+import { installSlice } from '../support/slice';
 import { installTapCounter, resetTaps, taps } from '../support/taps';
 
 /**
@@ -29,6 +30,7 @@ const NAVIGATION_BUDGET = 2;
 
 test.beforeEach(async ({ context, baseURL }) => {
   await signIn(context, FIELD_PERSON, baseURL ?? 'http://127.0.0.1:3100');
+  await installSlice(context);
   await installTapCounter(context);
 });
 
@@ -46,6 +48,29 @@ test.describe('bugetul de tapuri pe teren', () => {
 
     const used = await taps(page);
     expect(used).toBeLessThanOrEqual(NAVIGATION_BUDGET);
+    expect(used).toBeLessThanOrEqual(MAX_TAPS);
+  });
+
+  test('necesarul de material pleaca in trei atingeri, cap-coada', async ({ page }) => {
+    await page.goto('/field');
+    // Felia trebuie sa fi ajuns: fara o unitate de lucru, ecranul arata starea
+    // goala si n-ar avea ce masura.
+    await expect(page.getByText('Lucrarea de test')).toBeVisible();
+
+    await resetTaps(page);
+
+    await page.getByTestId('quick-actions-toggle').click();
+    await page.getByRole('link', { name: 'Necesar material' }).click();
+
+    // Campul e deja focalizat (`autoFocus`) si unitatea precompletata — de asta
+    // scrisul nu costa un tap si alegerea lucrarii nu costa niciunul.
+    await page.getByTestId('material-text').fill('20 m teava PEHD 63, 4 coliere');
+    await page.getByTestId('send-request').click();
+
+    await expect(page.getByRole('heading', { name: 'Azi' })).toBeVisible();
+
+    const used = await taps(page);
+    expect(used).toBe(3);
     expect(used).toBeLessThanOrEqual(MAX_TAPS);
   });
 
