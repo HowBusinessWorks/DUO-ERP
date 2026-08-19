@@ -72,20 +72,32 @@ export async function createRequestTx(
   values: ReturnType<typeof createRequestInputSchema.parse>,
 ): Promise<{ readonly id: string }> {
   const id = uuidv7();
-  await tx.insert(schema.requests).values({
-    id,
-    companyId: values.companyId,
-    type: values.type,
-    source: values.source,
-    objectiveId: values.objectiveId,
-    contractId: values.contractId,
-    contractObjectiveId: values.contractObjectiveId,
-    title: values.title,
-    description: values.description ?? null,
-    estimatedValue: values.estimatedValue,
-    slaDueAt: values.slaDueAt === null ? null : new Date(values.slaDueAt),
-    createdBy: actor.personId,
-  });
+
+  /*
+   * Insert scris de mana, si nu prin drizzle, dintr-un motiv care s-a mai platit
+   * de trei ori in proiect: **drizzle numeste TOATE coloanele**, punand `default`
+   * pe cele nedate. Un `grant insert (coloane)` care exclude `estimated_value` —
+   * si asta e exact grantul terenului — n-ar putea fi satisfacut niciodata,
+   * oricat de goala ar fi valoarea.
+   *
+   * Asa, coloana de bani apare in `insert` **doar cand chiar se scrie ceva in
+   * ea**. Un actor care n-are voie sa scrie bani si nici nu incearca trece; unul
+   * care incearca primeste 42501, adica exact refuzul corect, din grant, nu
+   * dintr-o verificare paralela care se poate uita.
+   */
+  const withEstimate = values.estimatedValue !== null;
+
+  await tx.execute(sql`
+    insert into app.requests
+      (id, company_id, type, source, objective_id, contract_id, contract_objective_id,
+       title, description, sla_due_at, created_by${withEstimate ? sql`, estimated_value` : sql``})
+    values (
+      ${id}, ${values.companyId}, ${values.type}::app.request_type,
+      ${values.source}::app.request_source, ${values.objectiveId}, ${values.contractId},
+      ${values.contractObjectiveId}, ${values.title}, ${values.description ?? null},
+      ${values.slaDueAt}, ${actor.personId}${withEstimate ? sql`, ${values.estimatedValue}` : sql``}
+    )`);
+
   return { id };
 }
 

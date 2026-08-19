@@ -94,6 +94,22 @@ e vizuală.
 dacă întârzie. Fixul GPS în subsol nu vine niciodată; o poză fără coordonate e o
 dovadă mai slabă, dar o poză neluată nu e nicio dovadă.
 
+## Ce aduce felia pentru fișe, și de ce
+
+Felia poartă **răspunsurile deja completate** și **fișele de intervenție cu
+liniile lor**. Nu ca să arate istoric: `saveInspection` și `saveIntervention`
+**rescriu** tot setul de linii, nu îl îmbină. Un ecran care ar porni gol și ar
+salva ar șterge ce s-a completat înainte — inclusiv de la birou, și tăcut.
+
+Ce **nu** trece niciodată: `estimated_value` de pe ieșirea unei constatări și
+`unit_cost` de pe un material. Nu sunt ascunse la afișare — rolul `app_field`
+n-are grant de citire pe ele.
+
+Are o consecință vizibilă, și e tratată în ecran: **o fișă care conține deja o
+ieșire de tip `propunere` se deschide read-only pe teren.** Propunerea poartă o
+valoare estimată, iar la salvare telefonul ar trebui s-o trimită înapoi — n-are
+de unde s-o știe. Mai bine spune „se editează de la birou" decât să șteargă.
+
 ## Cum se adaugă un tip nou de mutație
 
 Două locuri. Nu există un al treilea:
@@ -137,10 +153,13 @@ dacă datele s-au schimbat, telefonul trebuie să genereze o **mutație nouă**,
 `id` nou.
 
 De asta ecranul de conflicte (`/field/conflicte`) n-are buton „încearcă din nou":
-ar fi aceeași respingere cu alt nume. Are **„renunță la ea"** și **„deblochează
-coada"**, iar reîncercarea adevărată înseamnă redeschiderea fișei — atunci pleacă
-una nouă. Butonul „duplică drept fișă nouă" din §3.3 sosește cu ecranele, la 10c:
-el are nevoie de ecranul fișei ca să deschidă o copie editabilă.
+ar fi aceeași respingere cu alt nume. Are **„renunță la ea"**, **„deblochează
+coada"** și **„duplică drept fișă nouă"**.
+
+Duplicarea e reîncercarea adevărată. Deschide fișa cu **ce a scris omul**, luat
+din payload-ul mutației respinse — nu cu ce știe serverul, care e exact starea ce
+a produs refuzul. La trimitere pleacă o mutație cu `id` nou și cea refuzată se
+șterge, deci nu rămâne niciodată o pereche care să se calce.
 
 Ștergerea unui rând din jurnal ca să se „deblocheze" coada e ultima soluție și se
 face doar cu rolul de serviciu — un rol de aplicație n-are `delete` acolo,

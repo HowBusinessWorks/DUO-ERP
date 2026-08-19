@@ -1,6 +1,8 @@
 import Dexie, { type Table } from 'dexie';
 import type {
+  FieldAnswer,
   FieldChecklist,
+  FieldInterventionSheet,
   FieldPerson,
   FieldSeries,
   FieldStage,
@@ -46,6 +48,15 @@ export interface OutboxRow {
   errorMessage?: string;
   /** Ce descrie mutația, în cuvintele omului. Apare pe ecranul de conflicte. */
   label: string;
+  /**
+   * Unitatea de lucru pe care o atinge, când are una.
+   *
+   * Nu se citește din `payload`: ecranul de conflicte ar fi trebuit să știe
+   * forma fiecărui tip de mutație ca să găsească acolo un id. Îl pune ecranul
+   * care a creat mutația, care oricum îl are — și de aici pleacă butonul
+   * „duplică drept fișă nouă".
+   */
+  entityId?: string;
 }
 
 /**
@@ -63,6 +74,14 @@ export interface MediaRow {
   readonly workUnitId: string;
   /** Faza, doar la lucrări: pozele „Înainte" și „După" au foldere separate. */
   readonly phase?: 'inainte' | 'dupa';
+  /**
+   * Punctul de checklist pentru care s-a făcut poza, când e cazul.
+   *
+   * Nu schimbă unde aterizează fișierul — folderul rămâne „Poze". Există pentru
+   * regula „punctul ăsta cere poză", care altfel n-ar avea ce verifica local:
+   * `photoNodeId` e un id de server, iar în subsol nu există niciun server.
+   */
+  readonly checklistItemId?: string;
   readonly filename: string;
   readonly mime: string;
   readonly blob: Blob;
@@ -98,6 +117,8 @@ class FieldDatabase extends Dexie {
   declare stock: Table<FieldStockLine & { key: string }, string>;
   declare people: Table<FieldPerson, string>;
   declare series: Table<FieldSeries & { key: string }, string>;
+  declare answers: Table<FieldAnswer & { key: string }, string>;
+  declare interventionSheets: Table<FieldInterventionSheet, string>;
   declare outbox: Table<OutboxRow, string>;
   declare media: Table<MediaRow, string>;
   declare state: Table<SyncState, string>;
@@ -132,6 +153,18 @@ class FieldDatabase extends Dexie {
       .upgrade(async (tx) => {
         await tx.table('media').clear();
       });
+
+    /*
+     * v3: fisele completate, ca ecranele sa nu porneasca goale.
+     * `saveInspection` si `saveIntervention` REScriu tot setul de linii — un
+     * ecran care ar porni gol si ar salva ar sterge ce s-a completat inainte,
+     * inclusiv de la birou. Ambele magazii se rescriu la fiecare pull, ca restul
+     * feliei; nu sunt sursa de adevar.
+     */
+    this.version(3).stores({
+      answers: 'key, workUnitId',
+      interventionSheets: 'workUnitId',
+    });
   }
 }
 

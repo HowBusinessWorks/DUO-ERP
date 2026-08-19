@@ -401,8 +401,12 @@ export { INVENTORY_ALERT_KINDS, verifyStockJob } from './inventory-integrity';
 
 export { pullFieldSnapshot } from './field-snapshot';
 export type {
+  FieldAnswer,
   FieldChecklist,
   FieldChecklistItem,
+  FieldInterventionHour,
+  FieldInterventionMaterial,
+  FieldInterventionSheet,
   FieldPerson,
   FieldSeries,
   FieldSnapshot,

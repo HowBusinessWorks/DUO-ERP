@@ -24,9 +24,9 @@ lectură.*
 | **01–07** | Gata. |
 | **08** | Gata pe **08a** (schemă, domain, servicii) și **08b** (ecrane). **08c e SĂRIT dinadins** — decizia utilizatorului, vezi secțiunea lui mai jos. Din 08c există doar expirarea propunerilor. |
 | **09** | **Gata, tot** — 09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon de consum · 09b-4 acoperire, istoric, validare în masă, seed. Toate cele 24 de verificări acoperite. |
-| **10** | **10a** (sincronizarea), **10b** (PWA-ul offline) și **10c-1** (pozele, ＋, Playwright) sunt gata. Rămân **10c-2, 10c-3, 10c-4, 10d, 10e**. |
+| **10** | **10a**, **10b**, **10c-1** (pozele, ＋, Playwright) și **10c-2** (inspecția și intervenția) sunt gata. Rămân **10c-3, 10c-4, 10d, 10e**. |
 
-**Următorul lucru de făcut e 10c-2: ecranele `Inspecție` și `Intervenție`.**
+**Următorul lucru de făcut e 10c-3: `Necesar material`, `Pontaj`, `Bon de consum`.**
 
 ### Pasul 10, tăiat în cinci — iar 10c în patru
 
@@ -42,13 +42,15 @@ jumătatea unui pas. Aceeași convenție a mers la 09.
   - **10c-1**: GATA. Uploaderul de poze (coada `media` chiar se golește), butonul ＋ cu cele patru
     acțiuni, rândurile de context pe `Azi`, ecranul `Poze`, `Inspecții`, și **Playwright instalat**
     cu bugetul de tapuri blocant în CI.
-  - **10c-2**: `Inspecție` și `Intervenție`, offline complet. **Următorul lucru.**
-  - **10c-3**: `Necesar material` (în 3 tapuri), `Pontaj`, `Bon de consum`.
+  - **10c-2**: GATA. `Inspecție` și `Intervenție` offline, felia lărgită cu fișele completate,
+    „duplică drept fișă nouă" pe ecranul de conflicte, plus **două migrări de grant** fără de care
+    terenul nu putea salva nimic (vezi jurnalul).
+  - **10c-3**: `Necesar material` (în 3 tapuri), `Pontaj`, `Bon de consum`. **Următorul lucru.**
   - **10c-4**: `Jurnal` (cu tabela lui), plus măsurarea bugetului pe toate cele patru acțiuni.
 - **10d — raportul lunar** către client: migrare, coadă cu progres real, versionare și îngheț.
 - **10e — panoul PM** cu gauge-ul Delta.
 
-### Ce trebuie să știi ca să începi 10c-2
+### Ce trebuie să știi ca să începi 10c-3
 
 **Ce ai deja, gata de folosit:**
 
@@ -65,6 +67,11 @@ jumătatea unui pas. Aceeași convenție a mers la 09.
   singură dată pe serie, scrie blob-ul în IndexedDB și pleacă singură la sincronizare. Ecranele de
   la 10c-2 nu mai au nimic de scris pentru poze: pun componenta și gata.
 - **Ecranul `Poze`** (`/field/poze`) arată coada, cu miniatură, motiv și retrimitere.
+- **`/field/[unitId]`** deschide fișa unității din felia locală și alege ecranul după tip.
+  `?copiaza=<idMutatie>` pornește o copie a unei fișe refuzate.
+- **Felia poartă și fișele completate** (`snapshot.answers`, `snapshot.interventions`). Orice
+  ecran nou care salvează linii TREBUIE să pornească de la ele: serviciile **rescriu** setul, nu
+  îl îmbină, deci un ecran care pornește gol șterge munca altcuiva.
 
 **Ce lipsește, ecran cu ecran** (§3.5 din plan):
 
@@ -73,8 +80,8 @@ jumătatea unui pas. Aceeași convenție a mers la 09.
 | `Azi` | **Gata.** Listă, ＋ cu cele 4 acțiuni, rânduri de context. | 10b + 10c-1 |
 | `Poze` | **Gata.** Coada, cu miniatură, progres, retrimitere, ștergere. | 10c-1 |
 | `Inspecții` | **Gata ca listă.** Checklist-ul propriu-zis lipsește. | 10c-1 / 10c-2 |
-| `Inspecție` | Tot. Checklist offline, NOK cu ieșire **impusă și local** (#18), poze. | 10c-2 |
-| `Intervenție` | Tot. Materiale din gestiunea echipei, ore, poze înainte/după. | 10c-2 |
+| `Inspecție` | **Gata.** Checklist offline, NOK cu ieșire impusă local (#18), poze pe punct. | 10c-2 |
+| `Intervenție` | **Gata.** Materiale din gestiunea echipei, ore, poze înainte/după. | 10c-2 |
 | `Necesar material` | Tot, **în 3 tapuri** — și din buget au rămas **două**, vezi mai jos. | 10c-3 |
 | `Pontaj` | Tot. Ziua împărțită pe mai multe UL. | 10c-3 |
 | `Bon de consum` | Tot, plus lărgirea de drept decisă mai jos. | 10c-3 |
@@ -104,12 +111,14 @@ Utilizatorul a decis toate trei. Nu se redeschid fără el.
    **10c-4** — un tip fără executant ar accepta mutații pe care nu le poate aplica nimeni.
 3. **Playwright: instalat la 10c-1.** Vezi mai jos ce măsoară azi și ce nu.
 
-### Regula care a plătit de cinci ori la rând
+### Regula care a plătit de șapte ori la rând
 
 **Rulează fiecare use-case pe date reale, din rolul restrâns, ÎNAINTE să scrii ecranul.**
 
 La 09b-1 a scos patru defecte din 09a. La 09b-2 încă trei. La 09b-3 două. La 10a unul. La 10b unul.
-**Zece defecte, toate tăcute, niciunul prins de typecheck sau de testele existente.** Harness-ul se
+La 10c-2 încă două, și pe cele mai grave dintre toate: **întreaga fișă de inspecție era
+nesalvabilă de pe teren.**
+**Douăsprezece defecte, toate tăcute, niciunul prins de typecheck sau de testele existente.** Harness-ul se
 scrie în `packages/services/scripts/`, se rulează cu `pnpm exec tsx`, și se **șterge** după.
 
 Trei dintre ele au avut exact aceeași formă — **partea de jos era corectă, dar o persona n-avea
@@ -117,7 +126,12 @@ drum până la ea**:
 
 - catalogul de operațiuni, fără grant pentru teren (09b-2, migrarea `0027`);
 - liniile de pontaj, cu grant pe coloane pe care drizzle nu-l putea satisface (09b-3);
-- seriile de numerotare, fără grant pentru teren (10b, migrarea `0030`).
+- seriile de numerotare, fără grant pentru teren (10b, migrarea `0030`);
+- **ștergerea răspunsurilor** de inspecție, fără care a doua salvare cădea (10c-2, `0031`);
+- **crearea cererii** dintr-un NOK „creează intervenție", plus legătura ei înapoi (10c-2, `0032`).
+
+Cinci din cinci s-au văzut abia chemând use-case-ul din rolul restrâns, pe date reale. Niciunul
+n-are cum să apară la typecheck: `permission denied` nu e o eroare de tip.
 
 ### Patru capcane cunoscute, valabile mai departe
 
@@ -155,7 +169,8 @@ drum până la ea**:
 | 06 | **21** | Indexul de cursor măsurat la 10.000 de linii, nu la 100.000. Planul e însă independent de volum. |
 | 07 | **7** | Reluarea per parte există în client și merge; **întreruperea reală de rețea** cere Playwright. Singura verificare deschisă din pasul 07. |
 | 09 | — | Toate cele 24 sunt acoperite. |
-| 10 | **1–4, 8, 9, 17–28** | Cer ecranele de teren (10c-2…4), raportul lunar (10d) și panoul PM (10e). |
+| 10 | **1–4, 8, 9, 19–28** | Cer restul ecranelor de teren (10c-3, 10c-4), raportul lunar (10d) și panoul PM (10e). |
+| 10 | **17, 18** | Acoperite de fișa de inspecție de teren: NOK cu ieșire impusă **local**, verificat pe date reale din rolul `app_field`. |
 | 10 | **12–15** | Playwright e instalat și jobul e blocant, dar măsoară doar **drumul până la ecran**. Fluxul complet până la salvare se măsoară pe măsură ce apar ecranele. |
 
 ### Datorii deschise, în ordinea în care le-aș lua
@@ -180,7 +195,7 @@ completează dedesubt.
 
 ### Starea bazei de dezvoltare
 
-- Migrările **până la `0030` inclusiv sunt aplicate** pe Supabase dev.
+- Migrările **până la `0032` inclusiv sunt aplicate** pe Supabase dev.
 - **pg-boss rulează**, cu 9 cozi: `system.ping`, `contracts.expiryScan`,
   `contracts.deltaFillScan`, `rollup.verify`, `requests.expireBacklog`, `files.derive`,
   `files.cleanup`, `inventory.verifyStock`, `field.pruneMutations`.
@@ -339,6 +354,82 @@ smoke aruncabile, pe dev, cu bucket real. **Așa au ieșit la iveală toate defe
 - Înainte de commit: `pnpm typecheck` · `pnpm lint` · `pnpm test` · `pnpm build` · `pnpm scan:secrets`.
   Ultimul cere un build proaspăt, iar build-ul cade dacă un `next dev` ține `.next` ocupat — oprește
   serverele de dezvoltare înainte.
+
+---
+
+## 10c-2 — inspecția și intervenția, pe teren (19 august 2026)
+
+### Ce a intrat
+
+- **`FieldInspectionSheet`** — checklist offline, trei butoane mari per punct, NOK cu **ieșire
+  impusă local** (#18). La birou butonul ascultă de răspunsul serverului; în subsol nu există
+  server, iar o regulă verificată abia la sincronizare l-ar fi anunțat pe om a doua zi, de la 40 de
+  km de obiectiv.
+- **`FieldInterventionSheet`** — materiale **doar din gestiunea echipei**, cu cantitatea comparată
+  local cu disponibilul, ore, poze cu fază („Înainte"/„După" sunt foldere separate).
+- **`/field/[unitId]`** — alege fișa după tipul unității, citind din felia locală.
+- **Felia poartă acum fișele completate** (`snapshot.answers`, `snapshot.interventions`, cu
+  materiale și ore). Fără ele, un ecran de teren care pornea gol și salva ștergea ce completase
+  altcineva: ambele servicii **rescriu** setul de linii, nu îl îmbină.
+- **„Duplică drept fișă nouă"** (§3.3) — deschide fișa cu **ce a scris omul**, luat din payload-ul
+  mutației respinse, nu cu ce știe serverul. La trimitere pleacă un `id` nou și cea refuzată se
+  șterge. `OutboxRow.entityId` e pus de ecranul care creează mutația: ecranul de conflicte n-are de
+  ce să știe forma fiecărui payload.
+- Dexie **v3** (magaziile `answers` și `interventionSheets`), `MediaRow.checklistItemId`.
+
+### Două defecte care făceau fișa de inspecție nesalvabilă de pe teren
+
+Ambele au ieșit la primul push real din rolul `app_field`. Ambele erau acolo dinainte de pasul 10.
+
+1. **`0031` — `delete` pe `inspection_answers`.** `saveInspection` rescrie setul: șterge și
+   inserează. La 0026, terenul primise `select, insert, update`. Prima salvare mergea (tabela era
+   goală, `delete` n-avea ce șterge) și **a doua cădea cu 42501**. Cel mai urât fel de defect:
+   merge o dată.
+2. **`0032` — terenul nu putea crea o cerere.** Ieșirea „creează intervenție" a unui NOK — cea mai
+   frecventă, și chiar rostul regulii #18 — naște o cerere. `app.requests` avea doar `select`
+   pentru `app_field`. Același grant lipsă bloca și `material.request`, tipul de mutație declarat
+   la 10a: exista, avea executant, era testat, dar ar fi căzut la prima trimitere din teren.
+   Migrarea dă `insert` **fără `estimated_value`** (terenul poate naște o cerere, nu-i poate pune
+   preț) și `update` pe o singură coloană, pentru legătura înapoi, sub politica cea mai îngustă
+   care funcționează: **doar cererile create de mine**. Politica de citire a terenului e „cererile
+   care mi-au născut o UL pe care sunt asignat", iar o cerere de acum două secunde n-are încă
+   nicio UL — deci un `update` sub ea n-ar fi găsit niciun rând și ar fi trecut **tăcut**.
+
+Ca să poată fi respectat grantul, `createRequestTx` are acum **insert scris de mână**: drizzle
+numește toate coloanele, deci un `grant insert` care exclude `estimated_value` n-ar fi putut fi
+satisfăcut niciodată. Acum coloana apare în `insert` doar când chiar se scrie ceva în ea — a patra
+oară când capcana asta se plătește.
+
+### O consecință de model, scrisă pe față
+
+**O fișă care conține deja o ieșire de tip `propunere` se deschide read-only pe teren.** Propunerea
+poartă o valoare estimată; salvarea rescrie tot setul, deci telefonul ar trebui s-o trimită înapoi
+— dar rolul `app_field` n-are nici măcar grant de **citire** pe coloană. Nu e o alegere de
+interfață, e ce permite baza. Ecranul o spune: „se editează de la birou".
+
+### Cum a fost verificat
+
+- `field-snapshot.test.ts` — **7 teste**, pe Supabase dev, din rolul `app_field`. Două noi:
+  răspunsurile existente ajung în felie fără valoarea estimată, iar fișa de intervenție ajunge cu
+  materiale și ore **fără `unit_cost`** — scris dinadins în seed, ca să se vadă că nu iese.
+- `field-sync.test.ts` — **10 teste**. Două noi trimit payload-ul **exact cum îl compune ecranul**,
+  inclusiv șirurile goale pentru câmpurile opționale. Nu testează schema: testează că ecranul și
+  schema vorbesc aceeași limbă. Ele au scos ambele defecte de mai sus.
+- Verificarea de bani a fost **lărgită**: `value` a intrat în lista de cuvinte. `estimated_value` nu
+  se potrivea cu niciunul dintre cele vechi, deci verificarea ar fi trecut peste el.
+- `pnpm typecheck` · `lint` · `test` · `build` · `scan:secrets` · `e2e` — toate verzi.
+
+### Ce n-a fost verificat
+
+Ecranele n-au fost deschise într-un browser cu date reale — nu există încă un mod de a popula
+IndexedDB în testele de tapuri, iar jobul de tapuri rulează dinadins fără bază de date. Ce a fost
+verificat pe date reale e **stratul de sub ele**: felia și mutațiile, din rolul restrâns. Ăsta e
+stratul care a ascuns toate cele douăsprezece defecte de până acum.
+
+### Ce urmează la 10c-3
+
+`Necesar material` (în 3 tapuri — au rămas două după ＋), `Pontaj` și `Bon de consum`, ultimul cu
+lărgirea de drept decisă pe 19 august: consum doar din gestiunea propriei echipe.
 
 ---
 

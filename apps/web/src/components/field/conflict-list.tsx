@@ -1,7 +1,8 @@
 'use client';
 
 import { Badge, Banner, Button, EmptyState } from '@damina/ui';
-import { CheckCircle2, Trash2 } from 'lucide-react';
+import { CheckCircle2, CopyPlus, Trash2 } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { OutboxRow } from '../../lib/field/db';
 import { blockedMutations, discardMutation, retryQueue } from '../../lib/field/sync';
@@ -18,18 +19,22 @@ import { useSync } from './sync-provider';
  * validată la birou. Erorile de rețea nu ajung niciodată aici — ele se reiau
  * singure, iar dacă ar apărea pe ecranul ăsta ar învăța omul să-l ignore.
  *
- * Sunt două acțiuni, și niciuna nu e „încearcă din nou":
+ * Sunt trei acțiuni, și niciuna nu se numește „încearcă din nou":
  *
  *  - **Renunță** — mutația iese din coadă. Serverul ține minte răspunsul după
  *    `id`, deci retrimiterea acelorași date ar da același răspuns. N-ar fi o
  *    reîncercare, ar fi aceeași respingere cu alt buton.
  *  - **Deblochează coada** — restul mutațiilor își reiau drumul. Se apasă după
  *    ce ce le oprea a fost rezolvat sau abandonat.
+ *  - **Duplică drept fișă nouă** (§3.3) — deschide fișa cu ce a scris OMUL, nu
+ *    cu ce știe serverul. Asta e distincția care o face utilă: felia arată
+ *    exact starea care a produs refuzul, iar omul vrea înapoi munca lui, ca s-o
+ *    corecteze. La trimitere pleacă o mutație cu `id` nou, iar cea refuzată e
+ *    ștearsă — deci nu rămâne niciodată o pereche care să se calce.
  *
- * Ce lipsește deliberat: **„duplică drept fișă nouă"**. Ea cere ecranul fișei,
- * ca să poată deschide o copie editabilă cu `id` nou — sosește la 10c, odată cu
- * ecranele. Până atunci textul spune ce are omul de făcut, în loc să ofere un
- * buton care n-ar duce nicăieri.
+ * Butonul apare doar la mutațiile care au un ecran în spate. `entityId` e pus de
+ * ecranul care a creat mutația: ecranul ăsta n-are de ce să știe forma fiecărui
+ * tip de payload ca să caute un id în el.
  */
 export function ConflictList() {
   const { refresh, syncNow } = useSync();
@@ -85,6 +90,14 @@ export function ConflictList() {
             </p>
 
             <div className="mt-3 flex flex-wrap gap-2">
+              {row.entityId === undefined ? null : (
+                <Link
+                  href={`/field/${row.entityId}?copiaza=${row.id}`}
+                  className="flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-ink active:bg-surface-hover"
+                >
+                  <CopyPlus className="size-4" aria-hidden /> Duplică drept fișă nouă
+                </Link>
+              )}
               <Button
                 variant="ghost"
                 onClick={() => {
@@ -107,8 +120,7 @@ export function ConflictList() {
         </p>
         <p className="mt-1 text-xs text-ink-muted">
           Retrimiterea acelorași date dă același răspuns: serverul ține minte fiecare fișă după
-          numărul ei. Ca să reîncerci cu adevărat, deschide fișa din nou și salveaz-o — atunci
-          pleacă una nouă.
+          numărul ei. „Duplică" e reîncercarea adevărată — pleacă o fișă nouă, cu ce ai scris tu.
         </p>
         <Button
           className="mt-3"

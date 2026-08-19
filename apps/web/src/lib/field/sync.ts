@@ -86,6 +86,11 @@ interface PullResponse {
     }[];
     readonly people: readonly { readonly id: string }[];
     readonly series: readonly { readonly companyId: string; readonly series: string }[];
+    readonly answers: readonly {
+      readonly workUnitId: string;
+      readonly checklistItemId: string;
+    }[];
+    readonly interventions: readonly { readonly workUnitId: string }[];
   };
 }
 
@@ -121,7 +126,17 @@ export async function pull(): Promise<{ ok: boolean; reason?: string }> {
 
   await db.transaction(
     'rw',
-    [db.workUnits, db.stages, db.checklists, db.stock, db.people, db.series, db.state],
+    [
+      db.workUnits,
+      db.stages,
+      db.checklists,
+      db.stock,
+      db.people,
+      db.series,
+      db.answers,
+      db.interventionSheets,
+      db.state,
+    ],
     async () => {
       await Promise.all([
         db.workUnits.clear(),
@@ -130,6 +145,8 @@ export async function pull(): Promise<{ ok: boolean; reason?: string }> {
         db.stock.clear(),
         db.people.clear(),
         db.series.clear(),
+        db.answers.clear(),
+        db.interventionSheets.clear(),
       ]);
 
       await db.workUnits.bulkPut(body.snapshot.workUnits as never[]);
@@ -149,6 +166,15 @@ export async function pull(): Promise<{ ok: boolean; reason?: string }> {
           key: `${entry.companyId}|${entry.series}`,
         })) as never[],
       );
+
+      // Raspunsurile n-au cheie proprie pe server: sunt (unitate, punct).
+      await db.answers.bulkPut(
+        body.snapshot.answers.map((answer) => ({
+          ...answer,
+          key: `${answer.workUnitId}|${answer.checklistItemId}`,
+        })) as never[],
+      );
+      await db.interventionSheets.bulkPut(body.snapshot.interventions as never[]);
 
       await db.state.put({
         key: 'state',

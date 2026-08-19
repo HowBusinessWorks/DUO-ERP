@@ -26,6 +26,60 @@ export interface FieldSnapshot {
   readonly people: readonly FieldPerson[];
   /** Seriile pe care le poate folosi terenul, per firma. */
   readonly series: readonly FieldSeries[];
+  /** Ce s-a raspuns deja pe fisele de inspectie. Vezi comentariul de la 10c-2. */
+  readonly answers: readonly FieldAnswer[];
+  /** Ce s-a completat deja pe fisele de interventie. */
+  readonly interventions: readonly FieldInterventionSheet[];
+}
+
+/**
+ * Un punct deja completat pe o fisa de inspectie.
+ *
+ * **De ce e in felie:** `saveInspection` REScrie toate raspunsurile, nu le
+ * imbina. Un ecran de teren care ar porni gol si ar salva ar sterge tot ce s-a
+ * completat inainte — inclusiv de la birou. Felia aduce ce exista, ecranul
+ * trimite inapoi tot, si nimic nu dispare.
+ *
+ * **Ce lipseste dinadins:** `estimated_value` de pe iesire. Nu e o omisiune de
+ * politete — rolul `app_field` nici n-are grant pe coloana aia, deci n-o poate
+ * citi. Consecinta e reala si e tratata in ecran: o fisa care are macar o iesire
+ * de tip `propunere` nu se poate edita de pe teren, fiindca retrimiterea ei ar
+ * cere o valoare pe care telefonul n-are de unde s-o stie.
+ */
+export interface FieldAnswer {
+  readonly workUnitId: string;
+  readonly checklistItemId: string;
+  readonly answer: string;
+  readonly note: string | null;
+  readonly photoNodeId: string | null;
+  /** Iesirea, cand punctul e NOK. */
+  readonly outcome: string | null;
+  readonly resolutionNote: string | null;
+}
+
+export interface FieldInterventionMaterial {
+  readonly productId: string;
+  readonly lotId: string | null;
+  /** Cantitatea, ca sir. **Fara `unit_cost`** — nu se cere coloana. */
+  readonly quantity: string;
+  readonly locationId: string;
+}
+
+export interface FieldInterventionHour {
+  readonly personId: string;
+  readonly hours: string;
+  readonly workDate: string;
+}
+
+/** Fisa de interventie asa cum e acum in baza. Acelasi motiv ca la raspunsuri. */
+export interface FieldInterventionSheet {
+  readonly workUnitId: string;
+  readonly description: string | null;
+  readonly operationId: string | null;
+  readonly teamId: string | null;
+  readonly declaredHours: string | null;
+  readonly materials: readonly FieldInterventionMaterial[];
+  readonly hours: readonly FieldInterventionHour[];
 }
 
 export interface FieldWorkUnit {
@@ -268,6 +322,83 @@ export async function pullFieldSnapshot(actor: Actor): Promise<FieldSnapshot> {
             .orderBy(asc(schema.persons.fullName))
             .limit(300);
 
+    /*
+     * Ce s-a raspuns deja. `saveInspection` rescrie tot setul, deci fara felia
+     * asta un ecran de teren care porneste gol ar sterge munca altcuiva.
+     *
+     * `estimated_value` NU se cere: rolul `app_field` n-are grant pe coloana.
+     * Se cere doar `outcome`, cat sa stie ecranul ca fisa contine o propunere
+     * si sa se blocheze, in loc sa incerce o retrimitere care ar pica oricum.
+     */
+    const answers =
+      unitIds.length === 0
+        ? []
+        : await tx
+            .select({
+              workUnitId: schema.inspectionAnswers.workUnitId,
+              checklistItemId: schema.inspectionAnswers.checklistItemId,
+              answer: sql<string>`${schema.inspectionAnswers.answer}::text`,
+              note: schema.inspectionAnswers.note,
+              photoNodeId: schema.inspectionAnswers.photoNodeId,
+              outcome: sql<string | null>`${schema.inspectionFindings.outcome}::text`,
+              resolutionNote: schema.inspectionFindings.resolutionNote,
+            })
+            .from(schema.inspectionAnswers)
+            .leftJoin(
+              schema.inspectionFindings,
+              eq(schema.inspectionFindings.answerId, schema.inspectionAnswers.id),
+            )
+            .where(inArray(schema.inspectionAnswers.workUnitId, unitIds))
+            .limit(3000);
+
+    const interventionIds = units
+      .filter((unit) => unit.type === 'interventie')
+      .map((unit) => unit.id);
+
+    const interventionRows =
+      interventionIds.length === 0
+        ? []
+        : await tx
+            .select({
+              workUnitId: schema.interventions.workUnitId,
+              description: schema.interventions.description,
+              operationId: schema.interventions.operationId,
+              teamId: schema.interventions.teamId,
+              declaredHours: schema.interventions.declaredHours,
+            })
+            .from(schema.interventions)
+            .where(inArray(schema.interventions.workUnitId, interventionIds));
+
+    // Fara `unit_cost`: coloana e de birou, si nici n-ar trece de grant.
+    const materials =
+      interventionIds.length === 0
+        ? []
+        : await tx
+            .select({
+              workUnitId: schema.interventionMaterials.workUnitId,
+              productId: schema.interventionMaterials.productId,
+              lotId: schema.interventionMaterials.lotId,
+              quantity: schema.interventionMaterials.quantity,
+              locationId: schema.interventionMaterials.locationId,
+            })
+            .from(schema.interventionMaterials)
+            .where(inArray(schema.interventionMaterials.workUnitId, interventionIds))
+            .orderBy(asc(schema.interventionMaterials.createdAt));
+
+    const interventionHours =
+      interventionIds.length === 0
+        ? []
+        : await tx
+            .select({
+              workUnitId: schema.interventionHours.workUnitId,
+              personId: schema.interventionHours.personId,
+              hours: schema.interventionHours.hours,
+              workDate: schema.interventionHours.workDate,
+            })
+            .from(schema.interventionHours)
+            .where(inArray(schema.interventionHours.workUnitId, interventionIds))
+            .orderBy(asc(schema.interventionHours.createdAt));
+
     const series =
       companyIds.length === 0
         ? []
@@ -291,6 +422,25 @@ export async function pullFieldSnapshot(actor: Actor): Promise<FieldSnapshot> {
         isCritical: item.isCritical,
       });
       itemsByChecklist.set(item.checklistId, list);
+    }
+
+    const materialsByUnit = new Map<string, FieldInterventionMaterial[]>();
+    for (const row of materials) {
+      const list = materialsByUnit.get(row.workUnitId) ?? [];
+      list.push({
+        productId: row.productId,
+        lotId: row.lotId,
+        quantity: row.quantity,
+        locationId: row.locationId,
+      });
+      materialsByUnit.set(row.workUnitId, list);
+    }
+
+    const hoursByUnit = new Map<string, FieldInterventionHour[]>();
+    for (const row of interventionHours) {
+      const list = hoursByUnit.get(row.workUnitId) ?? [];
+      list.push({ personId: row.personId, hours: row.hours, workDate: row.workDate });
+      hoursByUnit.set(row.workUnitId, list);
     }
 
     return {
@@ -321,6 +471,12 @@ export async function pullFieldSnapshot(actor: Actor): Promise<FieldSnapshot> {
       stock,
       people,
       series,
+      answers,
+      interventions: interventionRows.map((row) => ({
+        ...row,
+        materials: materialsByUnit.get(row.workUnitId) ?? [],
+        hours: hoursByUnit.get(row.workUnitId) ?? [],
+      })),
     };
   });
 }

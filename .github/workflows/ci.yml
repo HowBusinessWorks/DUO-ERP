@@ -117,8 +117,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # `--with-deps` cheama apt, iar pe runner-ul ubuntu apt poate ramane agatat
+      # asteptand raspuns la promptul de repornire a serviciilor. Prima rulare a
+      # jobului a stat 20 de minute pe pasul asta si a fost anulata. Cele doua
+      # variabile il fac sa nu mai intrebe nimic.
       - name: Chromium
         run: pnpm exec playwright install --with-deps chromium
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          NEEDRESTART_MODE: a
+        timeout-minutes: 10
 
       # Blocant dinadins (pasul 10, §0). Daca seful de santier are nevoie de 7
       # tapuri ca sa comande material, da telefon la magazie si trasabilitatea

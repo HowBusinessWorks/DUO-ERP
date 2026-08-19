@@ -69,10 +69,20 @@ export interface PhotoCaptureProps {
   readonly workUnitId: string;
   /** Faza, doar la lucrări. Alege folderul „Înainte" sau „După". */
   readonly phase?: 'inainte' | 'dupa';
+  /** Punctul de checklist, când poza e cerută de un punct anume. */
+  readonly checklistItemId?: string;
   readonly label?: string;
+  /** Chemat după ce pozele au intrat în coadă. Ecranul își reface numărătoarea. */
+  readonly onAdded?: () => void;
 }
 
-export function PhotoCapture({ workUnitId, phase, label = 'Fă poză' }: PhotoCaptureProps) {
+export function PhotoCapture({
+  workUnitId,
+  phase,
+  checklistItemId,
+  label = 'Fă poză',
+  onAdded,
+}: PhotoCaptureProps) {
   const { refresh } = useSync();
   const inputRef = useRef<HTMLInputElement>(null);
   const [added, setAdded] = useState(0);
@@ -92,6 +102,7 @@ export function PhotoCapture({ workUnitId, phase, label = 'Fă poză' }: PhotoCa
           id,
           workUnitId,
           ...(phase === undefined ? {} : { phase }),
+          ...(checklistItemId === undefined ? {} : { checklistItemId }),
           // Numele poartă id-ul dinadins: două poze cu același nume în același
           // folder ar fi devenit două VERSIUNI ale aceluiași fișier, iar a doua
           // ar fi ascuns-o pe prima.
@@ -107,12 +118,13 @@ export function PhotoCapture({ workUnitId, phase, label = 'Fă poză' }: PhotoCa
 
       setAdded((current) => current + files.length);
       await refresh();
+      onAdded?.();
       if (inputRef.current !== null) {
         // Fără asta, a doua poză identică n-ar declanșa `change`.
         inputRef.current.value = '';
       }
     },
-    [phase, refresh, workUnitId],
+    [checklistItemId, onAdded, phase, refresh, workUnitId],
   );
 
   return (

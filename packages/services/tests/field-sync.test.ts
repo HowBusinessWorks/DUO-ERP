@@ -170,6 +170,50 @@ const fieldFor = (personId: string, companyId: string) => ({
   personId,
 });
 
+/**
+ * O inspectie cu un punct, pe terenul de test.
+ *
+ * Exista pentru un singur motiv: **forma pe care o trimite ecranul de teren**.
+ * `photoNodeId`, `estimatedValue` si `validUntil` pleaca de acolo ca siruri
+ * GOALE, nu lipsa — asa completeaza un formular campurile optionale. Daca
+ * schemele s-ar schimba maine ca sa ceara `null` sau absenta, fisa ar pica in
+ * subsol, iar omul ar afla a doua zi.
+ */
+async function inspectionGround(base: Ground): Promise<{
+  workUnitId: string;
+  checklistItemId: string;
+}> {
+  const checklistId = uuidv7();
+  const checklistItemId = uuidv7();
+  const workUnitId = uuidv7();
+  const tag = workUnitId.slice(-8);
+
+  await withActor(officeActor('inspectie de sincronizare'), async (tx) => {
+    const link = await tx.execute<{ id: string }>(sql`
+      select id from app.contract_objectives where objective_id = ${base.objectiveId} limit 1`);
+    await tx.execute(sql`
+      insert into app.checklists (id, code, name, objective_kind, version, is_active)
+      values (${checklistId}, ${`CHK-${tag}`}, 'Fisa de sincronizare', 'statie_pompare', 1, true)`);
+    await tx.execute(sql`
+      insert into app.checklist_items (id, checklist_id, position, text)
+      values (${checklistItemId}, ${checklistId}, 1, 'Punctul unic')`);
+    await tx.execute(sql`
+      insert into app.work_units
+        (id, company_id, type, code, name, objective_id, contract_objective_id, status, starts_on)
+      values (${workUnitId}, ${base.companyId}, 'inspectie', ${`I-${tag}`}, 'Inspectia de sincronizare',
+              ${base.objectiveId}, ${link.rows[0]?.id ?? null}, 'in_executie', ${base.workDate})`);
+    await tx.execute(sql`
+      insert into app.inspections (work_unit_id, checklist_id, checklist_version, performed_on)
+      values (${workUnitId}, ${checklistId}, 1, ${base.workDate})
+      on conflict (work_unit_id) do nothing`);
+    await tx.execute(sql`
+      insert into app.work_unit_assignments (id, work_unit_id, person_id, role)
+      values (${uuidv7()}, ${workUnitId}, ${base.personId}, 'echipa')`);
+  });
+
+  return { workUnitId, checklistItemId };
+}
+
 const at = (seconds: number): string => new Date(Date.UTC(2026, 7, 18, 9, seconds)).toISOString();
 
 const timesheetMutation = (base: Ground, id: string) => ({
@@ -227,6 +271,118 @@ describe('sincronizarea de teren', () => {
         select count(*)::text as n from app.timesheets where person_id = ${base.personId}`),
     );
     expect(sheets.rows[0]?.n).toBe('1');
+  });
+
+  it('fișa de inspecție trimisă exact cum o compune ecranul de teren', async () => {
+    const base = await ground();
+    const field = fieldFor(base.personId, base.companyId);
+    const sheet = await inspectionGround(base);
+
+    /*
+     * Payload-ul de mai jos e copiat din ce construieste `FieldInspectionSheet`,
+     * inclusiv sirurile goale. Nu e un test al schemei: e testul ca ecranul si
+     * schema vorbesc aceeasi limba, verificat din rolul `app_field`, pe date
+     * reale. Zece defecte tacute au fost gasite exact asa.
+     */
+    const result = await pushMutations(field, {
+      deviceId: 'telefon-1',
+      mutations: [
+        {
+          id: uuidv7(),
+          type: 'inspection.save',
+          payload: {
+            workUnitId: sheet.workUnitId,
+            answers: [
+              {
+                checklistItemId: sheet.checklistItemId,
+                answer: 'nok',
+                note: 'Se aude o bataie.',
+                photoNodeId: '',
+                finding: {
+                  outcome: 'interventie',
+                  resolutionNote: '',
+                  estimatedValue: '',
+                  validUntil: '',
+                },
+              },
+            ],
+          },
+          createdAt: at(0),
+        },
+      ],
+    });
+
+    expect(result.outcomes[0]?.status).toBe('applied');
+
+    const saved = await withActor(officeActor(), async (tx) =>
+      tx.execute<{ answer: string; outcome: string | null }>(sql`
+        select a.answer::text as answer, f.outcome::text as outcome
+          from app.inspection_answers a
+          left join app.inspection_findings f on f.answer_id = a.id
+         where a.work_unit_id = ${sheet.workUnitId}`),
+    );
+    expect(saved.rows[0]?.answer).toBe('nok');
+    // Iesirea obligatorie a unui NOK a ajuns intreaga, nu doar raspunsul.
+    expect(saved.rows[0]?.outcome).toBe('interventie');
+  });
+
+  it('fișa de intervenție trimisă exact cum o compune ecranul de teren', async () => {
+    const base = await ground();
+    const field = fieldFor(base.personId, base.companyId);
+    const workUnitId = uuidv7();
+    const tag = workUnitId.slice(-8);
+
+    await withActor(officeActor('interventie de sincronizare'), async (tx) => {
+      const link = await tx.execute<{ id: string }>(sql`
+        select id from app.contract_objectives where objective_id = ${base.objectiveId} limit 1`);
+      await tx.execute(sql`
+        insert into app.work_units
+          (id, company_id, type, code, name, objective_id, contract_objective_id, status, starts_on)
+        values (${workUnitId}, ${base.companyId}, 'interventie', ${`V-${tag}`}, 'Interventia de sincronizare',
+                ${base.objectiveId}, ${link.rows[0]?.id ?? null}, 'in_executie', ${base.workDate})`);
+      await tx.execute(sql`
+        insert into app.work_unit_assignments (id, work_unit_id, person_id, role)
+        values (${uuidv7()}, ${workUnitId}, ${base.personId}, 'echipa')`);
+    });
+
+    // `lotId`, `operationId` si `teamId` pleaca de pe ecran ca siruri GOALE.
+    const result = await pushMutations(field, {
+      deviceId: 'telefon-1',
+      mutations: [
+        {
+          id: uuidv7(),
+          type: 'intervention.save',
+          payload: {
+            workUnitId,
+            description: 'Schimbat garnitura.',
+            operationId: '',
+            teamId: '',
+            declaredHours: '4',
+            materials: [
+              {
+                productId: base.productId,
+                lotId: '',
+                quantity: '2',
+                locationId: base.locationId,
+              },
+            ],
+            hours: [{ personId: base.personId, hours: '4', workDate: base.workDate }],
+          },
+          createdAt: at(0),
+        },
+      ],
+    });
+
+    expect(result.outcomes[0]?.status).toBe('applied');
+
+    const lines = await withActor(officeActor(), async (tx) =>
+      tx.execute<{ materials: string; hours: string }>(sql`
+        select
+          (select count(*)::text from app.intervention_materials where work_unit_id = ${workUnitId}) as materials,
+          (select count(*)::text from app.intervention_hours where work_unit_id = ${workUnitId}) as hours`),
+    );
+    expect(lines.rows[0]?.materials).toBe('1');
+    expect(lines.rows[0]?.hours).toBe('1');
   });
 
   it('coada se oprește la prima eroare de business și nu sare peste ea (#7)', async () => {
