@@ -145,7 +145,7 @@ jobs:
           DATABASE_URL_SESSION: postgresql://fake:fake@localhost:5432/fake
 
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: urme-playwright
           path: |
