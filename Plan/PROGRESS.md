@@ -13,9 +13,25 @@
 
 ## De unde continui — predare către sesiunea următoare
 
-*Rescris la finalul lui 10b, 18 august 2026; actualizat la finalul lui 10c-1, 19 august. Citește-l
+*Rescris la finalul lui 10b, 18 august 2026; actualizat la finalul lui 10c-3, 19 august. Citește-l
 pe tot; restul fișierului e istoricul fiecărui pas, util când ai o întrebare punctuală, nu ca
 lectură.*
+
+### Sesiunea din 19 august, pe scurt
+
+Cinci commit-uri, toate pe `main`, CI verde pe ultimul:
+
+| Commit | Ce |
+|---|---|
+| `c62f482` | **10c-1** — uploaderul de poze, butonul ＋, ecranul `Poze`, Playwright cu job blocant |
+| `891e6cc` | reparație CI: sonda de pornire lovea o rută care cere baza de date |
+| `388466d` | **10c-2** — inspecția și intervenția offline, migrările `0031` și `0032` |
+| `52d58bd` | **10c-3** — necesarul de material (3 tapuri măsurate) și pontajul |
+| `2ec45d6` | bonul de consum scos din pasul 10; testele de coadă mutate pe rolul de teren |
+
+**Trei defecte tăcute găsite și reparate**, toate mai vechi decât pasul 10 și toate invizibile
+pentru typecheck. Două au cerut migrări (`0031`, `0032`); al treilea a scos un ecran din plan.
+Detaliile, în intrările de jurnal ale fiecărei bucăți.
 
 ### Ce e gata și ce nu
 
@@ -80,24 +96,24 @@ jumătatea unui pas. Aceeași convenție a mers la 09.
 |---|---|---|
 | `Azi` | **Gata.** Listă, ＋ cu cele 4 acțiuni, rânduri de context. | 10b + 10c-1 |
 | `Poze` | **Gata.** Coada, cu miniatură, progres, retrimitere, ștergere. | 10c-1 |
-| `Inspecții` | **Gata ca listă.** Checklist-ul propriu-zis lipsește. | 10c-1 / 10c-2 |
+| `Inspecții` | **Gata.** Lista filtrată; checklist-ul se deschide din ea. | 10c-1 |
 | `Inspecție` | **Gata.** Checklist offline, NOK cu ieșire impusă local (#18), poze pe punct. | 10c-2 |
 | `Intervenție` | **Gata.** Materiale din gestiunea echipei, ore, poze înainte/după. | 10c-2 |
 | `Necesar material` | **Gata.** Trei tapuri cap-coadă, măsurate în CI. | 10c-3 |
 | `Pontaj` | **Gata.** Ziua împărțită pe mai multe UL. | 10c-3 |
 | `Bon de consum` | **Scos din pasul 10.** Consumul pleacă prin fișa de intervenție. | — |
-| `Jurnal` | Tot, **și tabela**. Decis: se face. | 10c-4 |
-| `Utilaje și PV`, `Verificare SL` | Schelet cu `EmptyState`. `Utilaje` există; `Verificare SL` nu. | 10c-1 / faza 2 |
+| `Jurnal` | **Tot, și tabela.** Singurul ecran de scris care a rămas. | 10c-4 |
+| `Utilaje și PV` | **Gata** ca schelet final de fază 4. | 10c-1 |
+| `Verificare SL` | Schelet cu `EmptyState`, încă nescris. Faza 2. | 10c-4 |
 
 **Bugetul de tapuri e deja pe jumătate cheltuit înainte să se deschidă ecranul.** ＋ costă un tap,
-alegerea acțiunii încă unul. Ținta e 3, pragul de cădere 4. Deci `Necesar material` are voie la
-**două atingeri**, ceea ce înseamnă gestiune și produse **precompletate din felie**, nu formular
-gol. Testul din `e2e/field/tap-budget.spec.ts` măsoară azi doar drumul până la ecran; când ecranul
-există, se adaugă restul fluxului în același fișier.
+alegerea acțiunii încă unul. Ținta e 3, pragul de cădere 4 — deci un ecran de sub ＋ are voie la
+**o singură atingere**, cea de Trimite. `Necesar material` o respectă fiindcă vine cu unitatea
+precompletată și cu câmpul focalizat. Orice câmp obligatoriu în plus rupe pragul, iar testul cade.
 
-**Butonul „duplică drept fișă nouă"** din §3.3 lipsește din ecranul de conflicte, dinadins: are
-nevoie de ecranul fișei ca să deschidă o copie editabilă cu `id` nou. Se adaugă la **10c-2**, odată
-cu fișele.
+`Jurnal` intră sub aceeași regulă: **se deschide gata de scris**, cu unitatea aleasă și cursorul în
+text, iar Trimite e singurul tap. Testul se adaugă în `e2e/field/tap-budget.spec.ts`, lângă cel al
+necesarului — **nu** populând Dexie de mână, ci lărgind felia fabricată din `e2e/support/slice.ts`.
 
 ### Bonul de consum de pe teren — SCOS (decizia utilizatorului, 19 august)
 
@@ -131,41 +147,53 @@ Dacă vreodată devine o nevoie reală, ieșirea corectă e o funcție `security
 CMP-ul, terenul primește doar `execute`. Costă o a doua implementare, în SQL, a unei logici care
 există în TypeScript — de aceea nu s-a făcut acum.
 
-### Cele trei decizii deschise — luate pe 19 august
+### Deciziile utilizatorului — toate luate, niciuna deschisă
 
-Utilizatorul a decis toate trei. Nu se redeschid fără el.
+Nu se redeschid fără el.
 
-1. ~~**Bonul de consum pe teren: se lărgește dreptul, îngust.**~~ **Redeschisă pe 19 august**, la
-   implementare: lărgirea de drept nu e suficientă, fiindcă drumul cere citirea CMP-ului. Vezi
-   întrebarea deschisă de mai sus.
+1. **Bonul de consum pe teren** — decis de două ori. Prima variantă (lărgire îngustă de drept) a
+   căzut la implementare, fiindcă drumul cere citirea CMP-ului. A doua, cea în vigoare: **terenul
+   nu emite bonuri**. Vezi secțiunea de mai sus.
 2. **Jurnalul de șantier: se face acum**, nu în faza 2. Tabelă nouă (UL, etapă, om, text, dată,
    poze), plus `journal.append` în `MUTATION_TYPES` cu executantul lui. Toate trei împreună, la
    **10c-4** — un tip fără executant ar accepta mutații pe care nu le poate aplica nimeni.
-3. **Playwright: instalat la 10c-1.** Vezi mai jos ce măsoară azi și ce nu.
+3. **Playwright: instalat la 10c-1**, cu jobul de tapuri blocant în CI. Măsoară de la 10c-3 fluxul
+   întreg al necesarului de material, nu doar drumul până la ecran.
 
-### Regula care a plătit de șapte ori la rând
+### Regula care a plătit de opt ori la rând — și o a doua, învățată la 10c-3
 
-**Rulează fiecare use-case pe date reale, din rolul restrâns, ÎNAINTE să scrii ecranul.**
+**1. Rulează fiecare use-case pe date reale, din rolul restrâns, ÎNAINTE să scrii ecranul.**
 
 La 09b-1 a scos patru defecte din 09a. La 09b-2 încă trei. La 09b-3 două. La 10a unul. La 10b unul.
-La 10c-2 încă două, și pe cele mai grave dintre toate: **întreaga fișă de inspecție era
-nesalvabilă de pe teren.**
-**Douăsprezece defecte, toate tăcute, niciunul prins de typecheck sau de testele existente.** Harness-ul se
-scrie în `packages/services/scripts/`, se rulează cu `pnpm exec tsx`, și se **șterge** după.
+La 10c-2 încă două, dintre cele mai grave: **întreaga fișă de inspecție era nesalvabilă de pe
+teren.** La 10c-3 încă unul, de aceeași familie.
+**Treisprezece defecte, toate tăcute, niciunul prins de typecheck sau de testele existente.**
+Harness-ul se scrie în `packages/services/scripts/`, se rulează cu `pnpm exec tsx`, și se **șterge**
+după — sau, mai bine, devine test.
 
-Trei dintre ele au avut exact aceeași formă — **partea de jos era corectă, dar o persona n-avea
-drum până la ea**:
+**2. Un test care rulează cu actor de birou nu dovedește nimic despre teren.**
+
+Asta a costat un pas întreg. `consumption.save` avea patru teste verzi, toate cu `officeActor()` —
+care trece prin orice. Din rolul `app_field` drumul cădea cu 42501, și n-avea cum să meargă
+vreodată: emiterea bonului citește CMP-ul. **Regula, de acum:** orice mutație de teren are cel
+puțin un test care o trimite prin `pushMutations(fieldFor(...), …)`, cu payload-ul **exact cum îl
+compune ecranul** — inclusiv șirurile goale pentru câmpurile opționale.
+
+**Șase dintre ele au avut exact aceeași formă** — partea de jos era corectă, dar o persona n-avea
+drum până la ea:
 
 - catalogul de operațiuni, fără grant pentru teren (09b-2, migrarea `0027`);
 - liniile de pontaj, cu grant pe coloane pe care drizzle nu-l putea satisface (09b-3);
 - seriile de numerotare, fără grant pentru teren (10b, migrarea `0030`);
 - **ștergerea răspunsurilor** de inspecție, fără care a doua salvare cădea (10c-2, `0031`);
-- **crearea cererii** dintr-un NOK „creează intervenție", plus legătura ei înapoi (10c-2, `0032`).
+- **crearea cererii** dintr-un NOK „creează intervenție", plus legătura ei înapoi (10c-2, `0032`);
+- **emiterea bonului de consum** — singurul care NU s-a rezolvat cu un grant, fiindcă drumul cere
+  citirea prețului. Ecranul a fost scos (10c-3).
 
-Cinci din cinci s-au văzut abia chemând use-case-ul din rolul restrâns, pe date reale. Niciunul
+Șase din șase s-au văzut abia chemând use-case-ul din rolul restrâns, pe date reale. Niciunul
 n-are cum să apară la typecheck: `permission denied` nu e o eroare de tip.
 
-### Patru capcane cunoscute, valabile mai departe
+### Cinci capcane cunoscute, valabile mai departe
 
 1. **Drizzle numește TOATE coloanele într-un `insert`**, punând `default` pe cele nedate. Un
    `grant insert (coloane)` nu poate fi satisfăcut prin drizzle dacă lista exclude ceva.
@@ -177,6 +205,10 @@ n-are cum să apară la typecheck: `permission denied` nu e o eroare de tip.
    *memorat* vedea `{c:[8],e:0,s:1}` acolo unde cel care prinsese execuția vedea `"8.0000"`.
 4. **Nu presupune că o lună e deschisă.** Martie 2026 e închisă pe dev de la testul pasului 06;
    seed-ul de fișe a picat pe asta. Alege dintre cele deschise, la rulare.
+5. **O migrare deja aplicată pe dev nu se rescrie în loc.** Migratorul o sare tăcut, după `when`
+   din `_journal.json`, și rămâi cu o bază care nu seamănă cu fișierul. Dacă e neapărat nevoie —
+   fișierul încă n-a plecat la nimeni — pune `drop … if exists` înaintea fiecărui `create` și
+   **mărește `when`**. Altfel: migrare nouă. Pățit la `0032`.
 
 ### Cum verifici ce ai construit
 
@@ -203,9 +235,31 @@ n-are cum să apară la typecheck: `permission denied` nu e o eroare de tip.
 | 06 | **21** | Indexul de cursor măsurat la 10.000 de linii, nu la 100.000. Planul e însă independent de volum. |
 | 07 | **7** | Reluarea per parte există în client și merge; **întreruperea reală de rețea** cere Playwright. Singura verificare deschisă din pasul 07. |
 | 09 | — | Toate cele 24 sunt acoperite. |
-| 10 | **1–4, 8, 9, 19–28** | Cer restul ecranelor de teren (10c-3, 10c-4), raportul lunar (10d) și panoul PM (10e). |
-| 10 | **17, 18** | Acoperite de fișa de inspecție de teren: NOK cu ieșire impusă **local**, verificat pe date reale din rolul `app_field`. |
-| 10 | **12–15** | Playwright e instalat și jobul e blocant, dar măsoară doar **drumul până la ecran**. Fluxul complet până la salvare se măsoară pe măsură ce apar ecranele. |
+| 10 | **1–4, 8, 9, 19–28** | Cer `Jurnal` (10c-4), raportul lunar (10d) și panoul PM (10e). |
+| 10 | **17, 18** | **Acoperite** de fișa de inspecție de teren: NOK cu ieșire impusă **local**, verificat pe date reale din rolul `app_field`. |
+| 10 | **12–15** | **Măsurate cap-coadă** pentru `Necesar material` (3 tapuri), blocant în CI. Celelalte acțiuni de sub ＋ se măsoară pe măsură ce capătă ecran. |
+| 10 | **5–7, 10, 11, 16** | **Acoperite** de la 10a–10b: idempotență, oprirea cozii, retenție, felia sub 2 MB, zero lei la nivel de date. |
+
+### Cum te apuci de 10c-4, concret
+
+Sunt trei lucruri, în ordinea asta:
+
+1. **Tabela jurnalului.** Migrare nouă (`0033`), generată cu `pnpm db:generate` din schema Drizzle
+   și completată dedesubt de mână — **nu scrisă direct în SQL**, fiindcă schimbă schema. Coloane:
+   unitate de lucru, etapă (opțional), persoană, text, data consemnării. Plus RLS ca pe
+   `inspection_answers` (biroul tot, terenul „ale mele") și grant-uri. **Terenul are nevoie și de
+   `delete`** dacă serviciul rescrie setul — vezi ce a costat `0031`.
+2. **`journal.append` în `MUTATION_TYPES`**, cu schema lui în `MUTATION_PAYLOAD_SCHEMAS` și
+   executantul în `EXECUTORS`. Cele două locuri, nu un al treilea.
+3. **Ecranul**, sub `/field/jurnal` — există deja ruta, cu `EmptyState`. Se deschide gata de scris:
+   unitatea precompletată, cursorul în text, Trimite ca singur tap. Model bun de urmat:
+   `MaterialRequest`, care rezolvă exact aceeași constrângere.
+
+Și, înainte de ecran: **rulează mutația din rolul de teren**, cu payload-ul exact cum îl compune
+ecranul. Un test în `field-sync.test.ts`, lângă celelalte patru. Regula 2 de mai sus există fiindcă
+un pas întreg a trecut fără ea.
+
+Mai rămâne scheletul `Verificare SL` — `EmptyState`, ca `Utilaje și PV`, ca să nu ducă în 404.
 
 ### Datorii deschise, în ordinea în care le-aș lua
 
@@ -222,8 +276,9 @@ n-are cum să apară la typecheck: `permission denied` nu e o eroare de tip.
 
 **Datoria `pnpm db:generate` rămâne plătită.** Toate migrările care ating tabele au fost
 **generate** cu drizzle-kit și completate dedesubt de mână (triggere, RLS, grant-uri pe coloană).
-Cele care NU schimbă schema — `0022`, `0023`, `0027`, `0028`, `0030` — sunt scrise integral de
-mână, iar snapshot-urile lor sunt copii ale precedentului, ca lanțul drizzle-kit să rămână întreg.
+Cele care NU schimbă schema — `0022`, `0023`, `0027`, `0028`, `0030`, `0031`, `0032` — sunt scrise
+integral de mână, iar snapshot-urile lor sunt copii ale precedentului cu `id` nou și `prevId` legat,
+ca lanțul drizzle-kit să rămână întreg.
 **Nu scrie migrări de mână când schimbi tabele** — scrie schema Drizzle, generează, apoi
 completează dedesubt.
 
@@ -240,6 +295,10 @@ completează dedesubt.
 - **Martie 2026 e ÎNCHISĂ** pe dev, de la testul de închidere al pasului 06. Orice seed sau harness
   care presupune o lună anume trebuie să aleagă dintre cele deschise — prima variantă a seed-ului de
   fișe a picat exact pe asta.
+- **Baza de dev a fost reparată în loc o dată**, la `0032`: fișierul a fost rescris după ce fusese
+  deja înregistrat ca aplicat, iar migratorul l-a sărit tăcut. S-a rezolvat cu `drop … if exists`
+  plus `when` mărit în `_journal.json`. CI-ul a confirmat apoi că fișierul se aplică curat **de la
+  zero** — asta e dovada care contează, nu baza mea.
 - **300 de poze cu EXIF** (`teren-001.jpg` … `teren-300.jpg`) în folderul `Poze` al lucrării
   `01950000-…-000008000001`, cu miniaturile lor în `derived`. Se pot șterge oricând.
 - **Resturi de la harness-uri**: firme `Smoke06b …` / `Damina Fisiere …`, echipe și gestiuni
