@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { createRequestInputSchema } from './requests';
-import { createConsumptionNoteInputSchema } from './inventory';
 import {
   saveInspectionInputSchema,
   saveInterventionInputSchema,
@@ -24,18 +23,30 @@ import { uuidSchema } from './primitives';
 /**
  * Tipurile pe care le poate trimite terenul.
  *
- * Cele patru din faza asta au toate un use-case in spate. `journal.append`,
- * `sl.verify-line`, `equipment.request` si `equipment.observation` apar in
- * §3.5 ca ecrane, dar tabelele lor vin cu fazele 2 si 4 — pana atunci nu sunt
- * in lista, si asta e o alegere: un tip declarat fara executant ar fi acceptat
- * mutatii pe care nu le poate aplica nimeni, iar telefonul ar crede ca a
- * trimis.
+ * Fiecare are un use-case in spate SI un ecran care il produce. Regula are doua
+ * jumatati, si a doua a fost invatata scump:
+ *
+ *  - un tip **fara executant** ar accepta mutatii pe care nu le poate aplica
+ *    nimeni, iar telefonul ar crede ca a trimis;
+ *  - un tip **pe care rolul de teren nu-l poate rula** e la fel de rau. Asa a
+ *    stat `consumption.save` de la 10a pana la 10c-3: exista, avea executant,
+ *    era testat — dar toate testele lui rulau cu actor de birou, iar din rolul
+ *    `app_field` ar fi cazut cu 42501 la prima trimitere reala.
+ *
+ * `consumption.save` a fost SCOS, si nu din lipsa unui grant: emiterea bonului
+ * citeste CMP-ul gestiunii si scrie in registrul de cost, adica exact ce
+ * interzice regula „zero lei pe teren". Consumul pleaca de pe teren prin fisa de
+ * interventie, iar biroul il materializeaza la validare — drum care exista si e
+ * testat. Decizia utilizatorului, 19 august.
+ *
+ * `journal.append`, `sl.verify-line`, `equipment.request` si
+ * `equipment.observation` apar in §3.5 ca ecrane, dar tabelele lor vin cu
+ * fazele 2 si 4.
  */
 export const MUTATION_TYPES = [
   'inspection.save',
   'intervention.save',
   'timesheet.save',
-  'consumption.save',
   'material.request',
 ] as const;
 
@@ -46,7 +57,6 @@ export const MUTATION_PAYLOAD_SCHEMAS = {
   'inspection.save': saveInspectionInputSchema,
   'intervention.save': saveInterventionInputSchema,
   'timesheet.save': saveTimesheetInputSchema,
-  'consumption.save': createConsumptionNoteInputSchema,
   'material.request': createRequestInputSchema,
 } as const satisfies Record<MutationType, z.ZodTypeAny>;
 

@@ -148,7 +148,7 @@ Butonul ＋ deschide **cele 4 acțiuni frecvente**: Necesar material · Fișă d
 | `Intervenție` | complet (materiale din gestiunea echipei, ore, poze înainte/după) |
 | `Jurnal` | complet (text + poze pe etapă) |
 | `Necesar material` | complet, **în 3 tapuri** (cererea ajunge în coada de birou; procesarea e faza 3) |
-| `Bon de consum` | complet |
+| `Bon de consum` | **SCOS din pasul 10** (decizia utilizatorului, 19 august 2026). Emiterea bonului citește CMP-ul gestiunii și scrie în registrul de cost — terenul ar fi trebuit să poată citi prețuri, adică exact ce interzice regula 2 de mai sus. Consumul pleacă de pe teren **prin fișa de intervenție**, iar biroul îl materializează la validare: drum care există și e testat. Ce se pierde, spus pe față: consumul NElegat de o intervenție nu se poate emite de pe teren. |
 | `Pontaj` | complet (ziua împărțită pe mai multe UL) |
 | `Utilaje și PV` | schelet cu `EmptyState` — faza 4 |
 | `Verificare SL` | schelet cu `EmptyState` — faza 2 |

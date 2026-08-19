@@ -9,7 +9,7 @@ sunt consecințe.
 1. **Mutația își aduce propriul `id`**, UUID v7 generat pe telefon înainte să
    existe rețea. Un `id` deja aplicat întoarce rezultatul **memorat**, fără să
    reexecute nimic. Fără asta, un retry după un răspuns pierdut ar emite al
-   doilea bon de consum pentru același material.
+   doilea rând de material pe aceeași fișă.
 2. **Ordinea e per dispozitiv, secvențială.** Fișa se salvează înainte să fie
    validată; consumul, după ce există fișa. Două telefoane ale aceluiași om au
    cozi și cursoare independente.
@@ -129,10 +129,23 @@ Două locuri. Nu există un al treilea:
 > unde cel care a prins execuția vede `"8.0000"`. Două răspunsuri diferite pentru
 > aceeași mutație. Fiecare executant își declară forma de pe sârmă.
 
+Regula are **două** jumătăți, și a doua a fost învățată scump.
+
 Un tip declarat **fără** executant ar accepta mutații pe care nu le poate aplica
 nimeni, iar telefonul ar crede că a trimis. De asta `journal.append`,
 `sl.verify-line` și `equipment.*` nu sunt încă în listă: ecranele lor sunt
 prevăzute, tabelele vin cu fazele 2 și 4.
+
+Dar un tip **pe care rolul de teren nu-l poate rula** e la fel de rău. Așa a stat
+`consumption.save` de la 10a până la 10c-3: exista, avea executant, era testat —
+însă toate testele lui rulau cu actor de birou, iar din rolul `app_field` ar fi
+căzut cu 42501 la prima trimitere reală. A fost **scos**, și nu din lipsa unui
+grant: emiterea bonului citește CMP-ul gestiunii și scrie în registrul de cost,
+adică exact ce interzice „zero lei pe teren". Consumul pleacă de pe teren prin
+fișa de intervenție, iar biroul îl materializează la validare.
+
+**Deci: orice tip nou se testează din rolul de teren, pe date reale, înainte să
+fie declarat.** Nu din rolul de birou, care trece prin orice.
 
 ## Cum depanezi o coadă blocată
 
@@ -178,10 +191,12 @@ Se întâmplă și singur, la 90 de zile: `field.pruneMutations` (duminica, 01:0
 șterge jurnalul mai vechi de atât și cursoarele care n-au mai vorbit de atunci.
 
 **Prețul retenției, spus pe față:** după uitare, o mutație retrimisă se
-*reexecută*. Unde nu doare e la `timesheet.save`, idempotent pe cheia lui
-naturală (om, zi). Unde ar durea e `consumption.save`, care ar emite al doilea
-bon. De asta 90 de zile e o alegere: peste ea, telefonul face pull complet și își
-golește coada, în loc s-o retrimită.
+*reexecută*. Unde nu doare e la `timesheet.save`, `inspection.save` și
+`intervention.save`: toate trei **rescriu** setul lor de linii, deci a doua
+execuție dă exact același rezultat. Unde ar durea e `material.request`, care ar
+naște a doua cerere în coada biroului — supărător, dar vizibil și reversibil, nu
+o mișcare de stoc fantomă. De asta 90 de zile e o alegere: peste ea, telefonul
+face pull complet și își golește coada, în loc s-o retrimită.
 
 ## Limita de rată
 

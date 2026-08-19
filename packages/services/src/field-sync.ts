@@ -11,7 +11,6 @@ import { AppError } from '@damina/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { saveInspection } from './inspections';
 import { saveIntervention } from './interventions';
-import { createConsumptionNote } from './inventory';
 import { createRequest } from './requests';
 import { saveTimesheet } from './timesheets';
 
@@ -70,10 +69,6 @@ const EXECUTORS: Readonly<Record<MutationType, Executor>> = {
   'timesheet.save': async (actor, payload) => {
     const result = await saveTimesheet(actor, payload as never);
     return { id: result.id, totalHours: result.totalHours.toDbString() };
-  },
-  'consumption.save': async (actor, payload) => {
-    const note = await createConsumptionNote(actor, payload as never);
-    return { id: note.id, number: note.number, total: note.total.toDbString() };
   },
   'material.request': async (actor, payload) => {
     const request = await createRequest(actor, payload as never);

@@ -228,21 +228,52 @@ const timesheetMutation = (base: Ground, id: string) => ({
   createdAt: at(0),
 });
 
-const consumptionMutation = (base: Ground, id: string, quantity: string, seconds: number) => ({
+/**
+ * O interventie a mea, gata de completat.
+ *
+ * A inlocuit bonul de consum in testele de coada, si nu din intamplare:
+ * `consumption.save` a fost scos din `MUTATION_TYPES` la 10c-3. Testele lui
+ * rulau cu `officeActor()` si de asta n-au aratat niciodata ca din rolul de
+ * teren drumul cadea cu 42501 — emiterea bonului citeste CMP si scrie in
+ * registrul de cost, adica exact ce n-are voie terenul.
+ *
+ * De aici incolo, **toate** testele de coada folosesc actorul de teren.
+ */
+async function interventionGround(base: Ground): Promise<string> {
+  const workUnitId = uuidv7();
+  const tag = workUnitId.slice(-8);
+
+  await withActor(officeActor('interventie de coada'), async (tx) => {
+    const link = await tx.execute<{ id: string }>(sql`
+      select id from app.contract_objectives where objective_id = ${base.objectiveId} limit 1`);
+    await tx.execute(sql`
+      insert into app.work_units
+        (id, company_id, type, code, name, objective_id, contract_objective_id, status, starts_on)
+      values (${workUnitId}, ${base.companyId}, 'interventie', ${`V-${tag}`}, 'Interventia de coada',
+              ${base.objectiveId}, ${link.rows[0]?.id ?? null}, 'in_executie', ${base.workDate})`);
+    await tx.execute(sql`
+      insert into app.work_unit_assignments (id, work_unit_id, person_id, role)
+      values (${uuidv7()}, ${workUnitId}, ${base.personId}, 'echipa')`);
+  });
+
+  return workUnitId;
+}
+
+/**
+ * O mutatie de interventie. Cu `workUnitId` inexistent, pica cu `NOT_FOUND` —
+ * adica o eroare de BUSINESS, exact ce trebuie ca sa se vada oprirea cozii.
+ */
+const interventionMutation = (workUnitId: string, id: string, seconds: number) => ({
   id,
-  type: 'consumption.save' as const,
+  type: 'intervention.save' as const,
   payload: {
-    companyId: base.companyId,
-    series: 'BC',
-    locationId: base.locationId,
-    workUnitId: base.workUnitId,
-    stageId: base.stageId,
-    contractId: base.contractId,
-    componentId: base.componentId,
-    objectiveId: base.objectiveId,
-    documentDate: base.workDate,
-    effectDate: base.workDate,
-    lines: [{ productId: base.productId, lotId: '', quantity }],
+    workUnitId,
+    description: 'Completata de pe teren.',
+    operationId: '',
+    teamId: '',
+    declaredHours: '2',
+    materials: [],
+    hours: [],
   },
   createdAt: at(seconds),
 });
@@ -432,17 +463,19 @@ describe('sincronizarea de teren', () => {
 
   it('coada se oprește la prima eroare de business și nu sare peste ea (#7)', async () => {
     const base = await ground();
+    const field = fieldFor(base.personId, base.companyId);
+    const mine = await interventionGround(base);
     const good = uuidv7();
     const bad = uuidv7();
     const after = uuidv7();
 
-    // Consumul e drept de birou; aici se testează MOTORUL, nu poarta.
-    const batch = await pushMutations(officeActor(), {
+    const batch = await pushMutations(field, {
       deviceId: 'telefon-2',
       mutations: [
-        consumptionMutation(base, good, '2', 10),
-        consumptionMutation(base, bad, '999', 20),
-        consumptionMutation(base, after, '1', 30),
+        interventionMutation(mine, good, 10),
+        // Unitate inexistenta: `NOT_FOUND`, deci eroare de business, nu de retea.
+        interventionMutation(uuidv7(), bad, 20),
+        interventionMutation(mine, after, 30),
       ],
     });
 
@@ -454,26 +487,29 @@ describe('sincronizarea de teren', () => {
     expect(batch.blocked).toBe(true);
     expect(batch.outcomes[1]?.message ?? '').not.toBe('');
 
-    const notes = await withActor(officeActor(), async (tx) =>
-      tx.execute<{ n: string }>(sql`
-        select count(*)::text as n from app.consumption_notes where work_unit_id = ${base.workUnitId}`),
+    // Cea dinaintea erorii CHIAR s-a scris: oprirea nu da inapoi ce a mers.
+    const saved = await withActor(officeActor(), async (tx) =>
+      tx.execute<{ description: string | null }>(sql`
+        select description from app.interventions where work_unit_id = ${mine}`),
     );
-    expect(notes.rows[0]?.n).toBe('1');
+    expect(saved.rows[0]?.description).toBe('Completata de pe teren.');
   });
 
   it('o mutație respinsă rămâne respinsă, fără să se reexecute', async () => {
     const base = await ground();
+    const field = fieldFor(base.personId, base.companyId);
     const bad = uuidv7();
+    const missing = uuidv7();
 
-    const first = await pushMutations(officeActor(), {
+    const first = await pushMutations(field, {
       deviceId: 'telefon-3',
-      mutations: [consumptionMutation(base, bad, '999', 10)],
+      mutations: [interventionMutation(missing, bad, 10)],
     });
     expect(first.outcomes[0]?.status).toBe('failed');
 
-    const again = await pushMutations(officeActor(), {
+    const again = await pushMutations(field, {
       deviceId: 'telefon-3',
-      mutations: [consumptionMutation(base, bad, '999', 10)],
+      mutations: [interventionMutation(missing, bad, 10)],
     });
     expect(again.outcomes[0]?.status).toBe('failed');
     expect(again.outcomes[0]?.message).toBe(first.outcomes[0]?.message);
@@ -481,15 +517,17 @@ describe('sincronizarea de teren', () => {
 
   it('mutațiile se aplică în ordinea creării, nu în cea din listă', async () => {
     const base = await ground();
+    const field = fieldFor(base.personId, base.companyId);
+    const mine = await interventionGround(base);
     const first = uuidv7();
     const second = uuidv7();
 
     // Trimise invers: cea de la secunda 30 înaintea celei de la 10.
-    const batch = await pushMutations(officeActor(), {
+    const batch = await pushMutations(field, {
       deviceId: 'telefon-4',
       mutations: [
-        consumptionMutation(base, second, '999', 30),
-        consumptionMutation(base, first, '2', 10),
+        interventionMutation(uuidv7(), second, 30),
+        interventionMutation(mine, first, 10),
       ],
     });
 
@@ -504,7 +542,7 @@ describe('sincronizarea de teren', () => {
     const base = await ground();
     const broken = uuidv7();
 
-    const batch = await pushMutations(officeActor(), {
+    const batch = await pushMutations(fieldFor(base.personId, base.companyId), {
       deviceId: 'telefon-5',
       mutations: [
         {
