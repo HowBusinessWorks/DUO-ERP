@@ -40,9 +40,10 @@ Detaliile, în intrările de jurnal ale fiecărei bucăți.
 | **01–07** | Gata. |
 | **08** | Gata pe **08a** (schemă, domain, servicii) și **08b** (ecrane). **08c e SĂRIT dinadins** — decizia utilizatorului, vezi secțiunea lui mai jos. Din 08c există doar expirarea propunerilor. |
 | **09** | **Gata, tot** — 09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon de consum · 09b-4 acoperire, istoric, validare în masă, seed. Toate cele 24 de verificări acoperite. |
-| **10** | **10a**, **10b**, **10c-1**, **10c-2**, **10c-3** gata. Rămân **10c-4, 10d, 10e**. |
+| **10** | **10a**, **10b**, **10c** (tot, inclusiv 10c-4) și **10e** gata. Rămâne **10d — raportul lunar**. |
 
-**Următorul lucru de făcut e 10c-4: `Jurnal` (cu tabela lui) și scheletul `Verificare SL`.**
+**Următorul lucru de făcut e 10d: raportul lunar către client.** Cu el, pasul 10 e închis, iar
+faza 1 e completă.
 
 ### Pasul 10, tăiat în cinci — iar 10c în patru
 
@@ -63,9 +64,11 @@ jumătatea unui pas. Aceeași convenție a mers la 09.
     terenul nu putea salva nimic (vezi jurnalul).
   - **10c-3**: GATA. `Necesar material` (trei tapuri, **măsurate cap-coadă**) și `Pontaj`.
     `Bon de consum` a fost **scos din pasul 10** — vezi mai jos de ce.
-  - **10c-4**: `Jurnal` (cu tabela lui), plus măsurarea bugetului pe toate cele patru acțiuni.
+  - **10c-4**: GATA. `Jurnal de șantier` — tabela `app.journal_entries` (migrarea `0033`),
+    `journal.append` cu executantul lui, ecranul în 3 tapuri, plus scheletul `Verificare SL`.
 - **10d — raportul lunar** către client: migrare, coadă cu progres real, versionare și îngheț.
-- **10e — panoul PM** cu gauge-ul Delta.
+  **SINGURUL rămas.**
+- **10e — panoul PM** cu gauge-ul Delta: GATA (commit `3a67299`).
 
 ### Ce trebuie să știi ca să începi 10c-4
 
@@ -102,9 +105,9 @@ jumătatea unui pas. Aceeași convenție a mers la 09.
 | `Necesar material` | **Gata.** Trei tapuri cap-coadă, măsurate în CI. | 10c-3 |
 | `Pontaj` | **Gata.** Ziua împărțită pe mai multe UL. | 10c-3 |
 | `Bon de consum` | **Scos din pasul 10.** Consumul pleacă prin fișa de intervenție. | — |
-| `Jurnal` | **Tot, și tabela.** Singurul ecran de scris care a rămas. | 10c-4 |
+| `Jurnal` | **Gata.** Text liber, etapă opțională, poze, 3 tapuri măsurate. | 10c-4 |
 | `Utilaje și PV` | **Gata** ca schelet final de fază 4. | 10c-1 |
-| `Verificare SL` | Schelet cu `EmptyState`, încă nescris. Faza 2. | 10c-4 |
+| `Verificare SL` | **Gata** ca schelet final de fază 2. | 10c-4 |
 
 **Bugetul de tapuri e deja pe jumătate cheltuit înainte să se deschidă ecranul.** ＋ costă un tap,
 alegerea acțiunii încă unul. Ținta e 3, pragul de cădere 4 — deci un ecran de sub ＋ are voie la
@@ -235,31 +238,29 @@ n-are cum să apară la typecheck: `permission denied` nu e o eroare de tip.
 | 06 | **21** | Indexul de cursor măsurat la 10.000 de linii, nu la 100.000. Planul e însă independent de volum. |
 | 07 | **7** | Reluarea per parte există în client și merge; **întreruperea reală de rețea** cere Playwright. Singura verificare deschisă din pasul 07. |
 | 09 | — | Toate cele 24 sunt acoperite. |
-| 10 | **1–4, 8, 9, 19–28** | Cer `Jurnal` (10c-4), raportul lunar (10d) și panoul PM (10e). |
+| 10 | **20–26** | Cer raportul lunar (10d). Restul pasului e acoperit. |
 | 10 | **17, 18** | **Acoperite** de fișa de inspecție de teren: NOK cu ieșire impusă **local**, verificat pe date reale din rolul `app_field`. |
-| 10 | **12–15** | **Măsurate cap-coadă** pentru `Necesar material` (3 tapuri), blocant în CI. Celelalte acțiuni de sub ＋ se măsoară pe măsură ce capătă ecran. |
+| 10 | **12–15** | **Măsurate cap-coadă** pentru `Necesar material` și `Jurnal` (3 tapuri fiecare), blocant în CI. Celelalte două acțiuni de sub ＋ se măsoară când capătă ecran propriu. |
 | 10 | **5–7, 10, 11, 16** | **Acoperite** de la 10a–10b: idempotență, oprirea cozii, retenție, felia sub 2 MB, zero lei la nivel de date. |
 
-### Cum te apuci de 10c-4, concret
+### Cum te apuci de 10d, concret
 
-Sunt trei lucruri, în ordinea asta:
+Planul e §3.6, iar verificările sunt #20–26. Ordinea care ține:
 
-1. **Tabela jurnalului.** Migrare nouă (`0033`), generată cu `pnpm db:generate` din schema Drizzle
-   și completată dedesubt de mână — **nu scrisă direct în SQL**, fiindcă schimbă schema. Coloane:
-   unitate de lucru, etapă (opțional), persoană, text, data consemnării. Plus RLS ca pe
-   `inspection_answers` (biroul tot, terenul „ale mele") și grant-uri. **Terenul are nevoie și de
-   `delete`** dacă serviciul rescrie setul — vezi ce a costat `0031`.
-2. **`journal.append` în `MUTATION_TYPES`**, cu schema lui în `MUTATION_PAYLOAD_SCHEMAS` și
-   executantul în `EXECUTORS`. Cele două locuri, nu un al treilea.
-3. **Ecranul**, sub `/field/jurnal` — există deja ruta, cu `EmptyState`. Se deschide gata de scris:
-   unitatea precompletată, cursorul în text, Trimite ca singur tap. Model bun de urmat:
-   `MaterialRequest`, care rezolvă exact aceeași constrângere.
+1. **Migrarea `0024_monthly_reports`** (numerotată `0034` în lanțul real): `app.monthly_reports` +
+   `app.monthly_report_versions`, cu `unique (contract_id, period_id)` și `unique (report_id,
+   version)`. Generată cu `pnpm db:generate`, RLS și grant-uri scrise dedesubt.
+2. **Coada `reports.monthly`** în worker, cu `singletonKey` pe raport (#26) și progres real prin
+   `job_progress` (#20) — ecranul arată „312 din 480 poze", nu spinner.
+3. **Ecranul**: fișe incluse, poze, **fișe nevalidate ca „neincluse ⚠" cu link** (#21), șablon,
+   apoi `Generează → Aprobă intern → Îngheață și trimite`.
+4. **Îngheț și versionare** (#22–24): v1 înghețată, artefact în `damina-archive` + nod în folderul
+   contractului; o fișă modificată după îngheț NU rescrie raportul; regenerarea face v2.
+5. **Raport web cu link tokenizat** (#25) și blocajul facturii de mentenanță până la aprobarea
+   internă.
 
-Și, înainte de ecran: **rulează mutația din rolul de teren**, cu payload-ul exact cum îl compune
-ecranul. Un test în `field-sync.test.ts`, lângă celelalte patru. Regula 2 de mai sus există fiindcă
-un pas întreg a trecut fără ea.
-
-Mai rămâne scheletul `Verificare SL` — `EmptyState`, ca `Utilaje și PV`, ca să nu ducă în 404.
+Jurnalul de șantier intră în numărătoarea raportului: `app.journal_entries` există de la 10c-4 și
+n-are încă niciun cititor — 10d e primul.
 
 ### Datorii deschise, în ordinea în care le-aș lua
 
@@ -488,6 +489,47 @@ smoke aruncabile, pe dev, cu bucket real. **Așa au ieșit la iveală toate defe
 - Testul de integrare (`packages/services/tests/pm-panel.test.ts`, verificările #27 și #28) e
   scris, dar **nu a putut fi rulat local** — nu există Docker pe mașina de dezvoltare și nici
   `TEST_DATABASE_URL`. Rulează în CI, la `test:db`.
+
+---
+
+## 10c-4 — jurnalul de șantier (19 august 2026)
+
+### Ce a intrat
+
+- **`app.journal_entries`** (migrarea `0033`): unitate de lucru, etapă opțională, persoană, text,
+  data consemnării. **Append-only pentru toată lumea** — `update` și `delete` nu se acordă nimănui,
+  nici biroului, nici lui `app_service`. O corectură se scrie ca intrare nouă, cu data ei; un
+  jurnal care se poate rescrie nu mai e o consemnare, ci o părere de acum despre ce a fost atunci.
+- **`journal.append`** în `MUTATION_TYPES`, cu schema în `MUTATION_PAYLOAD_SCHEMAS` și executantul
+  în `EXECUTORS` — cele două locuri, nu un al treilea.
+- **Ecranul `/field/jurnal`**, în locul scheletei: unitate precompletată, data de azi, cursorul în
+  text, `PhotoCapture` pentru poze. **Trei tapuri cap-coadă**, măsurate în `tap-budget.spec.ts`
+  lângă cel al necesarului, pe felia fabricată din `e2e/support/slice.ts`.
+- **Scheletul `Verificare SL`** (`/field/verificare-sl`), `EmptyState`, ca `Utilaje și PV`.
+
+### Decizii
+
+1. **Cine consemnează vine din `actor.personId`, nu din payload.** Un `personId` de pe sârmă ar fi
+   însemnat că se poate scrie în jurnal în numele altuia — exact ce trebuie să nu se poată.
+2. **Poza n-are coloană în tabelă.** Pleacă prin coada `media`, în folderul unității, ca peste tot
+   pe teren. O a doua legătură ar fi însemnat două adevăruri despre același fișier.
+3. **Fără audit pe tabelă.** `attach_audit` ar produce același jurnal a doua oară: e append-only și
+   își poartă autorul și momentul pe rând. Același motiv ca la `stock_movements` (0026).
+4. **Etapa e opțională și pornește goală**, iar `select`-ul apare doar dacă lucrarea are etape. Un
+   câmp obligatoriu în plus ar fi rupt pragul de tapuri, iar testul ar fi căzut.
+5. **Fără `grant delete`**, spre deosebire de `inspection_answers` la 0031: serviciul adaugă, nu
+   rescrie un set. Idempotența la retrimitere o dă `app.applied_mutations` — și `journal.append` e
+   singurul tip fără cheie naturală, deci e singurul care depinde strict de ea.
+
+### Regula 1 și 2, aplicate înainte de ecran
+
+Mutația a fost rulată **din rolul `app_field`, pe baza de dev**, cu payload-ul exact cum îl compune
+ecranul (`stageId` ca șir gol): aplicată, retrimiterea a ieșit `duplicate`, iar rândul se vede prin
+RLS din același rol. **Al patrusprezecelea defect tăcut nu a existat** — prima dată când drumul de
+teren merge din prima. Migrarea `0033` e aplicată pe dev.
+
+Testele: două noi în `field-sync.test.ts` (a doua consemnare se adaugă, nu rescrie; retrimiterea nu
+dublează), plus testul de tapuri în `e2e/field/tap-budget.spec.ts`. `test:db` rulează în CI.
 
 ---
 
@@ -1543,7 +1585,7 @@ Ce ți-a lăsat pasul 07 și îți va folosi:
 | 07 — File management (R2) | 🟩 **gata** (07a–07c-2; 20/21 — #7 cere Playwright pentru întreruperea reală de rețea) | 2026-08-18 |
 | 08 — Cereri, rutare, backlog | 🟨 în lucru (08a + 08b gata; **08c SĂRIT dinadins** — decizia utilizatorului) | 2026-08-18 |
 | 09 — Fișe de lucru | 🟩 **gata** (09a fundația · 09b-1 inspecția · 09b-2 intervenția · 09b-3 pontaj, stoc, bon · 09b-4 acoperire, istoric, validare în masă, seed; 24/24) | 2026-08-18 |
-| 10 — Teren offline, raport lunar | 🟨 în lucru (**10a** sincronizarea și **10b** PWA-ul offline: gata; **10c** ecranele, **10d** raportul, **10e** panoul PM: neatinse) | 2026-08-18 |
+| 10 — Teren offline, raport lunar | 🟨 în lucru (**10a**, **10b**, **10c** ecranele, **10e** panoul PM: gata; **10d** raportul lunar: neatins) | 2026-08-19 |
 
 Legendă: ⬜ neînceput · 🟨 în lucru · 🟩 gata (toate verificările din pas trec) · 🟥 blocat
 

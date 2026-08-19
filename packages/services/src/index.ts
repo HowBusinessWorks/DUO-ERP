@@ -415,6 +415,8 @@ export type {
   FieldWorkUnit,
 } from './field-snapshot';
 
+export { appendJournalEntry } from './journal';
+
 export { markPulled, pruneAppliedMutations, pushMutations, readCursor } from './field-sync';
 export type { PushResult, SyncCursor } from './field-sync';
 

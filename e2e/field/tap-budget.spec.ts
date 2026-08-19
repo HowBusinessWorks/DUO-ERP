@@ -14,12 +14,13 @@ import { installTapCounter, resetTaps, taps } from '../support/taps';
  * dar uita-te ce ai facut", nu „e in regula".
  *
  * **Ce se masoara acum:** drumul de la `Azi` pana la ecranul unei actiuni
- * frecvente. Sunt doua tapuri — ＋ si actiunea — si asta e tot ce se poate
- * masura cat timp ecranele de sub ＋ inca se construiesc. Restul bugetului
- * (completarea si trimiterea) se masoara pe fiecare ecran, cand exista: la
- * `Necesar material`, cele doua tapuri ramase sunt tot bugetul, si de asta
- * ecranul trebuie sa se deschida cu gestiunea si produsele precompletate din
- * felie, nu cu un formular gol.
+ * frecvente (doua tapuri — ＋ si actiunea) SI fluxul cap-coada al celor doua
+ * actiuni care au ecran real: `Necesar material` si `Jurnal`. Amandoua trebuie
+ * sa incapa in trei, deci fiecare se deschide cu tot ce se poate ghici deja
+ * completat — unitate, data, cursor in camp — nu cu un formular gol.
+ *
+ * Celelalte doua de sub ＋ (`Fisa de interventie`, `Solicita utilaj`) se masoara
+ * cap-coada cand capata ecran propriu sub buton.
  */
 
 /** Peste atat, testul cade. Nu e o convenite de test, e regula din §0. */
@@ -66,6 +67,28 @@ test.describe('bugetul de tapuri pe teren', () => {
     // scrisul nu costa un tap si alegerea lucrarii nu costa niciunul.
     await page.getByTestId('material-text').fill('20 m teava PEHD 63, 4 coliere');
     await page.getByTestId('send-request').click();
+
+    await expect(page.getByRole('heading', { name: 'Azi' })).toBeVisible();
+
+    const used = await taps(page);
+    expect(used).toBe(3);
+    expect(used).toBeLessThanOrEqual(MAX_TAPS);
+  });
+
+  test('jurnalul de santier pleaca in trei atingeri, cap-coada', async ({ page }) => {
+    await page.goto('/field');
+    await expect(page.getByText('Lucrarea de test')).toBeVisible();
+
+    await resetTaps(page);
+
+    await page.getByTestId('quick-actions-toggle').click();
+    await page.getByRole('link', { name: 'Adaugă în jurnal' }).click();
+
+    // Unitatea e precompletata, data e azi, campul e focalizat, iar etapa nu
+    // apare deloc cat timp lucrarea n-are etape. Fiecare dintre ele ar fi fost
+    // „corect" ca formular si ar fi costat cate un tap.
+    await page.getByTestId('journal-text').fill('Turnat radier zona 2, oprit 2 ore de ploaie');
+    await page.getByTestId('send-journal').click();
 
     await expect(page.getByRole('heading', { name: 'Azi' })).toBeVisible();
 

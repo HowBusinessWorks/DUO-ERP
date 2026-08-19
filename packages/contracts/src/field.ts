@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { appendJournalEntryInputSchema } from './journal';
 import { createRequestInputSchema } from './requests';
 import {
   saveInspectionInputSchema,
@@ -39,15 +40,15 @@ import { uuidSchema } from './primitives';
  * interventie, iar biroul il materializeaza la validare — drum care exista si e
  * testat. Decizia utilizatorului, 19 august.
  *
- * `journal.append`, `sl.verify-line`, `equipment.request` si
- * `equipment.observation` apar in §3.5 ca ecrane, dar tabelele lor vin cu
- * fazele 2 si 4.
+ * `sl.verify-line`, `equipment.request` si `equipment.observation` apar in §3.5
+ * ca ecrane, dar tabelele lor vin cu fazele 2 si 4.
  */
 export const MUTATION_TYPES = [
   'inspection.save',
   'intervention.save',
   'timesheet.save',
   'material.request',
+  'journal.append',
 ] as const;
 
 export type MutationType = (typeof MUTATION_TYPES)[number];
@@ -58,6 +59,7 @@ export const MUTATION_PAYLOAD_SCHEMAS = {
   'intervention.save': saveInterventionInputSchema,
   'timesheet.save': saveTimesheetInputSchema,
   'material.request': createRequestInputSchema,
+  'journal.append': appendJournalEntryInputSchema,
 } as const satisfies Record<MutationType, z.ZodTypeAny>;
 
 /**

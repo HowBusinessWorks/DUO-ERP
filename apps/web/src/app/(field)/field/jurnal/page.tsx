@@ -1,25 +1,20 @@
-import { EmptyState } from '@damina/ui';
-import { BookText } from 'lucide-react';
+import { JournalEntry } from '../../../../components/field/journal-entry';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * `Jurnal de șantier` — una dintre cele patru actiuni de sub butonul ＋.
+ * `Jurnal de șantier` — una dintre cele patru acțiuni de sub butonul ＋.
  *
- * Jurnalul n-are inca tabela, deci nici mutatie: `journal.append` NU e in `MUTATION_TYPES`, dinadins — un tip fara executant ar fi acceptat mutatii pe care nu le poate aplica nimeni, iar telefonul ar fi crezut ca a trimis. Tabela + mutatia + ecranul vin impreuna, la 10c-4.
- *
- * Ruta exista de pe acum fiindca butonul ＋ o arata: o actiune care duce in 404
- * e mai rea decat una care spune cinstit ce urmeaza.
+ * Tabela (`app.journal_entries`, migrarea `0033`), mutația (`journal.append`) și
+ * ecranul au intrat împreună, la 10c-4: un tip de mutație fără executant ar fi
+ * acceptat mutații pe care nu le poate aplica nimeni, iar telefonul ar fi crezut
+ * că a trimis.
  */
 export default function FieldJournalPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-semibold">Jurnal de șantier</h1>
-      <EmptyState
-        icon={<BookText className="size-5" aria-hidden />}
-        title="Ecranul se pregătește"
-        body="Aici se va scrie ce s-a întâmplat pe șantier, cu poze pe etapă. Până atunci, ce e de consemnat intră în observațiile fișei."
-      />
+      <JournalEntry />
     </div>
   );
 }

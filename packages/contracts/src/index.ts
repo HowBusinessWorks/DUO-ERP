@@ -254,6 +254,9 @@ export type {
   LocationType,
 } from './inventory';
 
+export { appendJournalEntryInputSchema } from './journal';
+export type { AppendJournalEntryInput } from './journal';
+
 export {
   MAX_MUTATIONS_PER_PUSH,
   MUTATION_PAYLOAD_SCHEMAS,

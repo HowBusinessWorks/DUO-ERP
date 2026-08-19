@@ -10,6 +10,7 @@ import { schema, withActor, type Actor } from '@damina/db';
 import { AppError } from '@damina/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { saveInspection } from './inspections';
+import { appendJournalEntry } from './journal';
 import { saveIntervention } from './interventions';
 import { createRequest } from './requests';
 import { saveTimesheet } from './timesheets';
@@ -73,6 +74,16 @@ const EXECUTORS: Readonly<Record<MutationType, Executor>> = {
   'material.request': async (actor, payload) => {
     const request = await createRequest(actor, payload as never);
     return { id: request.id };
+  },
+  /*
+   * Jurnalul ADAUGA, nu rescrie — singurul tip de aici care nu are o cheie
+   * naturala pe care sa fie idempotent de la sine. Ce-l tine sa nu produca a
+   * doua consemnare identica la o retrimitere e strict `app.applied_mutations`,
+   * si de asta id-ul mutatiei se genereaza pe telefon, inainte sa existe retea.
+   */
+  'journal.append': async (actor, payload) => {
+    const entry = await appendJournalEntry(actor, payload as never);
+    return { id: entry.id };
   },
 };
 

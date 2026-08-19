@@ -461,6 +461,100 @@ describe('sincronizarea de teren', () => {
     expect(saved.rows[0]?.estimated).toBeNull();
   });
 
+  it('jurnalul de șantier pleacă din teren, exact cum îl compune ecranul', async () => {
+    const base = await ground();
+    const field = fieldFor(base.personId, base.companyId);
+
+    /*
+     * Ecranul trimite `stageId` ca șir GOL când lucrarea n-are etapă aleasă, iar
+     * data e cea de pe telefon. Ambele intră aici exact în forma aia: regula 2 a
+     * pasului spune că un tip de mutație nu se declară până nu s-a trimis o dată
+     * din rolul `app_field`, cu payload-ul ecranului, nu cu unul curățat de test.
+     */
+    const first = await pushMutations(field, {
+      deviceId: 'telefon-J',
+      mutations: [
+        {
+          id: uuidv7(),
+          type: 'journal.append',
+          payload: {
+            workUnitId: base.workUnitId,
+            stageId: '',
+            entryDate: base.workDate,
+            text: 'Turnat radier zona 2, oprit 2 ore de ploaie.',
+          },
+          createdAt: at(0),
+        },
+      ],
+    });
+    expect(first.outcomes[0]?.status).toBe('applied');
+
+    // A doua consemnare, cu etapă: se ADAUGĂ, nu rescrie prima.
+    const second = await pushMutations(field, {
+      deviceId: 'telefon-J',
+      mutations: [
+        {
+          id: uuidv7(),
+          type: 'journal.append',
+          payload: {
+            workUnitId: base.workUnitId,
+            stageId: base.stageId,
+            entryDate: base.workDate,
+            text: 'Reluat după ploaie.',
+          },
+          createdAt: at(1),
+        },
+      ],
+    });
+    expect(second.outcomes[0]?.status).toBe('applied');
+
+    const rows = await withActor(officeActor(), async (tx) =>
+      tx.execute<{ text: string; stage_id: string | null; person_id: string }>(sql`
+        select text, stage_id, person_id from app.journal_entries
+         where work_unit_id = ${base.workUnitId}
+         order by created_at`),
+    );
+    expect(rows.rows).toHaveLength(2);
+    expect(rows.rows[0]?.stage_id).toBeNull();
+    expect(rows.rows[1]?.stage_id).toBe(base.stageId);
+    // Cine consemnează vine din sesiune, nu din payload — ecranul nici nu-l trimite.
+    expect(rows.rows[0]?.person_id).toBe(base.personId);
+  });
+
+  it('jurnalul retrimis nu produce a doua consemnare identică', async () => {
+    const base = await ground();
+    const field = fieldFor(base.personId, base.companyId);
+
+    /*
+     * `journal.append` e singurul tip fără cheie naturală: nu are pe ce să fie
+     * idempotent de la sine, cum e pontajul pe (om, zi). Ce-l ține e strict
+     * jurnalul de mutații — iar dacă ar dispărea, o cădere de rețea la
+     * jumătatea cererii ar dubla tăcut consemnarea.
+     */
+    const mutation = {
+      id: uuidv7(),
+      type: 'journal.append' as const,
+      payload: {
+        workUnitId: base.workUnitId,
+        stageId: '',
+        entryDate: base.workDate,
+        text: 'Aceeași consemnare, trimisă de două ori.',
+      },
+      createdAt: at(0),
+    };
+
+    await pushMutations(field, { deviceId: 'telefon-K', mutations: [mutation] });
+    const again = await pushMutations(field, { deviceId: 'telefon-K', mutations: [mutation] });
+    expect(again.outcomes[0]?.status).toBe('duplicate');
+
+    const count = await withActor(officeActor(), async (tx) =>
+      tx.execute<{ n: string }>(sql`
+        select count(*)::text as n from app.journal_entries
+         where work_unit_id = ${base.workUnitId}`),
+    );
+    expect(count.rows[0]?.n).toBe('1');
+  });
+
   it('coada se oprește la prima eroare de business și nu sare peste ea (#7)', async () => {
     const base = await ground();
     const field = fieldFor(base.personId, base.companyId);
