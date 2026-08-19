@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@damina/shared": "workspace:*",
-    "zod": "^3.25.56"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@damina/tsconfig": "workspace:*",
