@@ -13,8 +13,8 @@
     "ensure:buckets": "tsx scripts/ensure-buckets.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.821.0",
-    "@aws-sdk/s3-request-presigner": "^3.821.0",
+    "@aws-sdk/client-s3": "^3.1121.0",
+    "@aws-sdk/s3-request-presigner": "^3.1121.0",
     "@damina/shared": "workspace:*",
     "dotenv": "^16.5.0"
   },
