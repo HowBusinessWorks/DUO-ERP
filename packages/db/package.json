@@ -20,16 +20,16 @@
   "dependencies": {
     "@damina/shared": "workspace:*",
     "dotenv": "^16.5.0",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.3",
     "pg": "^8.16.0"
   },
   "devDependencies": {
     "@damina/tsconfig": "workspace:*",
     "@testcontainers/postgresql": "^11.0.3",
     "@types/node": "^22.15.30",
-    "@types/pg": "^8.15.4",
-    "drizzle-kit": "^0.31.1",
-    "tsx": "^4.19.4",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
     "typescript": "^5.8.3",
     "vitest": "^3.2.3"
   }
